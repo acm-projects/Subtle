@@ -1,3 +1,7 @@
+<div align="center">
+  <img src = "https://media1.tenor.com/m/stj1QfW0sRcAAAAd/only-yesterday-ghibli.gif">
+</div>
+
 # Subtle 🏡
 
 Finding short-term housing as a student intern can mean scrolling through Facebook groups, scattered spreadsheets, and public marketplaces with uncertain listings. Subtle is a student-focused relocation platform for college students moving for internships, co-ops, or summer programs.
@@ -95,11 +99,9 @@ The platform brings together a housing marketplace, apartment intelligence, and 
 
 ## Competitors ⚔️
 
-Alternatives considered in the feasibility report:
-
-- **Facebook Housing Groups:** Subtle aims to add .edu verification and apartment intelligence to the housing search experience.
-- **Ohana:** Subtle's planned focus is student interns, with social connections alongside housing listings.
-- **Urbanbound:** Subtle targets students moving for internships, co-ops, and summer programs, with housing and intern discovery in one platform.
+- **Facebook Housing Groups:** Subtle adds .edu verification, searchable listings, and apartment scores to make finding student housing easier.
+- **Ohana:** Subtle goes beyond finding housing by helping interns meet potential roommates and build connections nearby.
+- **Urbanbound:** Subtle puts student needs first, bringing short-term housing, commute insights, and intern connections into one place.
 
 ## Git Cheatsheet 📓
 
@@ -124,6 +126,21 @@ Alternatives considered in the feasibility report:
 | `git fetch` | Fetch remote changes without merging |
 | `git reset --hard HEAD` | Discard uncommitted changes to tracked files |
 | `git revert <commit>` | Create a new commit that reverses a commit's changes |
+
+## Conventional Commits ✍️
+
+Use `type: short description` for commit messages. Add an optional scope to show which part of the project changed: `type(scope): short description`.
+
+| Type | When to use it | Example |
+| --- | --- | --- |
+| `feat` | Add a feature | `feat(listings): add price filters` |
+| `fix` | Fix a bug | `fix(auth): handle expired sessions` |
+| `docs` | Update documentation | `docs: update setup instructions` |
+| `refactor` | Restructure code without changing behavior | `refactor: simplify scoring function` |
+| `test` | Add or update tests | `test: cover listing search` |
+| `chore` | Maintain tooling or dependencies | `chore: update dependencies` |
+
+For a breaking change, add `!` before the colon, such as `feat(api)!: change listing response format`.
 
 ## Team 👥
 
