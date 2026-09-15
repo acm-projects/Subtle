@@ -50,6 +50,8 @@ The platform brings together a housing marketplace, apartment intelligence, and 
   - [What is React?](https://www.youtube.com/watch?v=Tn6-PIqc4UM)
   - [React Foundations](https://nextjs.org/learn/react-foundations)
   - [Next.js Course](https://nextjs.org/learn)
+  - [Next.js Tutorial for Beginners](https://www.youtube.com/watch?v=ZVnjOPwW4ZA)
+  - [Next.js in 7 minutes](https://www.youtube.com/watch?v=xnOwOBYaA3w)
   - [Next.js Installation](https://nextjs.org/docs/app/getting-started/installation)
   - [Tailwind CSS Docs](https://tailwindcss.com/docs)
 
@@ -57,10 +59,13 @@ The platform brings together a housing marketplace, apartment intelligence, and 
 
 - Frameworks
   - [Node.js](https://nodejs.org/en/)
+  - [Node.js Crash Course](https://www.youtube.com/watch?v=xnOwOBYaA3w)
   - [Building APIs with Next.js](https://nextjs.org/blog/building-apis-with-nextjs)
 - PostgreSQL + Supabase
   - [Supabase Docs](https://supabase.com/docs)
+  - [PostgreSQL tutorial for beginners](https://www.youtube.com/watch?v=SpfIwlAYaKk)
   - [Supabase Auth Resources](https://supabase.com/docs/guides/auth)
+  - [Supabase Full Course](https://www.youtube.com/watch?v=kyphLGnSz6Q)
 - Authentication
   - [Auth0 Docs](https://auth0.com/docs/get-started) — planned authentication and .edu verification
 - Messaging
@@ -77,7 +82,7 @@ The platform brings together a housing marketplace, apartment intelligence, and 
 
 **Full Stack**
 
-- [Next.js + Supabase Setup Guide](https://supabase.com/docs/guides/getting-started/quickstarts/nextjs)
+- [Next.js + Supabase Setup Guide](https://www.youtube.com/watch?v=6XGvBBDtRfo)
 
 **Developer Tools**
 
