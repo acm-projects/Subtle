@@ -1,5 +1,5 @@
 <div align="center">
-  <img src = "https://media1.tenor.com/m/stj1QfW0sRcAAAAd/only-yesterday-ghibli.gif">
+  <img src="https://media.tenor.com/stj1QfW0sRcAAAAM/only-yesterday-ghibli.gif" width="600" alt="Only Yesterday animation">
 </div>
 
 # Subtle 🏡
