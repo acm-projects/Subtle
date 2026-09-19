@@ -150,4 +150,5 @@ For a breaking change, add `!` before the colon, such as `feat(api)!: change lis
 ## Team 👥
 
 - Sunay Shehaan - Project Manager
+- Tejas Palukuri - Car Nerd
 - Lerich Osay - Industry Mentor
