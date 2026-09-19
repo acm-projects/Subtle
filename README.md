@@ -151,4 +151,5 @@ For a breaking change, add `!` before the colon, such as `feat(api)!: change lis
 
 - Sunay Shehaan - Project Manager
 - Tejas Palukuri - Car Nerd
+- Pritikaa Venkatakrishnan - Likes Popsicles 
 - Lerich Osay - Industry Mentor
