@@ -148,6 +148,8 @@ Use `type: short description` for commit messages. Add an optional scope to show
 For a breaking change, add `!` before the colon, such as `feat(api)!: change listing response format`.
 
 ## Team 👥
+- Caitlin Ochuwa - 😜✌🏾
 - Sanjana Suresh - pro dancer
 - Sunay Shehaan - Project Manager
+- Tejas Palukuri - Car Nerd
 - Lerich Osay - Industry Mentor
