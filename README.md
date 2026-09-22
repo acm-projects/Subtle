@@ -71,6 +71,8 @@ The platform brings together a housing marketplace, apartment intelligence, and 
 - Messaging
   - [Supabase Realtime](https://supabase.com/docs/guides/realtime)
 - APIs
+  - [What is an API? (AWS)](https://aws.amazon.com/what-is/api/)
+  - [What is an API? Video](https://youtu.be/ipXAhatnazw?si=qDdqkm-3K5ShJmYT)
   - [Google Maps Platform](https://mapsplatform.google.com/lp/maps-apis/) — Routes, Compute Route Matrix, Places, and Geocoding
   - [Crime Data API](https://crimescore.io/crime-data-api/)
   - Public transportation APIs
