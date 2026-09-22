@@ -67,7 +67,7 @@ The platform brings together a housing marketplace, apartment intelligence, and 
   - [Supabase Auth Resources](https://supabase.com/docs/guides/auth)
   - [Supabase Full Course](https://www.youtube.com/watch?v=kyphLGnSz6Q)
 - Authentication
-  - [Auth0 Docs](https://auth0.com/docs/get-started) — planned authentication and .edu verification
+  - [Supabase Auth](https://supabase.com/docs/guides/auth) — planned authentication and .edu verification
 - Messaging
   - [Supabase Realtime](https://supabase.com/docs/guides/realtime)
 - APIs
