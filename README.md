@@ -67,10 +67,12 @@ The platform brings together a housing marketplace, apartment intelligence, and 
   - [Supabase Auth Resources](https://supabase.com/docs/guides/auth)
   - [Supabase Full Course](https://www.youtube.com/watch?v=kyphLGnSz6Q)
 - Authentication
-  - [Auth0 Docs](https://auth0.com/docs/get-started) — planned authentication and .edu verification
+  - [Supabase Auth](https://supabase.com/docs/guides/auth) — planned authentication and .edu verification
 - Messaging
   - [Supabase Realtime](https://supabase.com/docs/guides/realtime)
 - APIs
+  - [What is an API? (AWS)](https://aws.amazon.com/what-is/api/)
+  - [What is an API? Video](https://youtu.be/ipXAhatnazw?si=qDdqkm-3K5ShJmYT)
   - [Google Maps Platform](https://mapsplatform.google.com/lp/maps-apis/) — Routes, Compute Route Matrix, Places, and Geocoding
   - [Crime Data API](https://crimescore.io/crime-data-api/)
   - Public transportation APIs
