@@ -25,10 +25,10 @@ export default function Navbar() {
       </div>
 
       <div className="flex items-center justify-end gap-5">
-        <a href="#" className="rounded-full bg-[#b89168] px-8 py-3 text-base font-medium text-[#f9f1e6] hover:bg-[#c49a6c]">
+        <a href="/login?mode=signup" className="rounded-full bg-[#b89168] px-8 py-3 text-base font-medium text-[#f9f1e6] hover:bg-[#c49a6c]">
           Sign Up
         </a>
-        <a href="#" className="text-base text-[#e8dccb] hover:text-[#c49a6c]">Log in</a>
+        <a href="/login?mode=login" className="text-base text-[#e8dccb] hover:text-[#c49a6c]">Log in</a>
       </div>
     </nav>
   )
