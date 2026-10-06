@@ -5,7 +5,7 @@ export default function Navbar() {
     <nav className="fixed top-0 z-20 grid h-20 w-full grid-cols-[1fr_auto_1fr] items-center bg-[#342923] px-8 shadow-md">
       <div className="flex items-center gap-4">
         <Link
-          href="/landing"
+          href="/"
           aria-label="Home"
           className="flex h-10 w-10 items-center justify-center rounded-md bg-[#3d312a] text-[#f1e6d6]"
         >
@@ -14,7 +14,7 @@ export default function Navbar() {
             <path d="M5 9.5V21h5v-6h4v6h5V9.5" />
           </svg>
         </Link>
-        <Link href="/landing" className="font-[family-name:var(--font-serif)] text-3xl font-semibold text-[#f1e6d6]">
+        <Link href="/" className="font-[family-name:var(--font-serif)] text-3xl font-semibold text-[#f1e6d6]">
           subtle.
         </Link>
       </div>
