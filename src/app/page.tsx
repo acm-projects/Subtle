@@ -1,31 +1,31 @@
 import './globals.css'
-import Image from 'next/image'
-import { Newsreader, DM_Sans, Playfair_Display, Plus_Jakarta_Sans } from 'next/font/google'
+import { Newsreader, Plus_Jakarta_Sans } from 'next/font/google'
+import Backdrop from '../components/Backdrop'
 import Navbar from '../components/Navbar'
 import Hero from '../components/Hero'
 import Section2 from '../components/Section2'
 import Section3 from '../components/Section3'
 import Section4 from '../components/Section4'
 
-const serif = Newsreader({ subsets: ['latin'], variable: '--font-serif' })
-const sans = DM_Sans({ subsets: ['latin'], variable: '--font-sans' })
-const display = Playfair_Display({ subsets: ['latin'], style: ['normal', 'italic'], variable: '--font-display' })
+const serif = Newsreader({ subsets: ['latin'], style: ['normal', 'italic'], variable: '--font-serif' })
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-body' })
+
+// one continuous sky: dusk blue under the hero, easing into warm cream at the bottom
+const SKY =
+  'linear-gradient(180deg, #B9CADB 0px, #BFCEDE 880px, #D3DEE9 1250px, #E5EBF1 1850px, #EFEDEA 2500px, #F6EFE6 3050px, #FAF2E8 100%)'
 
 export default function LandingPage() {
   return (
     <main
-      className={`${serif.variable} ${sans.variable} ${display.variable} ${body.variable} relative isolate min-h-screen bg-[#342923] font-[family-name:var(--font-sans)] text-[#f3e9dc]`}
+      className={`${serif.variable} ${body.variable} relative isolate min-h-screen overflow-x-clip font-[family-name:var(--font-body)] text-[#1E2B44]`}
+      style={{ background: SKY }}
     >
-      <div className="fixed inset-x-4 bottom-0 top-20 -z-10 overflow-hidden">
-        <Image src="/images/hero-la.jpg" alt="" fill priority className="object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/10 to-black/40" />
-      </div>
+      <Backdrop />
       <Navbar />
       <Hero />
       <Section2 />
-    <Section3 />
-    <Section4 />
+      <Section3 />
+      <Section4 />
     </main>
   )
 }

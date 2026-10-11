@@ -1,35 +1,41 @@
-import Link from 'next/link'
+'use client'
 
-export default function Navbar() {
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+
+// Dark glass over the photo; switches to light glass once the photo has faded.
+export default function Navbar({ light: alwaysLight = false }: { light?: boolean }) {
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > window.innerHeight * 0.55)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  const light = alwaysLight || scrolled
+  const shell = light
+    ? 'bg-white/70 border-white text-[#1E2B44] shadow-[0_20px_50px_-30px_rgba(30,43,68,0.45)]'
+    : 'bg-[#1E2B44]/40 border-white/25 text-white'
+  const link = light ? 'hover:bg-[#1E2B44]/[0.06]' : 'hover:bg-white/15'
+  const cta = light ? 'bg-[#1E2B44] text-white hover:bg-[#2F4161]' : 'bg-white text-[#1E2B44] hover:bg-[#FBF3EA]'
+
   return (
-    <nav className="fixed top-0 z-20 grid h-20 w-full grid-cols-[1fr_auto_1fr] items-center bg-[#342923] px-8 shadow-md">
-      <div className="flex items-center gap-4">
-        <Link
-          href="/"
-          aria-label="Home"
-          className="flex h-10 w-10 items-center justify-center rounded-md bg-[#3d312a] text-[#f1e6d6]"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 10.5 12 3l9 7.5" />
-            <path d="M5 9.5V21h5v-6h4v6h5V9.5" />
-          </svg>
-        </Link>
-        <Link href="/" className="font-[family-name:var(--font-serif)] text-3xl font-semibold text-[#f1e6d6]">
+    <div className="fixed inset-x-0 top-4 z-50 px-4 md:px-8">
+      <nav
+        className={`mx-auto flex max-w-6xl items-center gap-2 rounded-full border py-2 pl-6 pr-2 backdrop-blur-xl transition-colors duration-500 ${shell}`}
+      >
+        <Link href="/" className="mr-auto font-[family-name:var(--font-serif)] text-[26px] font-medium">
           subtle.
         </Link>
-      </div>
-
-      <div className="hidden gap-12 text-base font-medium text-[#f1e6d6] md:flex">
-        <a href="#" className="hover:text-[#c49a6c]">How It Works</a>
-        <a href="#" className="hover:text-[#c49a6c]">Browse Cities</a>
-      </div>
-
-      <div className="flex items-center justify-end gap-5">
-        <a href="/login?mode=signup" className="rounded-full bg-[#b89168] px-8 py-3 text-base font-medium text-[#f9f1e6] hover:bg-[#c49a6c]">
+        <a href="/login?mode=login" className={`rounded-full px-4 py-3 text-sm font-medium transition-colors ${link}`}>
+          Log in
+        </a>
+        <a href="/login?mode=signup" className={`rounded-full px-6 py-3 text-sm font-semibold transition-colors ${cta}`}>
           Sign Up
         </a>
-        <a href="/login?mode=login" className="text-base text-[#e8dccb] hover:text-[#c49a6c]">Log in</a>
-      </div>
-    </nav>
+      </nav>
+    </div>
   )
 }

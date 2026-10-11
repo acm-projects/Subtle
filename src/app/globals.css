@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+/* landing page motion */
+@keyframes bob {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -8px; }
+}
+@keyframes glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+.animate-bob { animation: bob 6s ease-in-out infinite; }
+.animate-glow { animation: glow 4s ease-in-out infinite; }
+.animate-glow-slow { animation: glow 5.5s 1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-bob, .animate-glow, .animate-glow-slow { animation: none; }
+}

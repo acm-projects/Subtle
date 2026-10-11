@@ -360,7 +360,7 @@ function LoginForm() {
 
   return (
     <div className="sb-auth">
-      <Navbar />
+      <Navbar light />
 
       <div className="sb-body">
         <div className="sb-center">
@@ -368,7 +368,7 @@ function LoginForm() {
             {isSignUpMode ? (
               <>
                 <h1>create your account<span className="sb-dot">.</span></h1>
-                <p>Join <em>4,500+</em> verified students and tech interns booking safely.</p>
+                <p>Join the verified students and interns booking safely with <em>subtle.</em></p>
               </>
             ) : (
               <>

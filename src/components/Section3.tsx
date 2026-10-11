@@ -93,60 +93,53 @@ export default function Section3() {
   const count = Math.round(progress * total)
 
   return (
-    <section
-      ref={ref}
-      className="relative overflow-hidden bg-[#140e0b] px-8 py-24 font-[family-name:var(--font-body)] md:px-20"
-    >
-      <div className="mx-auto grid max-w-7xl items-center gap-12 md:grid-cols-[1.7fr_1fr]">
-        {/* graph */}
-        <div>
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <h3 className="font-[family-name:var(--font-serif)] text-3xl text-[#e6ddd2] md:text-4xl">
-              Interns joining Subtle
-            </h3>
-            <div className="text-right">
-              <div className="font-[family-name:var(--font-display)] text-5xl font-bold tabular-nums text-[#d9a06b]">
-                {count}
-              </div>
-              <div className="text-xs uppercase tracking-widest text-[#a8957f]">interns and counting</div>
-            </div>
+    <section ref={ref} className="relative px-4 pb-32 pt-4 md:px-8">
+      <div className="mx-auto max-w-[1000px]">
+        <h2
+          className={`mb-8 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] transition-all duration-1000 ease-out md:text-[56px] ${
+            started ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
+          }`}
+        >
+          Interns joining Subtle
+        </h2>
+
+        {/* graph card */}
+        <div className="rounded-[32px] border border-white bg-white/85 px-6 pb-24 pt-7 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-[13px] text-[#4A5A75]">
+              Total interns, May to August · Summer 2026 · <strong className="text-[#1E2B44]">Sample data</strong>
+            </span>
+            <span className="inline-flex items-baseline gap-2 rounded-full bg-[#1E2B44] px-4 py-2 text-white">
+              <strong className="font-[family-name:var(--font-serif)] text-[26px] leading-none tabular-nums">{count}</strong>
+              <span className="text-xs">interns and counting</span>
+            </span>
           </div>
 
-          <svg
-            viewBox={`0 0 ${W} ${H}`}
-            className="mt-6 w-full overflow-visible"
-            role="img"
-            aria-label="Interns joining Subtle over the summer"
-          >
+          <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 w-full overflow-visible" role="img" aria-label="Sample line graph of interns joining Subtle, May to August, ending at 400">
             <defs>
               <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#8a5328" stopOpacity="0.7" />
-                <stop offset="100%" stopColor="#8a5328" stopOpacity="0.04" />
+                <stop offset="0%" stopColor="#A9C7E8" stopOpacity="0.6" />
+                <stop offset="100%" stopColor="#A9C7E8" stopOpacity="0" />
               </linearGradient>
               <clipPath id="reveal">
                 <rect x="0" y="0" width={clipWidth} height={H} />
               </clipPath>
             </defs>
 
-            <text x="4" y="24" fontSize="16" fill="#d8cfc4">
-              Interns
-            </text>
-
-            {/* y labels */}
+            {/* gridlines + y labels */}
             {yLabels.map((n) => (
-              <text key={n} x={L - 12} y={yAt(n) + 5} textAnchor="end" fontSize="16" fill="#d8cfc4">
-                {n}
-              </text>
+              <g key={n}>
+                <line x1={L} x2={W - R} y1={yAt(n)} y2={yAt(n)} stroke={n === 0 ? '#C9DBEA' : '#E4EAF1'} strokeWidth="1" />
+                <text x={L - 12} y={yAt(n) + 5} textAnchor="end" fontSize="13" fill="#4A5A75">
+                  {n}
+                </text>
+              </g>
             ))}
-
-            {/* axes */}
-            <line x1={L} x2={L} y1={T} y2={H - B} stroke="#8c8279" strokeWidth="1.5" />
-            <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="#8c8279" strokeWidth="1.5" />
 
             {/* month labels */}
             {periods.map((p, i) =>
               p.month ? (
-                <text key={p.label} x={xAt(i)} y={H - 14} textAnchor="middle" fontSize="17" fill="#d8cfc4">
+                <text key={p.label} x={xAt(i)} y={H - 14} textAnchor="middle" fontSize="13" fontWeight="600" fill="#1E2B44">
                   {p.month}
                 </text>
               ) : null
@@ -155,7 +148,7 @@ export default function Section3() {
             {/* area + line, revealed left to right */}
             <g clipPath="url(#reveal)">
               <path d={areaPath} fill="url(#areaFill)" />
-              <path d={linePath} fill="none" stroke="#cc8a52" strokeWidth="4" strokeLinecap="round" />
+              <path d={linePath} fill="none" stroke="#2F4161" strokeWidth="3.5" strokeLinecap="round" />
             </g>
 
             {/* dots appear as the line reaches them */}
@@ -165,14 +158,14 @@ export default function Section3() {
               return (
                 <g key={periods[i].label} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
                   <circle cx={x} cy={y} r="16" fill="transparent" />
-                  <circle cx={x} cy={y} r={active ? 8 : 6} fill="#cc8a52" stroke="#140e0b" strokeWidth="2" />
+                  <circle cx={x} cy={y} r={active ? 8 : 6} fill="#C27A4A" stroke="#FFFFFF" strokeWidth="2.5" />
                   {active && (
                     <g>
-                      <rect x={x - 62} y={y - 58} width="124" height="42" rx="8" fill="#2a211b" stroke="#3a2f27" />
-                      <text x={x} y={y - 40} textAnchor="middle" fontSize="12" fill="#b9a994">
+                      <rect x={x - 66} y={y - 60} width="132" height="44" rx="10" fill="#1E2B44" />
+                      <text x={x} y={y - 42} textAnchor="middle" fontSize="12" fill="#C9DBEA">
                         {periods[i].label}
                       </text>
-                      <text x={x} y={y - 24} textAnchor="middle" fontSize="14" fontWeight="700" fill="#f3ece3">
+                      <text x={x} y={y - 25} textAnchor="middle" fontSize="14" fontWeight="700" fill="#FFFFFF">
                         {cumulative[i]} interns (+{periods[i].joined})
                       </text>
                     </g>
@@ -181,25 +174,29 @@ export default function Section3() {
               )
             })}
           </svg>
-
-          <p className="mt-2 text-center text-sm tracking-wide text-[#a8957f]">Summer 2026 · Sample data</p>
         </div>
 
-        {/* quotes slide in from the right, one after the other */}
-        <div className="flex flex-col gap-6">
+        {/* quotes overlap the bottom of the graph card */}
+        <div className="relative -mt-16 grid gap-6 px-4 md:grid-cols-2 md:px-7">
           {quotes.map((q, i) => (
             <figure
               key={q.who}
-              className={`rounded-2xl border border-[#3a2f27] bg-[#2a211b] p-8 transition-all duration-1000 ease-out ${
-                started ? 'translate-x-0 opacity-100' : 'translate-x-24 opacity-0'
+              className={`rounded-3xl bg-white p-7 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] transition-all duration-1000 ease-out hover:-translate-y-1 ${
+                started ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
               }`}
-              style={{ transitionDelay: started ? `${500 + i * 350}ms` : '0ms' }}
+              style={{ transitionDelay: started ? `${600 + i * 300}ms` : '0ms' }}
             >
-              <blockquote className="font-[family-name:var(--font-serif)] text-2xl font-semibold leading-snug text-[#f3ece3]">
-                &ldquo;{q.text}&rdquo;
-              </blockquote>
-              <figcaption className="mt-5 text-sm text-[#b98b5e]">
-                {q.who} · {q.when}
+              <blockquote className="font-[family-name:var(--font-serif)] text-[23px] leading-snug">&ldquo;{q.text}&rdquo;</blockquote>
+              <figcaption className="mt-5 flex items-center gap-2.5 text-sm">
+                <span
+                  aria-hidden="true"
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-bold text-white ${i === 0 ? 'bg-[#1E2B44]' : 'bg-[#A35F33]'}`}
+                >
+                  {q.who[0]}
+                </span>
+                <span>
+                  {q.who} · {q.when} · <span className="text-[#4A5A75]">sample quote</span>
+                </span>
               </figcaption>
             </figure>
           ))}
