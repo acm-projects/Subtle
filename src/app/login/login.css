@@ -1,0 +1,330 @@
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+/*
+  Matches the landing page: navy #1E2B44 · slate #2F4161 · muted text #4A5A75
+  pale blue #C9DBEA / #A9C7E8 · cream #FBF3EA · peach #F3C9A0 · terracotta #A35F33 (text-safe)
+  Fonts: Newsreader (headings) + Plus Jakarta Sans (body), same as the landing page.
+*/
+
+/* Full-screen backdrop, scoped to the login view so the dashboard is unaffected */
+.sb-auth {
+  --font-serif: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-body);
+  color: #1E2B44;
+  background:
+    radial-gradient(ellipse 55% 40% at 12% 20%, rgba(169, 199, 232, 0.55) 0%, rgba(169, 199, 232, 0) 100%),
+    radial-gradient(ellipse 50% 40% at 90% 85%, rgba(243, 201, 160, 0.5) 0%, rgba(243, 201, 160, 0) 100%),
+    linear-gradient(180deg, #D3DEE9 0%, #E5EBF1 40%, #F6EFE6 100%);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Old header classes (kept so nothing breaks if reused) ---------- */
+.sb-nav {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: 66px;
+  padding: 0 1.5rem 0 1rem;
+}
+.sb-nav-left { display: flex; align-items: center; gap: 0.9rem; }
+.sb-home { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 999px; color: #1E2B44; }
+.sb-logo { font-family: var(--font-serif); font-weight: 500; font-size: 1.65rem; color: #1E2B44; text-decoration: none; }
+.sb-nav-links { display: flex; gap: 2rem; }
+.sb-nav-links a { font-size: 0.9rem; font-weight: 500; color: #1E2B44; text-decoration: none; }
+.sb-nav-right { display: flex; align-items: center; justify-content: flex-end; gap: 0.6rem; }
+.sb-nav-right button { height: 44px; padding: 0 1.5rem; border-radius: 999px; border: 0; font: inherit; font-weight: 600; font-size: 0.9rem; cursor: pointer; }
+.sb-pill { background: #1E2B44; color: #FFFFFF; }
+.sb-pill:hover { background: #2F4161; }
+.sb-textbtn { background: transparent; color: #1E2B44; }
+
+/* ---------- Page body ---------- */
+.sb-body {
+  flex: 1;
+  display: flex;
+  padding: calc(96px + clamp(1rem, 3vh, 2.25rem)) 1.25rem clamp(1.5rem, 4vh, 3rem);
+}
+.sb-center {
+  width: 100%;
+  max-width: 34rem;
+  margin: auto;
+}
+
+.sb-headline {
+  text-align: center;
+  margin: 0 auto clamp(1.2rem, 3vh, 2rem);
+}
+.sb-headline h1 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(2.4rem, 6vh, 3.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  color: #1E2B44;
+}
+.sb-headline h1 .sb-dot { color: #A35F33; }
+.sb-headline p {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: #4A5A75;
+}
+.sb-headline em {
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: #2F4161;
+}
+
+/* ---------- Card (frosted glass, like the landing page cards) ---------- */
+.sb-card {
+  padding: clamp(1.5rem, 3.8vh, 2.4rem) clamp(1.4rem, 4vw, 2.4rem);
+  border-radius: 32px;
+  border: 1px solid #FFFFFF;
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
+  box-shadow: 0 30px 70px -36px rgba(30, 43, 68, 0.35);
+}
+
+.sb-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.sb-field { margin-bottom: clamp(0.9rem, 2.2vh, 1.25rem); }
+
+.sb-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 1.6rem;
+  margin-bottom: 0.35rem;
+}
+.sb-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1E2B44;
+}
+.sb-req { color: #A35F33; }
+.sb-hint { font-size: 0.78rem; font-style: italic; color: #4A5A75; }
+
+.sb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: #EEF3F8;
+  color: #2F4161;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.sb-input {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: clamp(3rem, 6.2vh, 3.4rem);
+  padding: 0 1.1rem;
+  background: #FFFFFF;
+  border: 1px solid #D5DFEA;
+  border-radius: 16px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sb-input:focus-within { border-color: #2F4161; box-shadow: 0 0 0 4px rgba(169, 199, 232, 0.45); }
+.sb-input svg { flex: none; color: #4A5A75; }
+.sb-input input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: 0.95rem;
+  color: #1E2B44;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.sb-input input::placeholder { color: #8A97AB; }
+
+.sb-eye {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin-right: -0.6rem;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: #4A5A75;
+}
+.sb-eye:hover { color: #1E2B44; }
+
+.sb-strength {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.sb-strength span {
+  height: 4px;
+  border-radius: 2px;
+  background: #E4EAF1;
+  transition: background 0.2s;
+}
+.sb-strength span.sb-on { background: #2F4161; }
+
+.sb-message { font-size: 0.9rem; line-height: 1.45; margin: 0 0 1rem; padding: 0.7rem 0.9rem; border-radius: 12px; }
+.sb-message.sb-error { color: #9B2C1F; background: #FBEAE6; }
+.sb-message.sb-ok { color: #1F5C3A; background: #E6F3EA; }
+
+/* Main button: navy pill, same as the landing page buttons */
+.sb-submit {
+  width: 100%;
+  height: clamp(3.1rem, 6.4vh, 3.5rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #FFFFFF;
+  background: #1E2B44;
+  box-shadow: 0 14px 30px -16px rgba(30, 43, 68, 0.7);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+.sb-submit:hover:not(:disabled) { background: #2F4161; transform: translateY(-1px); }
+.sb-submit:active:not(:disabled) { transform: translateY(1px); }
+.sb-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.sb-card-foot {
+  margin-top: clamp(1rem, 2.4vh, 1.4rem);
+  padding-top: clamp(0.9rem, 2vh, 1.2rem);
+  border-top: 1px solid #E4EAF1;
+  text-align: center;
+  font-size: 0.88rem;
+  color: #4A5A75;
+}
+.sb-linkbtn {
+  padding: 0;
+  margin-left: 0.3rem;
+  font: inherit;
+  font-weight: 600;
+  color: #1E2B44;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sb-linkbtn:hover { color: #A35F33; }
+
+/* ---------- Terms checkbox ---------- */
+.sb-check {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 clamp(0.9rem, 2.2vh, 1.3rem);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #4A5A75;
+  cursor: pointer;
+}
+.sb-check input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: #1E2B44; cursor: pointer; }
+.sb-check a { color: #1E2B44; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+
+/* ---------- Google button (below the card) ---------- */
+.sb-or {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin: clamp(1rem, 2.4vh, 1.4rem) 0;
+  font-size: 0.82rem;
+  color: #4A5A75;
+}
+.sb-or::before,
+.sb-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(30, 43, 68, 0.15);
+}
+
+.sb-google {
+  width: 100%;
+  height: clamp(3.1rem, 6.4vh, 3.5rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  border: 1px solid #FFFFFF;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #1E2B44;
+  background: rgba(255, 255, 255, 0.7);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 20px 50px -30px rgba(30, 43, 68, 0.45);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+.sb-google:hover { background: #FFFFFF; transform: translateY(-1px); }
+.sb-google:active { transform: translateY(1px); }
+.sb-google-g {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 1px #E4EAF1;
+}
+
+/* ---------- Footer ---------- */
+.sb-footer {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  font-size: 0.82rem;
+  color: #4A5A75;
+}
+.sb-footer nav { display: flex; gap: 1.8rem; }
+.sb-footer a { color: #4A5A75; text-decoration: none; }
+.sb-footer a:hover { color: #1E2B44; }
+
+/* ---------- Keyboard focus ---------- */
+.sb-auth a:focus-visible,
+.sb-auth button:focus-visible {
+  outline: 2px solid #2F4161;
+  outline-offset: 2px;
+}
+
+/* ---------- Small screens ---------- */
+@media (max-width: 760px) {
+  .sb-nav { grid-template-columns: 1fr auto; }
+  .sb-nav-links { display: none; }
+}
+@media (max-width: 520px) {
+  .sb-row { grid-template-columns: 1fr; gap: 0; }
+  .sb-card { border-radius: 24px; }
+  .sb-footer { flex-direction: column; }
+}
