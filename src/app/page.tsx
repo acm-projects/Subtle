@@ -1,14 +1,10 @@
 import './globals.css'
-import { Newsreader, Plus_Jakarta_Sans } from 'next/font/google'
 import Backdrop from '../components/Backdrop'
 import Navbar from '../components/Navbar'
 import Hero from '../components/Hero'
 import Section2 from '../components/Section2'
 import Section3 from '../components/Section3'
 import Section4 from '../components/Section4'
-
-const serif = Newsreader({ subsets: ['latin'], style: ['normal', 'italic'], variable: '--font-serif' })
-const body = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-body' })
 
 // one continuous sky: dusk blue under the hero, easing into warm cream at the bottom
 const SKY =
@@ -17,7 +13,7 @@ const SKY =
 export default function LandingPage() {
   return (
     <main
-      className={`${serif.variable} ${body.variable} relative isolate min-h-screen overflow-x-clip font-[family-name:var(--font-body)] text-[#1E2B44]`}
+      className={`relative isolate min-h-screen overflow-x-clip font-[family-name:var(--font-body)] text-[#1E2B44]`}
       style={{ background: SKY }}
     >
       <Backdrop />

@@ -15,3 +15,6 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-bob, .animate-glow, .animate-glow-slow { animation: none; }
 }
+
+/* keep page width (and the centered navbar) identical whether or not a page scrolls */
+html { scrollbar-gutter: stable; }

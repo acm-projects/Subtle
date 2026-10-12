@@ -1,15 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-
 /*
   Matches the landing page: navy #1E2B44 · slate #2F4161 · muted text #4A5A75
   pale blue #C9DBEA / #A9C7E8 · cream #FBF3EA · peach #F3C9A0 · terracotta #A35F33 (text-safe)
-  Fonts: Newsreader (headings) + Plus Jakarta Sans (body), same as the landing page.
+  Fonts: Newsreader (headings) + Plus Jakarta Sans (body), loaded once in app/layout.tsx.
 */
 
 /* Full-screen backdrop, scoped to the login view so the dashboard is unaffected */
 .sb-auth {
-  --font-serif: 'Newsreader', Georgia, 'Times New Roman', serif;
-  --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   position: fixed;
   inset: 0;
   overflow-y: auto;
