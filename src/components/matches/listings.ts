@@ -15,6 +15,12 @@ export type Listing = {
   description: string
   amenities: string[]
   hostName: string
+  subtitle?: string // e.g. "Private room in a furnished apartment"
+  whyScore?: string[] // short reasons behind the score; derived from the fields above if missing
+  features?: string[] // chips under "The place"; derived if missing
+  hostEmail?: string // shown on the contact page
+  hostVerified?: boolean // verified .edu sub-leaser
+  hostReplyTime?: string // e.g. "Replies within a day"
 }
 
 export type MatchContext = {
@@ -47,6 +53,12 @@ export const SAMPLE_LISTINGS: Listing[] = [
     description: 'Bright loft with tall windows, a shared kitchen, and a quiet workspace corner.',
     amenities: ['In-unit laundry', 'Wi-Fi', 'Desk', 'Furnished'],
     hostName: 'Maya',
+    subtitle: 'Private room in a furnished apartment',
+    whyScore: ['Walk to the office · 11 minutes', 'Dates match your summer · June 1', 'Pets allowed · Verified sublet'],
+    features: ['Apartment', 'Private room', 'Pets allowed', 'Furnished', 'Washer', '4th floor'],
+    hostEmail: 'maya@example.edu',
+    hostVerified: true,
+    hostReplyTime: 'Replies within a day',
   },
   {
     id: 'hayes-valley-studio',
@@ -117,3 +129,17 @@ export const SAMPLE_LISTINGS: Listing[] = [
     hostName: 'Sam',
   },
 ]
+
+// TODO(backend): fetch one listing by id instead of searching the sample list.
+export function getListing(id: string, listings: Listing[] = SAMPLE_LISTINGS) {
+  return listings.find((l) => l.id === id)
+}
+
+// Rough number of rent months between two dates like "June 1" and "Aug 22" (rounded). Null if unreadable.
+// TODO(backend): replace with the real total from the booking quote.
+export function stayMonths(from: string, to: string) {
+  const a = new Date(`${from}, 2001`).getTime()
+  const b = new Date(`${to}, 2001`).getTime()
+  if (Number.isNaN(a) || Number.isNaN(b) || b <= a) return null
+  return Math.max(1, Math.round((b - a) / (1000 * 60 * 60 * 24 * 30)))
+}

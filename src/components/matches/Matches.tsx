@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { SAMPLE_CONTEXT, SAMPLE_LISTINGS, type Listing, type MatchContext } from './listings'
-import { commuteIcon, commuteText, Dialog, Icon, ListingPhoto, ScoreBadge } from './parts'
+import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from './parts'
 
 type Sort = 'score' | 'price' | 'commute'
 const SORTS: { id: Sort; label: string }[] = [
@@ -16,7 +16,7 @@ const SORTS: { id: Sort; label: string }[] = [
 /*
   Backend hook-up points (everything else is UI):
   - listings / context props: pass the user's real matches and quiz answers
-  - requestBooking, sendMessage, toggleSaved: replace the TODOs with API calls
+  - toggleSaved: replace the TODO with an API call (Book and Contact are their own pages)
 */
 export default function Matches({
   listings = SAMPLE_LISTINGS,
@@ -28,10 +28,6 @@ export default function Matches({
   const [sort, setSort] = useState<Sort>('score')
   const [savedOnly, setSavedOnly] = useState(false)
   const [saved, setSaved] = useState<string[]>([])
-  const [open, setOpen] = useState<string | null>(null)
-  const [dialog, setDialog] = useState<{ kind: 'book' | 'contact'; listing: Listing } | null>(null)
-  const [sent, setSent] = useState(false)
-  const [message, setMessage] = useState('')
 
   const shown = useMemo(() => {
     const list = savedOnly ? listings.filter((l) => saved.includes(l.id)) : [...listings]
@@ -40,17 +36,6 @@ export default function Matches({
 
   // TODO(backend): persist saved homes
   const toggleSaved = (id: string) => setSaved((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
-  // TODO(backend): create a booking request
-  const requestBooking = () => setSent(true)
-  // TODO(backend): send the message to the host
-  const sendMessage = () => setSent(true)
-
-  const openDialog = (kind: 'book' | 'contact', listing: Listing) => {
-    setSent(false)
-    setMessage(kind === 'contact' ? `Hi ${listing.hostName}, I'm interning at ${context.company} this summer and I'm interested in your place in ${listing.neighborhood}.` : '')
-    setDialog({ kind, listing })
-  }
-
   return (
     <>
       <AppNavbar firstName="" />
@@ -115,7 +100,6 @@ export default function Matches({
           <ul className="mt-6 space-y-5">
             {shown.map((l, i) => {
               const isSaved = saved.includes(l.id)
-              const isOpen = open === l.id
               return (
                 <li
                   key={l.id}
@@ -128,7 +112,11 @@ export default function Matches({
                       <div className="flex items-start gap-4">
                         <ScoreBadge score={l.score} />
                         <div className="min-w-0 flex-1">
-                          <h2 className="font-[family-name:var(--font-serif)] text-3xl font-medium leading-tight">{l.title}</h2>
+                          <h2 className="font-[family-name:var(--font-serif)] text-3xl font-medium leading-tight">
+                            <Link href={`/matches/${l.id}`} className="hover:underline hover:underline-offset-4">
+                              {l.title}
+                            </Link>
+                          </h2>
                           <p className="mt-0.5 text-[15px]">
                             <strong className="text-lg">${l.price.toLocaleString()}</strong> / month
                           </p>
@@ -157,51 +145,19 @@ export default function Matches({
                         ))}
                       </ul>
 
-                      {isOpen && (
-                        <div className="mt-4 animate-[fadeIn_.3s_ease-out] rounded-[20px] bg-[#F4F7FA] p-4 text-sm">
-                          <p className="leading-relaxed">{l.description}</p>
-                          <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2">
-                            <div>
-                              <dt className="text-xs font-bold uppercase tracking-[0.1em] text-[#4A5A75]">Available</dt>
-                              <dd>
-                                {l.availableFrom} to {l.availableTo}
-                              </dd>
-                            </div>
-                            <div>
-                              <dt className="text-xs font-bold uppercase tracking-[0.1em] text-[#4A5A75]">Host</dt>
-                              <dd>{l.hostName}</dd>
-                            </div>
-                            <div className="col-span-2">
-                              <dt className="text-xs font-bold uppercase tracking-[0.1em] text-[#4A5A75]">Amenities</dt>
-                              <dd>{l.amenities.join(' · ')}</dd>
-                            </div>
-                          </dl>
-                        </div>
-                      )}
-
                       <div className="mt-auto grid grid-cols-3 gap-2 pt-5">
-                        <button
-                          type="button"
-                          onClick={() => openDialog('book', l)}
-                          className="min-h-12 rounded-full bg-[#1E2B44] text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]"
-                        >
+                        <Link href={`/matches/${l.id}/book`} className="flex min-h-12 items-center justify-center rounded-full bg-[#1E2B44] text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
                           Book
-                        </button>
-                        <button
-                          type="button"
-                          aria-expanded={isOpen}
-                          onClick={() => setOpen(isOpen ? null : l.id)}
-                          className="min-h-12 rounded-full border border-[#D5DFEA] bg-white text-[15px] font-semibold transition hover:-translate-y-0.5"
+                        </Link>
+                        <Link
+                          href={`/matches/${l.id}`}
+                          className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white text-[15px] font-semibold transition hover:-translate-y-0.5"
                         >
-                          {isOpen ? 'Hide details' : 'Details'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openDialog('contact', l)}
-                          className="min-h-12 rounded-full border border-[#D5DFEA] bg-white text-[15px] font-semibold transition hover:-translate-y-0.5"
-                        >
+                          Details
+                        </Link>
+                        <Link href={`/matches/${l.id}/contact`} className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white text-[15px] font-semibold transition hover:-translate-y-0.5">
                           Contact
-                        </button>
+                        </Link>
                       </div>
                     </div>
                   </div>
@@ -222,75 +178,6 @@ export default function Matches({
         </div>
         <p className="mt-8 text-center text-[13px] text-[#4A5A75]">&copy; 2026 Subtle Technologies, Inc. All rights reserved.</p>
       </section>
-
-      {dialog && (
-        <Dialog title={dialog.kind === 'book' ? `Book ${dialog.listing.title}` : `Contact ${dialog.listing.hostName}`} onClose={() => setDialog(null)}>
-          {sent ? (
-            <div className="text-center">
-              <span aria-hidden="true" className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#1E2B44] text-white">
-                <Icon name="check" size={24} />
-              </span>
-              <h2 className="mt-4 font-[family-name:var(--font-serif)] text-3xl font-medium">
-                {dialog.kind === 'book' ? 'Request sent.' : 'Message sent.'}
-              </h2>
-              <p className="mt-2 text-[15px] text-[#4A5A75]">
-                {dialog.listing.hostName} will get back to you here. (Demo only for now.)
-              </p>
-              <button type="button" onClick={() => setDialog(null)} className="mt-6 min-h-12 w-full rounded-full bg-[#1E2B44] font-semibold text-white">
-                Done
-              </button>
-            </div>
-          ) : dialog.kind === 'book' ? (
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#4A5A75]">Request to book</p>
-              <h2 className="mt-1 font-[family-name:var(--font-serif)] text-3xl font-medium">{dialog.listing.title}</h2>
-              <dl className="mt-4 space-y-2 rounded-[18px] bg-[#F4F7FA] p-4 text-sm">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-[#4A5A75]">Dates</dt>
-                  <dd className="font-semibold">
-                    {dialog.listing.availableFrom} to {dialog.listing.availableTo}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-[#4A5A75]">Monthly rent</dt>
-                  <dd className="font-semibold">${dialog.listing.price.toLocaleString()}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-[#4A5A75]">Commute</dt>
-                  <dd className="font-semibold">{commuteText(dialog.listing)}</dd>
-                </div>
-              </dl>
-              <p className="mt-3 text-sm text-[#4A5A75]">You won&apos;t be charged yet. {dialog.listing.hostName} reviews requests first.</p>
-              <button type="button" onClick={requestBooking} className="mt-5 min-h-12 w-full rounded-full bg-[#1E2B44] font-semibold text-white transition hover:bg-[#2F4161]">
-                Send request
-              </button>
-            </div>
-          ) : (
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#4A5A75]">Message the host</p>
-              <h2 className="mt-1 font-[family-name:var(--font-serif)] text-3xl font-medium">{dialog.listing.hostName}</h2>
-              <label htmlFor="contact-message" className="mt-4 block text-xs font-bold uppercase tracking-[0.1em]">
-                Your message
-              </label>
-              <textarea
-                id="contact-message"
-                rows={5}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className="mt-1.5 w-full resize-none rounded-2xl border border-[#D5DFEA] bg-white p-3 text-[15px] outline-none focus:border-[#2F4161] focus:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]"
-              />
-              <button
-                type="button"
-                onClick={sendMessage}
-                disabled={!message.trim()}
-                className="mt-4 min-h-12 w-full rounded-full bg-[#1E2B44] font-semibold text-white transition hover:bg-[#2F4161] disabled:opacity-40"
-              >
-                Send message
-              </button>
-            </div>
-          )}
-        </Dialog>
-      )}
     </>
   )
 }

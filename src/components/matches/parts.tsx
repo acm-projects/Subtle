@@ -49,10 +49,10 @@ function RoomArt({ seed }: { seed: number }) {
   )
 }
 
-export function ListingPhoto({ listing, seed }: { listing: Listing; seed: number }) {
+export function ListingPhoto({ listing, seed, className = 'min-h-[220px]' }: { listing: Listing; seed: number; className?: string }) {
   const [broken, setBroken] = useState(false)
   return (
-    <div className="relative min-h-[220px] overflow-hidden rounded-[22px] bg-[#EAF1F8]">
+    <div className={`relative overflow-hidden rounded-[22px] bg-[#EAF1F8] ${className}`}>
       {broken ? (
         <RoomArt seed={seed} />
       ) : (
