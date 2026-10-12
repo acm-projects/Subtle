@@ -4,24 +4,33 @@ import { useEffect, useRef, useState } from 'react'
 
 // sample listings (made up, labeled as sample on the page)
 const listings = [
-  { x: 31, y: 29, area: 'Echo Park', price: 800, type: 'Private room', commute: '4 min to work', dates: 'Jun - Aug' },
-  { x: 38, y: 38, area: 'Silver Lake', price: 950, type: 'Shared room', commute: '12 min to work', dates: 'Jun - Aug' },
-  { x: 50, y: 41, area: 'Downtown', price: 1250, type: 'Studio', commute: '6 min to work', dates: 'May - Aug' },
-  { x: 53, y: 21, area: 'Chinatown', price: 900, type: 'Private room', commute: '10 min to work', dates: 'Jun - Sep' },
-  { x: 60, y: 31, area: 'Little Tokyo', price: 1100, type: '2 bed, 1 spot open', commute: '8 min to work', dates: 'Jun - Aug' },
-  { x: 55, y: 47, area: 'Arts District', price: 1300, type: 'Studio', commute: '9 min to work', dates: 'Jun - Aug' },
-  { x: 52, y: 55, area: 'Historic Core', price: 1050, type: 'Private room', commute: '5 min to work', dates: 'May - Aug' },
-  { x: 26, y: 59, area: 'Koreatown', price: 750, type: 'Shared room', commute: '15 min to work', dates: 'Jun - Aug' },
-  { x: 16, y: 73, area: 'Mid-Wilshire', price: 850, type: 'Private room', commute: '18 min to work', dates: 'Jun - Aug' },
-  { x: 52, y: 85, area: 'Pico-Union', price: 700, type: 'Shared room', commute: '14 min to work', dates: 'Jun - Aug' },
-  { x: 71, y: 59, area: 'Boyle Heights', price: 800, type: 'Private room', commute: '11 min to work', dates: 'Jun - Sep' },
-  { x: 77, y: 54, area: 'Lincoln Heights', price: 775, type: '3 bed, 1 spot open', commute: '16 min to work', dates: 'Jun - Aug' },
-  { x: 84, y: 69, area: 'El Sereno', price: 725, type: 'Private room', commute: '20 min to work', dates: 'Jun - Aug' },
+  { x: 31, y: 29, area: 'Echo Park', score: 84, price: 800, type: 'Private room', commute: '4 min to work', dates: 'Jun - Aug' },
+  { x: 38, y: 38, area: 'Silver Lake', score: 91, price: 950, type: 'Shared room', commute: '12 min to work', dates: 'Jun - Aug' },
+  { x: 50, y: 41, area: 'Downtown', score: 96, price: 1250, type: 'Studio', commute: '6 min to work', dates: 'May - Aug' },
+  { x: 53, y: 21, area: 'Chinatown', score: 78, price: 900, type: 'Private room', commute: '10 min to work', dates: 'Jun - Sep' },
+  { x: 60, y: 31, area: 'Little Tokyo', score: 89, price: 1100, type: '2 bed, 1 spot open', commute: '8 min to work', dates: 'Jun - Aug' },
+  { x: 55, y: 47, area: 'Arts District', score: 82, price: 1300, type: 'Studio', commute: '9 min to work', dates: 'Jun - Aug' },
+  { x: 52, y: 55, area: 'Historic Core', score: 93, price: 1050, type: 'Private room', commute: '5 min to work', dates: 'May - Aug' },
+  { x: 26, y: 59, area: 'Koreatown', score: 74, price: 750, type: 'Shared room', commute: '15 min to work', dates: 'Jun - Aug' },
+  { x: 16, y: 73, area: 'Mid-Wilshire', score: 71, price: 850, type: 'Private room', commute: '18 min to work', dates: 'Jun - Aug' },
+  { x: 52, y: 85, area: 'Pico-Union', score: 68, price: 700, type: 'Shared room', commute: '14 min to work', dates: 'Jun - Aug' },
+  { x: 71, y: 59, area: 'Boyle Heights', score: 80, price: 800, type: 'Private room', commute: '11 min to work', dates: 'Jun - Sep' },
+  { x: 77, y: 54, area: 'Lincoln Heights', score: 76, price: 775, type: '3 bed, 1 spot open', commute: '16 min to work', dates: 'Jun - Aug' },
+  { x: 84, y: 69, area: 'El Sereno', score: 65, price: 725, type: 'Private room', commute: '20 min to work', dates: 'Jun - Aug' },
 ]
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 3
 const ZOOM_STEP = 0.5
+
+// Subtle score (sample): green for great matches, warmer as the score drops.
+// Every color keeps white text above 4.5:1 contrast.
+function scoreColor(score: number) {
+  if (score >= 90) return '#2E7D4F'
+  if (score >= 80) return '#4F7F2F'
+  if (score >= 70) return '#7A6A12'
+  return '#A35F33'
+}
 
 function Pin({ item, px, py, hidden }: { item: (typeof listings)[number]; px: number; py: number; hidden: boolean }) {
   const below = py < 50
@@ -35,7 +44,7 @@ function Pin({ item, px, py, hidden }: { item: (typeof listings)[number]; px: nu
         hidden ? 'pointer-events-none opacity-0' : 'opacity-100'
       }`}
       style={{ left: `${px}%`, top: `${py}%` }}
-      aria-label={`Sample listing: ${item.area}, ${item.type}, $${item.price} per month`}
+      aria-label={`Sample listing: ${item.area}, ${item.type}, $${item.price} per month, Subtle score ${item.score}`}
     >
       {/* house-shaped pin */}
       <svg
@@ -53,13 +62,25 @@ function Pin({ item, px, py, hidden }: { item: (typeof listings)[number]; px: nu
       </svg>
 
       <div
-        className={`pointer-events-none invisible absolute w-56 rounded-[18px] bg-white p-4 text-left text-xs text-[#1E2B44] opacity-0 shadow-[0_24px_50px_-20px_rgba(30,43,68,0.45)] transition-opacity duration-200 group-hover:visible group-hover:opacity-100 group-focus:visible group-focus:opacity-100 ${hAlign} ${
+        className={`pointer-events-none invisible absolute w-64 rounded-[18px] bg-white p-4 text-left text-xs text-[#1E2B44] opacity-0 shadow-[0_24px_50px_-20px_rgba(30,43,68,0.45)] transition-opacity duration-200 group-hover:visible group-hover:opacity-100 group-focus:visible group-focus:opacity-100 ${hAlign} ${
           below ? 'top-full mt-2' : 'bottom-full mb-10'
         }`}
       >
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[15px] font-bold">{item.area}</span>
-          <span className="text-sm font-bold text-[#A35F33]">${item.price.toLocaleString()}/mo</span>
+        <div className="flex items-center gap-3">
+          <span
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white shadow-[0_6px_14px_-6px_rgba(30,43,68,0.6)]"
+            style={{ backgroundColor: scoreColor(item.score) }}
+            aria-label={`Subtle score ${item.score} out of 100`}
+          >
+            {item.score}
+          </span>
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className="text-[15px] font-bold">{item.area}</span>
+              <span className="text-sm font-bold text-[#A35F33]">${item.price.toLocaleString()}/mo</span>
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#4A5A75]">Subtle score</span>
+          </span>
         </div>
         <p className="mt-1 text-[13px] text-[#4A5A75]">
           {item.type} · {item.commute}

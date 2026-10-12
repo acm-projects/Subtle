@@ -1,9 +1,5 @@
 import '../globals.css'
-import { Newsreader, Plus_Jakarta_Sans } from 'next/font/google'
 import Matches from '../../components/matches/Matches'
-
-const serif = Newsreader({ subsets: ['latin'], style: ['normal', 'italic'], variable: '--font-serif' })
-const body = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-body' })
 
 // same soft sky as the home page and quiz
 const SKY =
@@ -15,7 +11,7 @@ export const metadata = { title: 'Your matches · Subtle' }
 export default function MatchesPage() {
   return (
     <main
-      className={`${serif.variable} ${body.variable} min-h-screen font-[family-name:var(--font-body)] text-[#1E2B44]`}
+      className="min-h-screen font-[family-name:var(--font-body)] text-[#1E2B44]"
       style={{ background: SKY, backgroundAttachment: 'fixed' }}
     >
       <Matches />
