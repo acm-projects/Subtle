@@ -402,7 +402,10 @@ export default function Questionnaire() {
               ))}
             </ul>
             <div className="mt-10 flex flex-wrap justify-center gap-3">
-              <Link href="/home" className="rounded-full bg-[#1E2B44] px-7 py-3.5 text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
+              <Link href="/matches" className="rounded-full bg-[#1E2B44] px-7 py-3.5 text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
+                See my matches
+              </Link>
+              <Link href="/home" className="rounded-full border border-[#D5DFEA] bg-white px-7 py-3.5 text-[15px] font-semibold transition hover:-translate-y-0.5">
                 Back to home
               </Link>
               <button type="button" onClick={() => go(0)} className="rounded-full border border-[#D5DFEA] bg-white px-7 py-3.5 text-[15px] font-semibold transition hover:-translate-y-0.5">
