@@ -5,11 +5,12 @@ import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
 
-// Navbar for logged-in pages: logo, Post a listing, and Log out (with a confirm step).
+// Navbar for logged-in pages: logo, Messages, Post a listing, and Log out (with a confirm step).
 export default function AppNavbar({ firstName }: { firstName: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const posting = pathname?.startsWith('/post')
+  const messaging = pathname?.startsWith('/messages')
   const [confirming, setConfirming] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const stayRef = useRef<HTMLButtonElement>(null)
@@ -36,6 +37,19 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
         <nav className="mx-auto flex max-w-6xl items-center gap-2 rounded-full border border-white bg-white/70 py-2 pl-6 pr-2 text-[#1E2B44] shadow-[0_20px_50px_-30px_rgba(30,43,68,0.45)] backdrop-blur-xl">
           <Link href="/home" className="mr-auto font-[family-name:var(--font-serif)] text-[26px] font-medium">
             subtle.
+          </Link>
+          <Link
+            href="/messages"
+            aria-current={messaging ? 'page' : undefined}
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-3 text-sm font-semibold transition-colors ${
+              messaging ? 'bg-[#1E2B44] text-white' : 'hover:bg-[#1E2B44]/[0.06]'
+            }`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 5h16v11H9l-5 4z" />
+            </svg>
+            <span className="hidden sm:inline">Messages</span>
+            <span className="sr-only sm:hidden">Messages</span>
           </Link>
           <Link
             href="/post"
