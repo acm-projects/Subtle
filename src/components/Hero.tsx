@@ -8,7 +8,7 @@ const SWAP_MS = 700 // how long the swap takes
 
 const features = [
   { title: 'Verified housing', body: 'Every listing checked first.', icon: 'home' },
-  { title: 'Short commutes', body: 'See the ride to work.', icon: 'clock' },
+  { title: 'Post a Listing', body: 'Lease your home to interns.', icon: 'clock' },
   { title: 'Built-in community', body: 'Meet interns nearby.', icon: 'people' },
 ] as const
 
