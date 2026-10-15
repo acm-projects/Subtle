@@ -2,44 +2,28 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-// made-up sign-ups per period for Summer 2026 (swap for real data later)
-const periods = [
-  { label: 'May 1', month: 'May', joined: 60 },
-  { label: 'May 15', month: '', joined: 40 },
-  { label: 'Jun 1', month: 'Jun', joined: 55 },
-  { label: 'Jun 15', month: '', joined: 20 },
-  { label: 'Jul 1', month: 'Jul', joined: 70 },
-  { label: 'Jul 15', month: '', joined: 55 },
-  { label: 'Aug 1', month: 'Aug', joined: 60 },
-  { label: 'Aug 15', month: '', joined: 40 },
-]
-
-// running total of interns, computed from the sign-ups above
-const cumulative = periods.reduce<number[]>((acc, p) => {
-  acc.push((acc[acc.length - 1] ?? 0) + p.joined)
-  return acc
-}, [])
-const total = cumulative[cumulative.length - 1]
+// Visual only: the line's shape, with no numbers or data behind it yet.
+// Each value is a height from 0 (bottom) to 1 (top). Swap for real data later.
+const shape = [0.1, 0.18, 0.3, 0.36, 0.53, 0.66, 0.8, 0.9]
 
 const quotes = [
-  { text: 'I came for a sublet and left with a roommate I still talk to.', who: 'Aisha', when: 'Summer 2026' },
-  { text: 'Subtle took the stress out of finding a place to live.', who: 'Leo', when: 'Summer 2026' },
+  { text: 'I came for a sublet and left with a roommate I still talk to.', who: 'Aisha' },
+  { text: 'Subtle took the stress out of finding a place to live.', who: 'Leo' },
 ]
 
 // chart geometry
 const W = 640
 const H = 380
-const L = 56
+const L = 24
 const R = 24
-const T = 56
-const B = 48
-const Y_MAX = 400
-const yLabels = [0, 100, 200, 300, 400]
+const T = 40
+const B = 32
+const gridlines = [0, 0.25, 0.5, 0.75, 1]
 
-const xAt = (i: number) => L + (i * (W - L - R)) / (periods.length - 1)
-const yAt = (n: number) => T + (1 - n / Y_MAX) * (H - T - B)
+const xAt = (i: number) => L + (i * (W - L - R)) / (shape.length - 1)
+const yAt = (v: number) => T + (1 - v) * (H - T - B)
 
-const points: [number, number][] = cumulative.map((n, i) => [xAt(i), yAt(n)])
+const points: [number, number][] = shape.map((v, i) => [xAt(i), yAt(v)])
 
 function smoothPath(pts: [number, number][]) {
   let d = `M${pts[0][0]},${pts[0][1]}`
@@ -64,7 +48,6 @@ export default function Section3() {
   const ref = useRef<HTMLElement>(null)
   const [progress, setProgress] = useState(0)
   const [started, setStarted] = useState(false)
-  const [hover, setHover] = useState<number | null>(null)
 
   useEffect(() => {
     const obs = new IntersectionObserver(
@@ -90,7 +73,6 @@ export default function Section3() {
   }, [started])
 
   const clipWidth = L + progress * (W - L - R) + 2
-  const count = Math.round(progress * total)
 
   return (
     <section ref={ref} className="relative px-4 pb-32 pt-4 md:px-8">
@@ -107,15 +89,15 @@ export default function Section3() {
         <div className="rounded-[32px] border border-white bg-white/85 px-6 pb-24 pt-7 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-[13px] text-[#4A5A75]">
-              Total interns, May to August · Summer 2026 · <strong className="text-[#1E2B44]">Sample data</strong>
+              A growing intern community · <strong className="text-[#1E2B44]">Illustration, not real data</strong>
             </span>
-            <span className="inline-flex items-baseline gap-2 rounded-full bg-[#1E2B44] px-4 py-2 text-white">
-              <strong className="font-[family-name:var(--font-serif)] text-[26px] leading-none tabular-nums">{count}</strong>
-              <span className="text-xs">interns and counting</span>
+            <span className="inline-flex items-center gap-2 rounded-full bg-[#1E2B44] px-4 py-2 text-xs font-semibold text-white">
+              <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-[#F3C9A0]" />
+              Live numbers coming soon
             </span>
           </div>
 
-          <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 w-full overflow-visible" role="img" aria-label="Sample line graph of interns joining Subtle, May to August, ending at 400">
+          <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 w-full overflow-visible" role="img" aria-label="Illustration of a rising line graph. No real data yet.">
             <defs>
               <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#A9C7E8" stopOpacity="0.6" />
@@ -126,24 +108,10 @@ export default function Section3() {
               </clipPath>
             </defs>
 
-            {/* gridlines + y labels */}
-            {yLabels.map((n) => (
-              <g key={n}>
-                <line x1={L} x2={W - R} y1={yAt(n)} y2={yAt(n)} stroke={n === 0 ? '#C9DBEA' : '#E4EAF1'} strokeWidth="1" />
-                <text x={L - 12} y={yAt(n) + 5} textAnchor="end" fontSize="13" fill="#4A5A75">
-                  {n}
-                </text>
-              </g>
+            {/* gridlines only, no labels */}
+            {gridlines.map((v) => (
+              <line key={v} x1={L} x2={W - R} y1={yAt(v)} y2={yAt(v)} stroke={v === 0 ? '#C9DBEA' : '#E4EAF1'} strokeWidth="1" />
             ))}
-
-            {/* month labels */}
-            {periods.map((p, i) =>
-              p.month ? (
-                <text key={p.label} x={xAt(i)} y={H - 14} textAnchor="middle" fontSize="13" fontWeight="600" fill="#1E2B44">
-                  {p.month}
-                </text>
-              ) : null
-            )}
 
             {/* area + line, revealed left to right */}
             <g clipPath="url(#reveal)">
@@ -152,27 +120,11 @@ export default function Section3() {
             </g>
 
             {/* dots appear as the line reaches them */}
-            {points.map(([x, y], i) => {
-              if (x > clipWidth) return null
-              const active = hover === i
-              return (
-                <g key={periods[i].label} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
-                  <circle cx={x} cy={y} r="16" fill="transparent" />
-                  <circle cx={x} cy={y} r={active ? 8 : 6} fill="#C27A4A" stroke="#FFFFFF" strokeWidth="2.5" />
-                  {active && (
-                    <g>
-                      <rect x={x - 66} y={y - 60} width="132" height="44" rx="10" fill="#1E2B44" />
-                      <text x={x} y={y - 42} textAnchor="middle" fontSize="12" fill="#C9DBEA">
-                        {periods[i].label}
-                      </text>
-                      <text x={x} y={y - 25} textAnchor="middle" fontSize="14" fontWeight="700" fill="#FFFFFF">
-                        {cumulative[i]} interns (+{periods[i].joined})
-                      </text>
-                    </g>
-                  )}
-                </g>
+            {points.map(([x, y], i) =>
+              x > clipWidth ? null : (
+                <circle key={i} cx={x} cy={y} r="6" fill="#C27A4A" stroke="#FFFFFF" strokeWidth="2.5" className="animate-[fadeIn_.4s_ease-out]" />
               )
-            })}
+            )}
           </svg>
         </div>
 
@@ -195,7 +147,7 @@ export default function Section3() {
                   {q.who[0]}
                 </span>
                 <span>
-                  {q.who} · {q.when} · <span className="text-[#4A5A75]">sample quote</span>
+                  {q.who} · <span className="text-[#4A5A75]">sample quote</span>
                 </span>
               </figcaption>
             </figure>
