@@ -7,6 +7,10 @@ import Icon from '../quiz/icons'
 import PhotoPicker, { type Photo } from './PhotoPicker'
 import { EMPTY_LISTING, HOME_TYPES, INCLUDED, missingFields, ROOM_TYPES, shortDate, type NewListing } from './options'
 
+import { supabase } from '../../lib/supabase'
+import { createListing, type Listing as DbListing } from '../../lib/listings'
+import type { User } from '@supabase/supabase-js'
+
 const DRAFT_KEY = 'subtle-post-draft'
 const card = 'rounded-[32px] border border-white bg-white/65 p-6 shadow-[0_30px_70px_-40px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-8'
 const input =
@@ -38,20 +42,42 @@ function Chips({ name, options, selected, onToggle, multi }: { name: string; opt
   )
 }
 
-/*
-  Backend hook-up points:
-  - postListing: upload `photos` (in order, first = cover) and save `listing`
-  - saveDraft: drafts are kept in this browser for now (photos are not saved in drafts)
-*/
 export default function PostListing() {
   const [listing, setListing] = useState<NewListing>(EMPTY_LISTING)
   const [photos, setPhotos] = useState<Photo[]>([])
   const [tried, setTried] = useState(false)
   const [status, setStatus] = useState<'idle' | 'posting' | 'posted'>('idle')
   const [toast, setToast] = useState('')
+  const [user, setUser] = useState<User | null>(null)
+  const [firstName, setFirstName] = useState('')
+  const [checkingAuth, setCheckingAuth] = useState(true)
+  const [backendError, setBackendError] = useState('')
+  const [createdListing, setCreatedListing] = useState<DbListing | null>(null)
 
   const set = <K extends keyof NewListing>(key: K, value: NewListing[K]) => setListing((l) => ({ ...l, [key]: value }))
   const missing = missingFields(listing, photos.length)
+
+  // Listen for user auth session
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user)
+      setCheckingAuth(false)
+      if (user) {
+        const meta = user.user_metadata ?? {}
+        const name = (meta.first_name ?? meta.firstName ?? '') as string
+        setFirstName(name.trim())
+      }
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      if (session?.user) {
+        const meta = session.user.user_metadata ?? {}
+        const name = (meta.first_name ?? meta.firstName ?? '') as string
+        setFirstName(name.trim())
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   // restore a saved draft
   useEffect(() => {
@@ -67,7 +93,6 @@ export default function PostListing() {
     return () => clearTimeout(t)
   }, [toast])
 
-  // TODO(backend): save the draft to the user's account instead of this browser
   const saveDraft = () => {
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(listing))
@@ -77,20 +102,66 @@ export default function PostListing() {
     }
   }
 
-  // TODO(backend): upload photos and create the listing, then show it on the matches page
+  // Upload photos and insert listing into Supabase listing_table
   const postListing = async () => {
     setTried(true)
+    setBackendError('')
+
     if (missing.length) {
       requestAnimationFrame(() => document.getElementById('post-errors')?.focus())
       return
     }
+
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (!currentUser) {
+      // Save draft so student doesn't lose inputs
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(listing))
+      } catch {}
+      setBackendError('You must be logged in to post a listing. Your draft has been saved.')
+      requestAnimationFrame(() => document.getElementById('post-errors')?.focus())
+      return
+    }
+
     setStatus('posting')
-    await new Promise((r) => setTimeout(r, 700))
+
     try {
-      localStorage.removeItem(DRAFT_KEY)
-    } catch {}
-    setStatus('posted')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+      // Parse city & neighborhood from address if formatted with commas
+      const addrParts = listing.address.split(',').map((s) => s.trim()).filter(Boolean)
+      const neighborhood = addrParts[0] || null
+      const city = addrParts.length > 1 ? addrParts[1] : null
+
+      const files = photos.map((p) => p.file)
+      const payload = {
+        title: listing.title.trim(),
+        building_type: listing.homeType || 'Apartment',
+        beds: 1, // standard 1-bedroom default for student sublets
+        baths: 1,
+        monthly_rent: listing.rent ? Number(listing.rent) : null,
+        address: listing.address.trim(),
+        neighborhood,
+        city,
+        start_date: listing.availableFrom || null,
+        end_date: listing.availableTo || null,
+        room_type: listing.roomType,
+        amenities: listing.included,
+        company_tags: [listing.roomType],
+        about: listing.about.trim() || null,
+      }
+
+      const created = await createListing(payload, files)
+      setCreatedListing(created)
+      try {
+        localStorage.removeItem(DRAFT_KEY)
+      } catch {}
+      setStatus('posted')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (err: any) {
+      console.error('Failed to post listing:', err)
+      setBackendError(err.message || 'Something went wrong while posting your place.')
+      setStatus('idle')
+      requestAnimationFrame(() => document.getElementById('post-errors')?.focus())
+    }
   }
 
   const subtitle = `${listing.roomType} in ${/^[AEIOU]/i.test(listing.homeType) ? 'an' : 'a'} ${listing.homeType.toLowerCase()}`
@@ -146,19 +217,24 @@ export default function PostListing() {
   if (status === 'posted') {
     return (
       <>
-        <AppNavbar firstName="" />
+        <AppNavbar firstName={firstName} />
         <section className="flex min-h-screen items-center justify-center px-4 pb-16 pt-28">
           <div className={`${card} w-full max-w-2xl animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] text-center`} role="status">
             <span aria-hidden="true" className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#1E2B44] text-white">
               <Icon name="check" size={28} />
             </span>
             <h1 className="mt-5 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Your place is posted.</h1>
-            <p className="mt-3 text-[17px] text-[#4A5A75]">Interns whose answers fit your home will see it in their matches. (Demo only for now.)</p>
+            <p className="mt-3 text-[17px] text-[#4A5A75]">Your listing has been saved to Subtle! Interns whose preferences match your home will see it.</p>
             <div className="mx-auto mt-6 max-w-sm text-left">{preview}</div>
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               <Link href="/home" className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white font-semibold transition hover:-translate-y-0.5">
                 Back to home
               </Link>
+              <Link href="/matches" className="flex min-h-12 items-center justify-center rounded-full bg-[#1E2B44] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
+                Browse matches
+              </Link>
+            </div>
+            <div className="mt-4">
               <button
                 type="button"
                 onClick={() => {
@@ -167,10 +243,12 @@ export default function PostListing() {
                   setListing(EMPTY_LISTING)
                   setTried(false)
                   setStatus('idle')
+                  setBackendError('')
+                  setCreatedListing(null)
                 }}
-                className="min-h-12 rounded-full bg-[#1E2B44] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]"
+                className="text-sm font-semibold text-[#4A5A75] underline underline-offset-4 hover:text-[#1E2B44]"
               >
-                Post another place
+                + Post another place
               </button>
             </div>
           </div>
@@ -181,13 +259,29 @@ export default function PostListing() {
 
   return (
     <>
-      <AppNavbar firstName="" />
+      <AppNavbar firstName={firstName} />
       <section className="px-4 pb-16 pt-32 md:px-8">
         <div className="mx-auto w-full max-w-[1240px]">
           <header className="animate-[fadeIn_.5s_ease-out]">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">For sub-leasers</p>
             <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-7xl">Post your place.</h1>
             <p className="mt-2 font-[family-name:var(--font-serif)] text-2xl italic text-[#2F4161]">Find a subletter who actually fits.</p>
+
+            {!user && !checkingAuth && (
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-white bg-white/70 px-5 py-3 text-sm shadow-sm backdrop-blur-md">
+                <span className="text-[#4A5A75]">
+                  You are browsing as a guest. Your work is saved as a draft, but you&apos;ll need to log in to publish.
+                </span>
+                <div className="flex gap-2">
+                  <Link href="/login?mode=login" className="rounded-full bg-[#1E2B44] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#2F4161]">
+                    Log in
+                  </Link>
+                  <Link href="/login?mode=signup" className="rounded-full border border-[#D5DFEA] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#1E2B44] hover:border-[#1E2B44]">
+                    Sign up
+                  </Link>
+                </div>
+              </div>
+            )}
           </header>
 
           <div className="mt-10 grid items-start gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
@@ -282,9 +376,26 @@ export default function PostListing() {
                 <p className="mt-1 text-right text-xs text-[#4A5A75]">{listing.about.length} / 800</p>
               </section>
 
-              {tried && missing.length > 0 && (
+              {tried && (missing.length > 0 || backendError) && (
                 <div id="post-errors" tabIndex={-1} role="alert" className="rounded-[24px] border border-[#E9C4A6] bg-[#FBF3EA] p-5 text-[15px] outline-none">
-                  <p className="font-semibold">Almost there. Please add {missing.join(', ')}.</p>
+                  {missing.length > 0 && (
+                    <p className="font-semibold">Almost there. Please add {missing.join(', ')}.</p>
+                  )}
+                  {backendError && (
+                    <div className={missing.length > 0 ? 'mt-3 border-t border-[#E9C4A6]/60 pt-3' : ''}>
+                      <p className="font-semibold text-[#9B2C1F]">{backendError}</p>
+                      {!user && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Link href="/login?mode=login" className="inline-flex items-center rounded-full bg-[#1E2B44] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2F4161]">
+                            Log in to subtle.
+                          </Link>
+                          <Link href="/login?mode=signup" className="inline-flex items-center rounded-full border border-[#1E2B44] bg-white px-4 py-2 text-xs font-semibold text-[#1E2B44] transition hover:bg-[#FBF3EA]">
+                            Sign up with .edu
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
