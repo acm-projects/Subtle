@@ -3,7 +3,6 @@ import Backdrop from '../components/Backdrop'
 import Navbar from '../components/Navbar'
 import Hero from '../components/Hero'
 import Section2 from '../components/Section2'
-import Section3 from '../components/Section3'
 import Section4 from '../components/Section4'
 
 // one continuous sky: dusk blue under the hero, easing into warm cream at the bottom
@@ -20,7 +19,6 @@ export default function LandingPage() {
       <Navbar />
       <Hero />
       <Section2 />
-      <Section3 />
       <Section4 />
     </main>
   )
