@@ -5,6 +5,7 @@ import { useState } from 'react'
 import FlowShell from './FlowShell'
 import { SAMPLE_CONTEXT, type Listing, type MatchContext } from './listings'
 import { Icon } from './parts'
+import { startConversation } from '../messages/store'
 
 /*
   Backend hook-up points:
@@ -24,11 +25,13 @@ export default function ContactHost({ listing, context = SAMPLE_CONTEXT }: { lis
   )
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [conversationId, setConversationId] = useState<string | null>(null)
 
-  // TODO(backend): POST the message { listingId: listing.id, body: message }
+  // Saves through the messages store (TODO(backend) lives in src/components/messages/store.ts)
   const sendMessage = async () => {
     setSending(true)
-    await new Promise((r) => setTimeout(r, 500))
+    const id = await startConversation({ id: listing.id, title: listing.title, score: listing.score, hostName: listing.hostName }, message.trim())
+    setConversationId(id)
     setSending(false)
     setSent(true)
   }
@@ -44,13 +47,16 @@ export default function ContactHost({ listing, context = SAMPLE_CONTEXT }: { lis
             <Icon name="check" size={24} />
           </span>
           <h1 className="mt-5 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Message sent.</h1>
-          <p className="mt-3 text-[17px] text-[#4A5A75]">{host} will reply here. (Demo only for now.)</p>
+          <p className="mt-3 text-[17px] text-[#4A5A75]">{host} will reply in your messages. (Demo only for now.)</p>
           <div className="mt-8 grid grid-cols-2 gap-3">
             <Link href={`/matches/${listing.id}`} className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white font-semibold transition hover:-translate-y-0.5">
               Back to listing
             </Link>
-            <Link href={`/matches/${listing.id}/book`} className="flex min-h-12 items-center justify-center rounded-full bg-[#1E2B44] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
-              Book it
+            <Link
+              href={conversationId ? `/messages?c=${conversationId}` : '/messages'}
+              className="flex min-h-12 items-center justify-center rounded-full bg-[#1E2B44] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]"
+            >
+              Open messages
             </Link>
           </div>
         </div>
