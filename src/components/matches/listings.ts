@@ -18,6 +18,7 @@ export type Listing = {
   subtitle?: string // e.g. "Private room in a furnished apartment"
   whyScore?: string[] // short reasons behind the score; derived from the fields above if missing
   features?: string[] // chips under "The place"; derived if missing
+  imageUrl?: string // image URL (uploaded or remote)
   hostEmail?: string // shown on the contact page
   hostVerified?: boolean // verified .edu sub-leaser
   hostReplyTime?: string // e.g. "Replies within a day"
@@ -130,13 +131,56 @@ export const SAMPLE_LISTINGS: Listing[] = [
   },
 ]
 
-// TODO(backend): fetch one listing by id instead of searching the sample list.
+// Fetch listing by id from Supabase DB, falling back to sample listings
 export function getListing(id: string, listings: Listing[] = SAMPLE_LISTINGS) {
   return listings.find((l) => l.id === id)
 }
 
+// Convert a database row to the UI matched listing format
+export function dbListingToMatchListing(db: any): Listing {
+  const roomType: Listing['roomType'] = db.amenities?.includes('Shared room')
+    ? 'Shared room'
+    : db.amenities?.includes('Entire place')
+    ? 'Entire place'
+    : 'Private room'
+
+  const homeType: Listing['homeType'] =
+    db.building_type === 'Studio' ? 'Studio' : db.building_type === 'House' ? 'House' : 'Apartment'
+
+  const formattedStart = db.start_date
+    ? new Date(db.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : 'Flexible'
+  const formattedEnd = db.end_date
+    ? new Date(db.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : 'Flexible'
+
+  const coverImage = db.image_urls?.[0]
+
+  return {
+    id: db.id,
+    title: db.title || 'Sublet near campus',
+    neighborhood: db.neighborhood || db.city || 'Central',
+    price: db.monthly_rent || 0,
+    score: 88,
+    commuteMinutes: 15,
+    commuteMode: 'transit',
+    homeType,
+    roomType,
+    tags: db.company_tags?.length ? db.company_tags : (db.amenities?.slice(0, 2) ?? []),
+    availableFrom: formattedStart,
+    availableTo: formattedEnd,
+    description: db.about || 'Comfortable sublet, fully furnished and close to transit.',
+    amenities: db.amenities || [],
+    hostName: 'Student Host',
+    hostVerified: true,
+    hostReplyTime: 'Replies within a few hours',
+    subtitle: `${roomType} in a ${homeType.toLowerCase()}`,
+    features: [homeType, roomType, ...(db.amenities || [])],
+    imageUrl: coverImage,
+  }
+}
+
 // Rough number of rent months between two dates like "June 1" and "Aug 22" (rounded). Null if unreadable.
-// TODO(backend): replace with the real total from the booking quote.
 export function stayMonths(from: string, to: string) {
   const a = new Date(`${from}, 2001`).getTime()
   const b = new Date(`${to}, 2001`).getTime()

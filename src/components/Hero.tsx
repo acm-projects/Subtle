@@ -7,9 +7,9 @@ const SWAP_AT = 1600 // ms before the swap starts
 const SWAP_MS = 700 // how long the swap takes
 
 const features = [
-  { title: 'Find Verified Housing', body: 'Every listing checked first.', icon: 'home' },
-  { title: 'Post a Listing', body: 'Lease your home.', icon: 'clock' },
-  { title: 'Built-in Community', body: 'Meet interns nearby.', icon: 'people' },
+  { title: 'Verified housing', body: 'Every listing checked first.', icon: 'home' },
+  { title: 'Post a Listing', body: 'Lease your home to interns.', icon: 'clock' },
+  { title: 'Built-in community', body: 'Meet interns nearby.', icon: 'people' },
 ] as const
 
 function Icon({ name }: { name: 'home' | 'clock' | 'people' }) {

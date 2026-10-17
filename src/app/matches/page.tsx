@@ -1,5 +1,7 @@
 import '../globals.css'
 import Matches from '../../components/matches/Matches'
+import { getListings } from '../../lib/listings'
+import { dbListingToMatchListing, SAMPLE_LISTINGS } from '../../components/matches/listings'
 
 // same soft sky as the home page and quiz
 const SKY =
@@ -7,14 +9,24 @@ const SKY =
 
 export const metadata = { title: 'Your matches · Subtle' }
 
-// TODO(backend): load the logged-in user's matches and pass them to <Matches listings={...} context={...} />
-export default function MatchesPage() {
+export default async function MatchesPage() {
+  let matchedListings = SAMPLE_LISTINGS
+  try {
+    const { listings: dbListings } = await getListings({ pageSize: 50 })
+    if (dbListings?.length) {
+      const converted = dbListings.map(dbListingToMatchListing)
+      matchedListings = [...converted, ...SAMPLE_LISTINGS]
+    }
+  } catch (e) {
+    console.error('Error loading listings from DB:', e)
+  }
+
   return (
     <main
       className="min-h-screen font-[family-name:var(--font-body)] text-[#1E2B44]"
       style={{ background: SKY, backgroundAttachment: 'fixed' }}
     >
-      <Matches />
+      <Matches listings={matchedListings} />
     </main>
   )
 }
