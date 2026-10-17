@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { SAMPLE_CONTEXT, type Listing, type MatchContext } from './listings'
 import { commuteIcon, Icon, ListingPhoto, ScoreBadge, scoreColor } from './parts'
@@ -27,8 +27,28 @@ const featuresFor = (l: Listing) => l.features ?? Array.from(new Set([l.homeType
   - listing / context props: pass the real listing (fetched by id) and the user's quiz context
   - toggleSaved: persist; Book and Contact are their own pages (/matches/[id]/book and /contact)
 */
-export default function ListingDetail({ listing, context = SAMPLE_CONTEXT }: { listing: Listing; context?: MatchContext }) {
+export default function ListingDetail({ listing, context: initialContext = SAMPLE_CONTEXT }: { listing: Listing; context?: MatchContext }) {
   const [saved, setSaved] = useState(false)
+  const [context, setContext] = useState<MatchContext>(initialContext)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('subtle-quiz-v1')
+      if (raw) {
+        const q = JSON.parse(raw)
+        if (q.company || q.address) {
+          const addr = (q.address as string | undefined)?.trim() || initialContext.office
+          const parts = addr.split(',').map((s) => s.trim()).filter(Boolean)
+          const city = parts.length >= 2 ? parts.slice(-2).join(', ') : initialContext.city
+          setContext({
+            company: (q.company as string | undefined)?.trim() || initialContext.company,
+            office: addr,
+            city,
+          })
+        }
+      }
+    } catch {}
+  }, [initialContext])
 
   // TODO(backend): save / unsave listing.id for this user
   const toggleSaved = () => setSaved((s) => !s)
