@@ -28,12 +28,31 @@ export default function Questionnaire() {
   const [a, setA] = useState<QuizAnswers>(EMPTY)
   const [index, setIndex] = useState(0)
   const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [userEmail, setUserEmail] = useState('')
 
-  // read-only: greet by first name if the account has one
+  // read-only: greet by first name if the account has one, and restore saved answers
   useEffect(() => {
+    try {
+      const savedQuiz = localStorage.getItem('subtle-quiz-v1')
+      if (savedQuiz) {
+        setA((prev) => ({ ...prev, ...JSON.parse(savedQuiz) }))
+      }
+      const savedUser = localStorage.getItem('subtle-user-v1')
+      if (savedUser) {
+        const u = JSON.parse(savedUser)
+        if (u.firstName) setFirstName(u.firstName)
+        if (u.lastName) setLastName(u.lastName)
+        if (u.email) setUserEmail(u.email)
+      }
+    } catch {}
     supabase.auth.getUser().then(({ data }) => {
       const meta = data.user?.user_metadata ?? {}
-      setFirstName(((meta.first_name ?? meta.firstName ?? '') as string).trim())
+      const fn = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
+      const ln = ((meta.last_name ?? meta.lastName ?? '') as string).trim()
+      if (fn) setFirstName(fn)
+      if (ln) setLastName(ln)
+      if (data.user?.email) setUserEmail(data.user.email)
     })
   }, [])
 
@@ -74,8 +93,49 @@ export default function Questionnaire() {
     done: true,
   }
 
+  const saveQuizProgress = async (nextStepId?: StepId) => {
+    try {
+      localStorage.setItem('subtle-quiz-v1', JSON.stringify(a))
+    } catch {}
+    if (nextStepId === 'done') {
+      try {
+        await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            firstName: firstName || 'Intern',
+            lastName: lastName || 'Student',
+            email: userEmail || 'intern@subtle.edu',
+            company: a.company,
+            address: a.address,
+            budget: a.budget,
+            roommates: a.roommates,
+            interests: a.interests,
+            housingType: a.housingType,
+            accommodations: a.accommodations,
+            moveIn: a.moveIn,
+            commuteMode: a.commuteMode,
+            car: a.car,
+            maxCommute: a.maxCommute,
+            transitImportance: a.transitImportance,
+            gender: a.roommatePrefs.gender,
+            numRoommates: a.roommatePrefs.count,
+            noise: a.roommatePrefs.noise,
+            cleanliness: a.roommatePrefs.cleanliness,
+            guests: a.roommatePrefs.guests,
+            sleep: a.roommatePrefs.schedule,
+            temperature: a.roommatePrefs.temperature,
+            age: a.roommatePrefs.age,
+          }),
+        })
+      } catch {}
+    }
+  }
+
   const go = (i: number) => {
-    setIndex(Math.max(0, Math.min(i, steps.length - 1)))
+    const clamped = Math.max(0, Math.min(i, steps.length - 1))
+    void saveQuizProgress(steps[clamped]?.id)
+    setIndex(clamped)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const nextStep = steps[index + 1]
@@ -404,6 +464,9 @@ export default function Questionnaire() {
             <div className="mt-10 flex flex-wrap justify-center gap-3">
               <Link href="/matches" className="rounded-full bg-[#1E2B44] px-7 py-3.5 text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
                 See my matches
+              </Link>
+              <Link href="/internMatches" className="rounded-full border border-[#D5DFEA] bg-white px-7 py-3.5 text-[15px] font-semibold transition hover:-translate-y-0.5">
+                Intern matches
               </Link>
               <Link href="/home" className="rounded-full border border-[#D5DFEA] bg-white px-7 py-3.5 text-[15px] font-semibold transition hover:-translate-y-0.5">
                 Back to home

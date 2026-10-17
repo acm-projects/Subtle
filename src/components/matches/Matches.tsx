@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { SAMPLE_CONTEXT, SAMPLE_LISTINGS, type Listing, type MatchContext } from './listings'
 import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from './parts'
@@ -20,7 +20,7 @@ const SORTS: { id: Sort; label: string }[] = [
 */
 export default function Matches({
   listings = SAMPLE_LISTINGS,
-  context = SAMPLE_CONTEXT,
+  context: initialContext = SAMPLE_CONTEXT,
 }: {
   listings?: Listing[]
   context?: MatchContext
@@ -28,6 +28,26 @@ export default function Matches({
   const [sort, setSort] = useState<Sort>('score')
   const [savedOnly, setSavedOnly] = useState(false)
   const [saved, setSaved] = useState<string[]>([])
+  const [context, setContext] = useState<MatchContext>(initialContext)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('subtle-quiz-v1')
+      if (raw) {
+        const q = JSON.parse(raw)
+        if (q.company || q.address) {
+          const addr = (q.address as string | undefined)?.trim() || initialContext.office
+          const parts = addr.split(',').map((s) => s.trim()).filter(Boolean)
+          const city = parts.length >= 2 ? parts.slice(-2).join(', ') : initialContext.city
+          setContext({
+            company: (q.company as string | undefined)?.trim() || initialContext.company,
+            office: addr,
+            city,
+          })
+        }
+      }
+    } catch {}
+  }, [initialContext])
 
   const shown = useMemo(() => {
     const list = savedOnly ? listings.filter((l) => saved.includes(l.id)) : [...listings]
@@ -54,9 +74,23 @@ export default function Matches({
               <span className="inline-flex items-center gap-2 rounded-full border border-white bg-white/80 px-4 py-2 text-sm font-semibold">
                 <Icon name="pin" size={15} /> {context.city} · {context.company}
               </span>
-              <Link href="/questionnaire" className="text-sm font-semibold underline underline-offset-2 hover:text-[#A35F33]">
-                Edit my answers
-              </Link>
+              <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
+                <Link
+                  href="/internMatches"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#1E2B44] px-4 py-2 text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]"
+                >
+                  <Icon name="user" size={14} /> Intern matches
+                </Link>
+                <Link
+                  href="/messages"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#D5DFEA] bg-white px-4 py-2 transition hover:-translate-y-0.5"
+                >
+                  Messages
+                </Link>
+                <Link href="/questionnaire" className="underline underline-offset-2 hover:text-[#A35F33]">
+                  Edit my answers
+                </Link>
+              </div>
             </div>
           </div>
 
