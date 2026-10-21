@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from '../matches/parts'
 import { initials, shortTime } from '../messages/store'
-import { BUDGETS, COMMUTE_MODES, HOUSING_TYPES, label, MOVE_IN } from '../quiz/options'
+import { BUDGETS, COMMUTE_MODES, label, MOVE_IN } from '../quiz/options'
 import { useDashboardData } from './useDashboardData'
 
 const glass = 'rounded-[32px] border border-white bg-white/65 shadow-[0_30px_70px_-40px_rgba(30,43,68,0.38)] backdrop-blur-xl'
@@ -45,14 +45,12 @@ export default function Dashboard() {
 
   const name = d.firstName || 'there'
   const unread = d.conversations.filter((c) => c.unread).length
-  const contactedHost = d.conversations.some((c) => !c.sample && c.messages.some((m) => m.from === 'me'))
-  const steps = [
-    { done: true, title: 'Create your account', href: null },
-    { done: d.quizStatus === 'done', title: 'Take the housing quiz', href: '/questionnaire' },
-    { done: d.quizStatus === 'done', title: 'Look through your matches', href: '/matches' },
-    { done: contactedHost, title: 'Message a host', href: '/matches' },
-  ]
-  const doneCount = steps.filter((s) => s.done).length
+  const search = [
+    [d.quiz.company, d.quiz.address].filter(Boolean).join(', '),
+    label(BUDGETS, d.quiz.budget),
+    d.quiz.moveIn && (d.quiz.moveIn === 'flexible' ? 'Flexible move-in' : `Moving in ${label(MOVE_IN, d.quiz.moveIn)}`),
+    d.quiz.commuteMode && `${label(COMMUTE_MODES, d.quiz.commuteMode)}, up to ${d.quiz.maxCommute} min`,
+  ].filter(Boolean) as string[]
 
   return (
     <>
@@ -71,6 +69,18 @@ export default function Dashboard() {
                   ? 'Here is everything for your move, in one place.'
                   : 'Everything for your move lives here. Start wherever you like.'}
               </p>
+              {d.quizStatus !== 'none' && search.length > 0 && (
+                <div className="mt-5 flex flex-wrap items-center gap-2">
+                  {search.map((t) => (
+                    <span key={t} className="rounded-full border border-white bg-white/70 px-3.5 py-1.5 text-sm font-medium">
+                      {t}
+                    </span>
+                  ))}
+                  <Link href="/questionnaire" className="px-2 py-1.5 text-sm font-semibold underline underline-offset-4 hover:text-[#A35F33]">
+                    Edit
+                  </Link>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href="/matches" className={btnLight}>
@@ -85,9 +95,9 @@ export default function Dashboard() {
             </div>
           </header>
 
-          <div className="mt-8 grid gap-5 lg:grid-cols-12">
+          <div className="mt-12 grid gap-6 lg:grid-cols-12">
             {/* matches, or the quiz invite */}
-            <Card className="p-6 md:p-8 lg:col-span-8">
+            <Card className="p-7 md:p-10 lg:col-span-12">
               {d.loading ? (
                 <div className="space-y-4">
                   <Skeleton className="h-6 w-48" />
@@ -108,12 +118,12 @@ export default function Dashboard() {
                       See all matches <Icon name="arrowR" size={16} />
                     </Link>
                   </div>
-                  <ul className="mt-5 grid gap-4 sm:grid-cols-3">
+                  <ul className="mt-7 grid gap-5 sm:grid-cols-3">
                     {d.topMatches.map((l, i) => (
                       <li key={l.id}>
                         <Link href={`/matches/${l.id}`} className="group block rounded-[24px] border border-white bg-white/80 p-2.5 transition hover:-translate-y-1 hover:shadow-[0_24px_50px_-30px_rgba(30,43,68,0.5)]">
                           <div className="relative">
-                            <ListingPhoto listing={l} seed={i} className="h-40" />
+                            <ListingPhoto listing={l} seed={i} className="h-52" />
                             <span className="absolute bottom-2.5 right-2.5">
                               <ScoreBadge score={l.score} size={42} />
                             </span>
@@ -133,7 +143,7 @@ export default function Dashboard() {
                   </ul>
                 </>
               ) : (
-                <div className="grid items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
+                <div className="grid items-center gap-10 py-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
                   <div>
                     <p className={eyebrow}>{d.quizStatus === 'started' ? 'Almost there' : 'Your matches'}</p>
                     <h2 className={`${serif} mt-2 text-4xl font-medium leading-tight`}>
@@ -153,11 +163,11 @@ export default function Dashboard() {
                       </Link>
                     </div>
                   </div>
-                  <ul className="grid grid-cols-2 gap-3">
+                  <ul className="grid grid-cols-2 gap-4">
                     {QUIZ_TOPICS.map((t, i) => (
                       <li
                         key={t.title}
-                        className="flex animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] flex-col gap-3 rounded-[22px] border border-white bg-white/80 p-4"
+                        className="flex animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] flex-col gap-3 rounded-[24px] border border-white bg-white/80 p-5"
                         style={{ animationDelay: `${200 + i * 80}ms` }}
                       >
                         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF3F8]">
@@ -171,86 +181,8 @@ export default function Dashboard() {
               )}
             </Card>
 
-            {/* right column: search summary + next steps */}
-            <div className="flex flex-col gap-5 lg:col-span-4">
-              <Card className="p-6" delay={80}>
-                <div className="flex items-center justify-between gap-3">
-                  <p className={eyebrow}>Your search</p>
-                  {d.quizStatus !== 'none' && (
-                    <Link href="/questionnaire" className="text-sm font-semibold underline underline-offset-4 hover:text-[#A35F33]">
-                      Edit
-                    </Link>
-                  )}
-                </div>
-                {d.quizStatus === 'none' ? (
-                  <p className="mt-3 text-[15px] leading-relaxed text-[#4A5A75]">
-                    Your office, budget and move-in month will show here after the quiz, so every match is built around them.
-                  </p>
-                ) : (
-                  <dl className="mt-4 space-y-3 text-[15px]">
-                    {[
-                      { icon: 'building', k: 'Work', v: [d.quiz.company, d.quiz.address].filter(Boolean).join(' · ') },
-                      { icon: 'dollar', k: 'Budget', v: label(BUDGETS, d.quiz.budget) },
-                      { icon: 'calendar', k: 'Move-in', v: label(MOVE_IN, d.quiz.moveIn) },
-                      { icon: 'home', k: 'Home', v: label(HOUSING_TYPES, d.quiz.housingType) },
-                      { icon: 'walk', k: 'Commute', v: d.quiz.commuteMode ? `${label(COMMUTE_MODES, d.quiz.commuteMode)}, up to ${d.quiz.maxCommute} min` : '' },
-                    ].map((row) => (
-                      <div key={row.k} className="flex items-start gap-3">
-                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF3F8]">
-                          <Icon name={row.icon} size={15} />
-                        </span>
-                        <div className="min-w-0">
-                          <dt className="text-xs font-bold uppercase tracking-[0.1em] text-[#4A5A75]">{row.k}</dt>
-                          <dd className="truncate font-medium">{row.v || <span className="text-[#4A5A75]">Not answered yet</span>}</dd>
-                        </div>
-                      </div>
-                    ))}
-                  </dl>
-                )}
-              </Card>
-
-              <Card className="p-6" delay={140}>
-                <div className="flex items-center justify-between gap-3">
-                  <p className={eyebrow}>Your move</p>
-                  <span className="text-sm font-semibold">
-                    {doneCount} of {steps.length}
-                  </span>
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#E4EAF1]" role="progressbar" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={doneCount} aria-label="Move progress">
-                  <div className="h-full rounded-full bg-[#1E2B44] transition-[width] duration-700" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
-                </div>
-                <ul className="mt-4 space-y-1">
-                  {steps.map((s) => {
-                    const row = (
-                      <span className="flex items-center gap-3 py-1.5 text-[15px]">
-                        <span
-                          aria-hidden="true"
-                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${s.done ? 'bg-[#1E2B44] text-white' : 'border-2 border-[#C9DBEA]'}`}
-                        >
-                          {s.done && <Icon name="check" size={13} />}
-                        </span>
-                        <span className={s.done ? 'text-[#4A5A75] line-through decoration-[#C9DBEA]' : 'font-semibold'}>{s.title}</span>
-                        <span className="sr-only">{s.done ? '(done)' : '(to do)'}</span>
-                      </span>
-                    )
-                    return (
-                      <li key={s.title}>
-                        {!s.done && s.href ? (
-                          <Link href={s.href} className="block rounded-xl px-1 hover:bg-white/70">
-                            {row}
-                          </Link>
-                        ) : (
-                          <div className="px-1">{row}</div>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              </Card>
-            </div>
-
             {/* messages */}
-            <Card className="p-6 lg:col-span-5" delay={200}>
+            <Card className="p-7 md:p-8 lg:col-span-4" delay={200}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <p className={eyebrow}>Messages</p>
@@ -269,7 +201,7 @@ export default function Dashboard() {
                 <p className="mt-4 text-[15px] text-[#4A5A75]">No messages yet. Contact a host from any listing and the chat shows up here.</p>
               ) : (
                 <ul className="mt-3 space-y-1">
-                  {d.conversations.slice(0, 3).map((c) => {
+                  {d.conversations.slice(0, 2).map((c) => {
                     const last = c.messages[c.messages.length - 1]
                     return (
                       <li key={c.id}>
@@ -280,7 +212,7 @@ export default function Dashboard() {
                           <span className="min-w-0 flex-1">
                             <span className="flex items-baseline justify-between gap-2">
                               <span className={`truncate text-[15px] ${c.unread ? 'font-bold' : 'font-semibold'}`}>
-                                {c.hostName} <span className="font-normal text-[#4A5A75]">· {c.listingTitle}</span>
+                                {c.hostName}
                               </span>
                               <span className="shrink-0 text-xs text-[#4A5A75]">{last ? shortTime(last.sentAt) : ''}</span>
                             </span>
@@ -302,7 +234,7 @@ export default function Dashboard() {
             </Card>
 
             {/* my listings */}
-            <Card className="flex flex-col p-6 lg:col-span-4" delay={260}>
+            <Card className="flex flex-col p-7 md:p-8 lg:col-span-4" delay={260}>
               <p className={eyebrow}>Your listings</p>
               {d.loading ? (
                 <Skeleton className="mt-4 h-24" />
@@ -319,7 +251,7 @@ export default function Dashboard() {
               ) : (
                 <>
                   <ul className="mt-3 space-y-2">
-                    {d.myListings.slice(0, 3).map((l) => (
+                    {d.myListings.slice(0, 2).map((l) => (
                       <li key={l.id} className="flex items-center justify-between gap-3 rounded-[18px] border border-white bg-white/80 px-4 py-3">
                         <span className="min-w-0">
                           <span className="block truncate font-semibold">{l.title || 'Your place'}</span>
@@ -341,7 +273,7 @@ export default function Dashboard() {
             </Card>
 
             {/* intern community */}
-            <Card className="flex flex-col p-6 lg:col-span-3" delay={320}>
+            <Card className="flex flex-col p-7 md:p-8 lg:col-span-4" delay={320}>
               <p className={eyebrow}>Community</p>
               <div aria-hidden="true" className="mt-4 flex -space-x-3">
                 {['bg-[#1E2B44] text-white', 'bg-[#F3C9A0]', 'bg-[#C9DBEA]', 'bg-[#E4EAF1]'].map((tone, i) => (
