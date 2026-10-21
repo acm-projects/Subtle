@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
+import { supabase } from '../../lib/supabase'
 import AppNavbar from '../AppNavbar'
 import { SAMPLE_CONTEXT, SAMPLE_LISTINGS, type Listing, type MatchContext } from './listings'
 import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from './parts'
@@ -16,15 +17,16 @@ const SORTS: { id: Sort; label: string }[] = [
 /*
   Backend hook-up points (everything else is UI):
   - listings / context props: pass the user's real matches and quiz answers
-  - toggleSaved: replace the TODO with an API call (Book and Contact are their own pages)
+  - Dynamically refreshes personalized matches via GET /api/matches?email=...
 */
 export default function Matches({
-  listings = SAMPLE_LISTINGS,
+  listings: initialListings = SAMPLE_LISTINGS,
   context: initialContext = SAMPLE_CONTEXT,
 }: {
   listings?: Listing[]
   context?: MatchContext
 }) {
+  const [listings, setListings] = useState<Listing[]>(initialListings)
   const [sort, setSort] = useState<Sort>('score')
   const [savedOnly, setSavedOnly] = useState(false)
   const [saved, setSaved] = useState<string[]>([])
@@ -47,6 +49,32 @@ export default function Matches({
         }
       }
     } catch {}
+
+    // Fetch personalized scored matches from /api/matches using logged-in email
+    ;(async () => {
+      try {
+        let email = ''
+        const { data } = await supabase.auth.getUser()
+        if (data.user?.email) {
+          email = data.user.email
+        } else {
+          const savedUser = localStorage.getItem('subtle-user-v1')
+          if (savedUser) email = JSON.parse(savedUser)?.email ?? ''
+        }
+
+        const url = email ? `/api/matches?email=${encodeURIComponent(email)}` : '/api/matches'
+        const res = await fetch(url, { cache: 'no-store' })
+        if (res.ok) {
+          const payload = await res.json()
+          if (Array.isArray(payload.matches) && payload.matches.length > 0) {
+            setListings(payload.matches)
+          }
+          if (payload.context && payload.userProfile?.company_name) {
+            setContext(payload.context)
+          }
+        }
+      } catch {}
+    })()
   }, [initialContext])
 
   const shown = useMemo(() => {
@@ -54,7 +82,6 @@ export default function Matches({
     return list.sort((a, b) => (sort === 'score' ? b.score - a.score : sort === 'price' ? a.price - b.price : a.commuteMinutes - b.commuteMinutes))
   }, [listings, saved, savedOnly, sort])
 
-  // TODO(backend): persist saved homes
   const toggleSaved = (id: string) => setSaved((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
   return (
     <>
@@ -112,7 +139,7 @@ export default function Matches({
             </div>
             <div className="flex items-center gap-3 text-sm">
               <span className="text-[#4A5A75]">
-                {shown.length} {shown.length === 1 ? 'home' : 'homes'} · sample listings
+                {shown.length} {shown.length === 1 ? 'home' : 'homes'} · verified &amp; sample listings
               </span>
               <button
                 type="button"

@@ -128,23 +128,42 @@ export default function MatchesPage() {
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [contacted, setContacted] = useState<Set<string>>(new Set())
   const [firstName, setFirstName] = useState('')
+  const [myInterests, setMyInterests] = useState<string[]>(MY_INTERESTS)
+  const [internList, setInternList] = useState<Intern[]>(INTERNS)
 
-  // AppNavbar takes the user's first name; adjust to wherever you store it
+  // AppNavbar takes the user's first name; also fetch live intern matches from /api/intern-matches
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       const meta = data.user?.user_metadata
-      setFirstName(meta?.first_name ?? data.user?.email?.split('@')[0] ?? '')
+      const email = data.user?.email ?? ''
+      setFirstName(meta?.first_name ?? email.split('@')[0] ?? '')
+
+      try {
+        const query = email ? `?email=${encodeURIComponent(email)}` : ''
+        const res = await fetch(`/api/intern-matches${query}`)
+        if (res.ok) {
+          const json = await res.json()
+          if (Array.isArray(json.myInterests) && json.myInterests.length > 0) {
+            setMyInterests(json.myInterests)
+          }
+          if (Array.isArray(json.interns) && json.interns.length > 0) {
+            setInternList(json.interns)
+          }
+        }
+      } catch {
+        // Fallback to static INTERNS on network error
+      }
     })
   }, [])
 
   const interns: Placed[] = useMemo(
     () =>
-      INTERNS.map((i) => ({
+      internList.map((i) => ({
         ...i,
         ...polar(i.angle, i.radius),
-        shared: i.interests.filter((x) => MY_INTERESTS.includes(x)),
+        shared: i.interests.filter((x) => myInterests.includes(x)),
       })),
-    [],
+    [internList, myInterests],
   )
   const matches = interns.filter((i) => i.match !== undefined).sort((a, b) => (b.match ?? 0) - (a.match ?? 0))
 
@@ -215,7 +234,7 @@ export default function MatchesPage() {
 
             <div className="mb-2.5 mt-[22px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#3C6285]">Your interests</div>
             <div className="flex flex-wrap gap-1.5">
-              {MY_INTERESTS.map((i) => (
+              {myInterests.map((i) => (
                 <span key={i} className="rounded-full bg-[#DCEBF6] px-2.5 py-1 text-[11px] font-semibold text-[#245F90] ring-[1.5px] ring-inset ring-[#2E7DB5]">
                   {i}
                 </span>

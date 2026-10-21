@@ -93,48 +93,79 @@ export default function Questionnaire() {
     done: true,
   }
 
-  const saveQuizProgress = async (nextStepId?: StepId) => {
+  const saveQuizProgress = async (nextStepId?: StepId, latestAnswers: QuizAnswers = a) => {
     try {
-      localStorage.setItem('subtle-quiz-v1', JSON.stringify(a))
+      localStorage.setItem('subtle-quiz-v1', JSON.stringify(latestAnswers))
     } catch {}
     if (nextStepId === 'done') {
       try {
-        await fetch('/api/users', {
+        let email = userEmail
+        let fn = firstName
+        let ln = lastName
+
+        if (!email) {
+          const { data } = await supabase.auth.getUser()
+          if (data.user?.email) email = data.user.email
+          const meta = data.user?.user_metadata ?? {}
+          if (!fn) fn = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
+          if (!ln) ln = ((meta.last_name ?? meta.lastName ?? '') as string).trim()
+        }
+
+        if (!email) {
+          try {
+            const savedUser = localStorage.getItem('subtle-user-v1')
+            if (savedUser) {
+              const u = JSON.parse(savedUser)
+              if (u.email) email = u.email
+              if (!fn && u.firstName) fn = u.firstName
+              if (!ln && u.lastName) ln = u.lastName
+            }
+          } catch {}
+        }
+
+        const res = await fetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            firstName: firstName || 'Intern',
-            lastName: lastName || 'Student',
-            email: userEmail || 'intern@subtle.edu',
-            company: a.company,
-            address: a.address,
-            budget: a.budget,
-            roommates: a.roommates,
-            interests: a.interests,
-            housingType: a.housingType,
-            accommodations: a.accommodations,
-            moveIn: a.moveIn,
-            commuteMode: a.commuteMode,
-            car: a.car,
-            maxCommute: a.maxCommute,
-            transitImportance: a.transitImportance,
-            gender: a.roommatePrefs.gender,
-            numRoommates: a.roommatePrefs.count,
-            noise: a.roommatePrefs.noise,
-            cleanliness: a.roommatePrefs.cleanliness,
-            guests: a.roommatePrefs.guests,
-            sleep: a.roommatePrefs.schedule,
-            temperature: a.roommatePrefs.temperature,
-            age: a.roommatePrefs.age,
+            firstName: fn || 'Intern',
+            lastName: ln || 'Student',
+            email: email || 'intern@subtle.edu',
+            company: latestAnswers.company,
+            address: latestAnswers.address,
+            budget: latestAnswers.budget,
+            roommates: latestAnswers.roommates,
+            interests: latestAnswers.interests,
+            housingType: latestAnswers.housingType,
+            accommodations: latestAnswers.accommodations,
+            moveIn: latestAnswers.moveIn,
+            commuteMode: latestAnswers.commuteMode,
+            car: latestAnswers.car,
+            maxCommute: latestAnswers.maxCommute,
+            transitImportance: latestAnswers.transitImportance,
+            gender: latestAnswers.roommatePrefs.gender,
+            numRoommates: latestAnswers.roommatePrefs.count,
+            noise: latestAnswers.roommatePrefs.noise,
+            cleanliness: latestAnswers.roommatePrefs.cleanliness,
+            guests: latestAnswers.roommatePrefs.guests,
+            sleep: latestAnswers.roommatePrefs.schedule,
+            temperature: latestAnswers.roommatePrefs.temperature,
+            age: latestAnswers.roommatePrefs.age,
           }),
         })
-      } catch {}
+
+        if (!res.ok) {
+          const errData = await res.json()
+          console.error('Failed to save questionnaire responses to Supabase:', errData)
+        }
+      } catch (e) {
+        console.error('Error submitting questionnaire:', e)
+      }
     }
   }
 
   const go = (i: number) => {
     const clamped = Math.max(0, Math.min(i, steps.length - 1))
-    void saveQuizProgress(steps[clamped]?.id)
+    void saveQuizProgress(steps[clamped]?.id, a)
     setIndex(clamped)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
