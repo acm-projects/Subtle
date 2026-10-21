@@ -153,10 +153,17 @@ export default function HomeView() {
   // Read-only: show the logged-in user's first name if their account has one saved.
   useEffect(() => {
     setShow(true)
+    try {
+      const saved = localStorage.getItem('subtle-user-v1')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.firstName) setFirstName(parsed.firstName)
+      }
+    } catch {}
     supabase.auth.getUser().then(({ data }) => {
       const meta = data.user?.user_metadata ?? {}
       const name = (meta.first_name ?? meta.firstName ?? '') as string
-      setFirstName(name.trim())
+      if (name.trim()) setFirstName(name.trim())
     })
   }, [])
 
@@ -210,6 +217,23 @@ export default function HomeView() {
                 <path d="M5 12h14M13 6l6 6-6 6" />
               </svg>
             </Link>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Link
+                href="/post"
+                className="flex min-h-12 items-center justify-center gap-1.5 rounded-full border border-[#D5DFEA] bg-white/80 px-4 text-sm font-semibold text-[#1E2B44] transition hover:-translate-y-0.5 hover:bg-white"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Post a listing
+              </Link>
+              <Link
+                href="/matches"
+                className="flex min-h-12 items-center justify-center gap-1.5 rounded-full border border-[#D5DFEA] bg-white/80 px-4 text-sm font-semibold text-[#1E2B44] transition hover:-translate-y-0.5 hover:bg-white"
+              >
+                Browse matches
+              </Link>
+            </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-[#4A5A75]">
               <span>Takes a few minutes.</span>
               <span className="inline-flex items-center gap-1.5">

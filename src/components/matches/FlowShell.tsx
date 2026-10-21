@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { SAMPLE_CONTEXT, type Listing, type MatchContext } from './listings'
 import { Icon, ListingPhoto, ScoreBadge } from './parts'
@@ -7,7 +8,7 @@ import { Icon, ListingPhoto, ScoreBadge } from './parts'
 // Two-column glass layout shared by the Book and Contact pages: content on the left, the home on the right.
 export default function FlowShell({
   listing,
-  context = SAMPLE_CONTEXT,
+  context: initialContext = SAMPLE_CONTEXT,
   caption,
   children,
 }: {
@@ -16,6 +17,27 @@ export default function FlowShell({
   caption: React.ReactNode
   children: React.ReactNode
 }) {
+  const [context, setContext] = useState<MatchContext>(initialContext)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('subtle-quiz-v1')
+      if (raw) {
+        const q = JSON.parse(raw)
+        if (q.company || q.address) {
+          const addr = (q.address as string | undefined)?.trim() || initialContext.office
+          const parts = addr.split(',').map((s) => s.trim()).filter(Boolean)
+          const city = parts.length >= 2 ? parts.slice(-2).join(', ') : initialContext.city
+          setContext({
+            company: (q.company as string | undefined)?.trim() || initialContext.company,
+            office: addr,
+            city,
+          })
+        }
+      }
+    } catch {}
+  }, [initialContext])
+
   return (
     <>
       <AppNavbar firstName="" />

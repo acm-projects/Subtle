@@ -1,7 +1,10 @@
 'use client'
 
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import AppNavbar from '../../components/AppNavbar'
+import { startConversation } from '../../components/messages/store'
 import { supabase } from '../../lib/supabase'
 
 //Backend: replace these 
@@ -129,6 +132,7 @@ function Tooltip({
 }
 
 export default function MatchesPage() {
+  const router = useRouter()
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [contacted, setContacted] = useState<Set<string>>(new Set())
   const [firstName, setFirstName] = useState('')
@@ -176,6 +180,20 @@ export default function MatchesPage() {
   const contact = (id: string) => {
     // TODO: open a message composer / send a connection request through your backend
     setContacted((prev) => new Set(prev).add(id))
+    const intern = interns.find((x) => x.id === id)
+    if (!intern) return
+    const first = intern.name.split(' ')[0]
+    const sharedText = intern.shared.length ? ` I saw we both enjoy ${joinNames(intern.shared)}!` : ''
+    const convId = await startConversation(
+      {
+        id: `intern-${intern.id}`,
+        title: `${intern.role} · ${intern.school}`,
+        score: intern.match,
+        hostName: intern.name,
+      },
+      `Hi ${first}! I'm also interning in the city this summer.${sharedText} Would love to connect or look for housing together!`,
+    )
+    router.push(`/messages?c=${convId}`)
   }
 
   return (
