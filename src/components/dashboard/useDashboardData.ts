@@ -71,10 +71,10 @@ export function useDashboardData(): DashboardData {
       if (quizStatus === 'done') {
         let real: Listing[] = []
         try {
-          const { listings } = await getListings({ pageSize: 6 })
+          const { listings } = await getListings({ pageSize: 20 })
           real = (listings ?? []).map(dbListingToMatchListing)
         } catch {}
-        topMatches = [...real, ...SAMPLE_LISTINGS].sort((a, b) => b.score - a.score).slice(0, 6)
+        topMatches = [...real, ...SAMPLE_LISTINGS].sort((a, b) => b.score - a.score).slice(0, 12)
       }
 
       const savedHomes: Listing[] = []

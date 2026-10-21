@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from '../matches/parts'
 import { BOOKING_STEPS } from '../matches/activity'
@@ -34,6 +34,8 @@ export default function Dashboard() {
   const [hello, setHello] = useState('Welcome back')
   useEffect(() => setHello(greeting()), [])
   const name = d.firstName || 'there'
+  const rowRef = useRef<HTMLOListElement>(null)
+  const scrollRow = (dir: number) => rowRef.current?.scrollBy({ left: dir * 340, behavior: 'smooth' })
 
   return (
     <>
@@ -62,16 +64,29 @@ export default function Dashboard() {
               <>
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
-                    <p className={eyebrow}>Ranked by Subtle score</p>
+                    <p className={eyebrow}>Ranked by Subtle score · scroll for more</p>
                     <h2 className={`${serif} mt-1 text-4xl font-medium`}>Your best matches</h2>
                   </div>
-                  <Link href="/matches" className={btnLight}>
-                    See all matches <Icon name="arrowR" size={16} />
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => scrollRow(-1)} aria-label="Scroll matches left" className="flex h-12 w-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white/80 transition hover:bg-white">
+                      <Icon name="arrowL" size={18} />
+                    </button>
+                    <button type="button" onClick={() => scrollRow(1)} aria-label="Scroll matches right" className="flex h-12 w-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white/80 transition hover:bg-white">
+                      <Icon name="arrowR" size={18} />
+                    </button>
+                    <Link href="/matches" className={btnLight}>
+                      See all matches
+                    </Link>
+                  </div>
                 </div>
-                <ol className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <ol
+                  ref={rowRef}
+                  aria-label="Your best matches, scroll sideways for more"
+                  tabIndex={0}
+                  className="-mx-2 mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-px-2 px-2 pb-4 outline-none [scrollbar-color:#C9DBEA_transparent] [scrollbar-width:thin] focus-visible:ring-4 focus-visible:ring-[#A9C7E8]/60"
+                >
                   {d.topMatches.map((l, i) => (
-                    <li key={l.id} className="animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both]" style={{ animationDelay: `${120 + i * 70}ms` }}>
+                    <li key={l.id} className="w-[min(320px,80vw)] shrink-0 snap-start animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both]" style={{ animationDelay: `${120 + Math.min(i, 4) * 70}ms` }}>
                       <Link
                         href={`/matches/${l.id}`}
                         aria-label={`Number ${i + 1}: ${l.title}, Subtle score ${l.score}`}
