@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { SAMPLE_CONTEXT, SAMPLE_LISTINGS, type Listing, type MatchContext } from './listings'
 import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from './parts'
+import { loadSaved, toggleSavedId } from './activity'
 
 type Sort = 'score' | 'price' | 'commute'
 const SORTS: { id: Sort; label: string }[] = [
@@ -54,8 +55,9 @@ export default function Matches({
     return list.sort((a, b) => (sort === 'score' ? b.score - a.score : sort === 'price' ? a.price - b.price : a.commuteMinutes - b.commuteMinutes))
   }, [listings, saved, savedOnly, sort])
 
-  // TODO(backend): persist saved homes
-  const toggleSaved = (id: string) => setSaved((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+  // saved homes live in activity.ts (TODO(backend) there)
+  useEffect(() => setSaved(loadSaved()), [])
+  const toggleSaved = (id: string) => setSaved(toggleSavedId(id))
   return (
     <>
       <AppNavbar firstName="" />
@@ -63,34 +65,35 @@ export default function Matches({
         <div className="mx-auto w-full max-w-[1240px] rounded-[36px] border border-white bg-white/60 p-5 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-9">
           {/* header */}
           <div className="flex flex-wrap items-end justify-between gap-6">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">Ranked for you</p>
               <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">Your matches</h1>
-              <p className="mt-2 text-[17px] text-[#4A5A75]">
-                Highest Subtle score first. Every home is near {context.office}.
-              </p>
-            </div>
-            <div className="flex flex-col items-start gap-3 md:items-end">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white bg-white/80 px-4 py-2 text-sm font-semibold">
-                <Icon name="pin" size={15} /> {context.city} · {context.company}
-              </span>
-              <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
-                <Link
-                  href="/internMatches"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[#1E2B44] px-4 py-2 text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]"
-                >
-                  <Icon name="user" size={14} /> Intern matches
-                </Link>
-                <Link
-                  href="/messages"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[#D5DFEA] bg-white px-4 py-2 transition hover:-translate-y-0.5"
-                >
-                  Messages
-                </Link>
-                <Link href="/questionnaire" className="underline underline-offset-2 hover:text-[#A35F33]">
+              <p className="mt-2 text-[17px] text-[#4A5A75]">Highest Subtle score first.</p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <span title={context.office} className="inline-flex max-w-full items-center gap-2 rounded-full border border-white bg-white/80 px-4 py-2 text-sm font-semibold">
+                  <Icon name="pin" size={15} />
+                  <span className="truncate">
+                    Near {context.company} · {context.city}
+                  </span>
+                </span>
+                <Link href="/questionnaire" className="text-sm font-semibold underline underline-offset-2 hover:text-[#A35F33]">
                   Edit my answers
                 </Link>
               </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
+              <Link
+                href="/internMatches"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[#1E2B44] px-4 text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]"
+              >
+                <Icon name="user" size={14} /> Intern matches
+              </Link>
+              <Link
+                href="/messages"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-[#D5DFEA] bg-white px-4 transition hover:-translate-y-0.5"
+              >
+                Messages
+              </Link>
             </div>
           </div>
 

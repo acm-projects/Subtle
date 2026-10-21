@@ -5,12 +5,10 @@ import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
 
-// Navbar for logged-in pages: logo, Housing Matches, Intern Matches, Messages, Post a listing, and Log out (with a confirm step).
+// Navbar for logged-in pages: logo (back to the dashboard), Messages, Post a listing, and Log out (with a confirm step).
 export default function AppNavbar({ firstName: _firstName }: { firstName: string }) {
   const router = useRouter()
   const pathname = usePathname()
-  const matching = pathname?.startsWith('/matches')
-  const internMatching = pathname?.startsWith('/internMatches')
   const posting = pathname?.startsWith('/post')
   const messaging = pathname?.startsWith('/messages')
   const [confirming, setConfirming] = useState(false)
@@ -39,34 +37,6 @@ export default function AppNavbar({ firstName: _firstName }: { firstName: string
         <nav className="mx-auto flex max-w-6xl items-center gap-1.5 rounded-full border border-white bg-white/70 py-2 pl-6 pr-2 text-[#1E2B44] shadow-[0_20px_50px_-30px_rgba(30,43,68,0.45)] backdrop-blur-xl">
           <Link href="/home" className="mr-auto font-[family-name:var(--font-serif)] text-[26px] font-medium">
             subtle.
-          </Link>
-          <Link
-            href="/matches"
-            aria-current={matching ? 'page' : undefined}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2.5 text-sm font-semibold transition-colors md:px-4 md:py-3 ${
-              matching ? 'bg-[#1E2B44] text-white' : 'hover:bg-[#1E2B44]/[0.06]'
-            }`}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />
-            </svg>
-            <span className="hidden sm:inline">Matches</span>
-            <span className="sr-only sm:hidden">Matches</span>
-          </Link>
-          <Link
-            href="/internMatches"
-            aria-current={internMatching ? 'page' : undefined}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2.5 text-sm font-semibold transition-colors md:px-4 md:py-3 ${
-              internMatching ? 'bg-[#1E2B44] text-white' : 'hover:bg-[#1E2B44]/[0.06]'
-            }`}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="9" cy="8" r="3.5" />
-              <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
-              <path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6" />
-            </svg>
-            <span className="hidden sm:inline">Intern Matches</span>
-            <span className="sr-only sm:hidden">Intern Matches</span>
           </Link>
           <Link
             href="/messages"

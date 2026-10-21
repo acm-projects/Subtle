@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { SAMPLE_CONTEXT, type Listing, type MatchContext } from './listings'
 import { commuteIcon, Icon, ListingPhoto, ScoreBadge, scoreColor } from './parts'
+import { loadSaved, toggleSavedId } from './activity'
 
 const commuteTo = (l: Listing, office: string) => {
   const how = l.commuteMode === 'walk' ? 'walk' : l.commuteMode === 'transit' ? 'by transit' : l.commuteMode === 'bike' ? 'bike ride' : 'drive'
@@ -50,8 +51,9 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
     } catch {}
   }, [initialContext])
 
-  // TODO(backend): save / unsave listing.id for this user
-  const toggleSaved = () => setSaved((s) => !s)
+  // saved homes live in activity.ts (TODO(backend) there)
+  useEffect(() => setSaved(loadSaved().includes(listing.id)), [listing.id])
+  const toggleSaved = () => setSaved(toggleSavedId(listing.id).includes(listing.id))
 
   const facts = [
     { icon: 'dollar', label: 'Rent', value: `$${listing.price.toLocaleString()} / month` },
