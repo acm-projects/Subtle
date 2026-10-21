@@ -177,13 +177,17 @@ export default function MatchesPage() {
     [matches],
   )
 
-  const contact = (id: string) => {
-    // TODO: open a message composer / send a connection request through your backend
-    setContacted((prev) => new Set(prev).add(id))
-    const intern = interns.find((x) => x.id === id)
-    if (!intern) return
-    const first = intern.name.split(' ')[0]
-    const sharedText = intern.shared.length ? ` I saw we both enjoy ${joinNames(intern.shared)}!` : ''
+const contact = async (id: string) => {
+  const intern = interns.find((x) => x.id === id)
+  if (!intern || contacted.has(id)) return
+
+  // mark it right away so a double-click can't send two requests
+  setContacted((prev) => new Set(prev).add(id))
+
+  const first = intern.name.split(' ')[0]
+  const sharedText = intern.shared.length ? ` I saw we both enjoy ${joinNames(intern.shared)}!` : ''
+
+  try {
     const convId = await startConversation(
       {
         id: `intern-${intern.id}`,
@@ -194,7 +198,16 @@ export default function MatchesPage() {
       `Hi ${first}! I'm also interning in the city this summer.${sharedText} Would love to connect or look for housing together!`,
     )
     router.push(`/messages?c=${convId}`)
+  } catch (err) {
+    console.error('Could not start the conversation', err)
+    // undo the "sent" state so the button works again
+    setContacted((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
   }
+}
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_92%_100%,rgba(246,214,180,0.85),transparent_42%),linear-gradient(180deg,#c3d8ec_0%,#dde8f3_38%,#f1eeea_72%,#f7e8d8_100%)] text-[#1E2B44]">
