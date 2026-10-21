@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { SAMPLE_CONTEXT, SAMPLE_LISTINGS, type Listing, type MatchContext } from './listings'
 import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from './parts'
+import { loadSaved, toggleSavedId } from './activity'
 
 type Sort = 'score' | 'price' | 'commute'
 const SORTS: { id: Sort; label: string }[] = [
@@ -54,8 +55,9 @@ export default function Matches({
     return list.sort((a, b) => (sort === 'score' ? b.score - a.score : sort === 'price' ? a.price - b.price : a.commuteMinutes - b.commuteMinutes))
   }, [listings, saved, savedOnly, sort])
 
-  // TODO(backend): persist saved homes
-  const toggleSaved = (id: string) => setSaved((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+  // saved homes live in activity.ts (TODO(backend) there)
+  useEffect(() => setSaved(loadSaved()), [])
+  const toggleSaved = (id: string) => setSaved(toggleSavedId(id))
   return (
     <>
       <AppNavbar firstName="" />

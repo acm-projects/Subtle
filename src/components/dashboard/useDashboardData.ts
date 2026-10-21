@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { getListings } from '../../lib/listings'
+import { getListing as getDbListing, getListings } from '../../lib/listings'
+import { loadBookings, loadSaved, type Booking } from '../matches/activity'
 import { dbListingToMatchListing, SAMPLE_LISTINGS, type Listing } from '../matches/listings'
 import { EMPTY, type QuizAnswers } from '../quiz/options'
 
@@ -14,6 +15,8 @@ export type DashboardData = {
   quiz: QuizAnswers
   quizStatus: QuizStatus
   topMatches: Listing[]
+  savedHomes: Listing[]
+  bookings: Booking[]
 }
 
 // The quiz counts as done once the core questions are answered.
@@ -30,6 +33,7 @@ function quizStatusOf(q: QuizAnswers): QuizStatus {
   - name: Supabase user metadata, then the copy the login page saves
   - quiz: answers the questionnaire saves in this browser
   - topMatches: real listings from Supabase plus sample listings, ranked purely by Subtle score
+  - savedHomes / bookings: matches/activity.ts
 */
 export function useDashboardData(): DashboardData {
   const [data, setData] = useState<DashboardData>({
@@ -38,6 +42,8 @@ export function useDashboardData(): DashboardData {
     quiz: EMPTY,
     quizStatus: 'none',
     topMatches: [],
+    savedHomes: [],
+    bookings: [],
   })
 
   useEffect(() => {
@@ -71,7 +77,21 @@ export function useDashboardData(): DashboardData {
         topMatches = [...real, ...SAMPLE_LISTINGS].sort((a, b) => b.score - a.score).slice(0, 6)
       }
 
-      if (alive) setData({ loading: false, firstName, quiz, quizStatus, topMatches })
+      const savedHomes: Listing[] = []
+      for (const id of loadSaved().slice(0, 4)) {
+        const sample = SAMPLE_LISTINGS.find((l) => l.id === id)
+        if (sample) {
+          savedHomes.push(sample)
+          continue
+        }
+        try {
+          const db = await getDbListing(id)
+          if (db) savedHomes.push(dbListingToMatchListing(db))
+        } catch {}
+      }
+      const bookings = loadBookings()
+
+      if (alive) setData({ loading: false, firstName, quiz, quizStatus, topMatches, savedHomes, bookings })
     })()
     return () => {
       alive = false

@@ -5,6 +5,7 @@ import { useState } from 'react'
 import FlowShell from './FlowShell'
 import { SAMPLE_CONTEXT, stayMonths, type Listing, type MatchContext } from './listings'
 import { Icon } from './parts'
+import { addBookingRequest } from './activity'
 
 const STEPS = ['Choose your dates', 'Review the total', 'Send a request']
 
@@ -24,6 +25,7 @@ export default function BookListing({ listing, context = SAMPLE_CONTEXT }: { lis
   const requestBooking = async () => {
     setSending(true)
     await new Promise((r) => setTimeout(r, 500))
+    addBookingRequest(listing)
     setSending(false)
     setSent(true)
   }
