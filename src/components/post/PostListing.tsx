@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import AppNavbar from '../AppNavbar'
+import HouseMascot from '../HouseMascot'
 import Icon from '../quiz/icons'
 import PhotoPicker, { type Photo } from './PhotoPicker'
 import { EMPTY_LISTING, HOME_TYPES, INCLUDED, missingFields, ROOM_TYPES, shortDate, type NewListing } from './options'
@@ -220,9 +221,7 @@ export default function PostListing() {
         <AppNavbar firstName={firstName} />
         <section className="flex min-h-screen items-center justify-center px-4 pb-16 pt-28">
           <div className={`${card} w-full max-w-2xl animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] text-center`} role="status">
-            <span aria-hidden="true" className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#1E2B44] text-white">
-              <Icon name="check" size={28} />
-            </span>
+            <HouseMascot label="Subtle's house mascot waving" className="mx-auto h-36 w-36" />
             <h1 className="mt-5 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Your place is posted.</h1>
             <p className="mt-3 text-[17px] text-[#4A5A75]">Your listing has been saved to Subtle! Interns whose preferences match your home will see it.</p>
             <div className="mx-auto mt-6 max-w-sm text-left">{preview}</div>

@@ -6,6 +6,7 @@ import AppNavbar from '../AppNavbar'
 import { SAMPLE_CONTEXT, SAMPLE_LISTINGS, type Listing, type MatchContext } from './listings'
 import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from './parts'
 import { loadSaved, toggleSavedId } from './activity'
+import HouseMascot from '../HouseMascot'
 
 type Sort = 'score' | 'price' | 'commute'
 const SORTS: { id: Sort; label: string }[] = [
@@ -205,6 +206,7 @@ export default function Matches({
 
           {shown.length === 0 && (
             <div className="mt-6 rounded-[28px] border border-dashed border-[#C9DBEA] p-10 text-center">
+              <HouseMascot label="Subtle's house mascot" speed={0.7} className="mx-auto mb-3 h-28 w-28" />
               <p className="font-[family-name:var(--font-serif)] text-3xl">No saved homes yet.</p>
               <p className="mt-2 text-[#4A5A75]">Tap the heart on any home to keep it here.</p>
               <button type="button" onClick={() => setSavedOnly(false)} className="mt-5 rounded-full bg-[#1E2B44] px-6 py-3 font-semibold text-white">
