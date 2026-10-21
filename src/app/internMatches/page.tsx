@@ -1,7 +1,10 @@
 'use client'
 
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import AppNavbar from '../../components/AppNavbar'
+import { startConversation } from '../../components/messages/store'
 import { supabase } from '../../lib/supabase'
 
 //Backend: replace these 
@@ -114,13 +117,14 @@ function Tooltip({
         onClick={() => onContact(intern.id)}
         className="mt-3.5 w-full rounded-full bg-[#2E7DB5] py-2.5 text-sm font-semibold text-white transition hover:bg-[#245F90] disabled:cursor-default disabled:bg-[#9CB5CE]"
       >
-        {contacted ? 'Request sent' : `Contact ${intern.name.split(' ')[0]}`}
+        {contacted ? 'Opening chat…' : `Message ${intern.name.split(' ')[0]}`}
       </button>
     </div>
   )
 }
 
 export default function MatchesPage() {
+  const router = useRouter()
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [contacted, setContacted] = useState<Set<string>>(new Set())
   const [firstName, setFirstName] = useState('')
@@ -144,9 +148,22 @@ export default function MatchesPage() {
   )
   const matches = interns.filter((i) => i.match !== undefined).sort((a, b) => (b.match ?? 0) - (a.match ?? 0))
 
-  const contact = (id: string) => {
-    // TODO: open a message composer / send a connection request through your backend
+  const contact = async (id: string) => {
     setContacted((prev) => new Set(prev).add(id))
+    const intern = interns.find((x) => x.id === id)
+    if (!intern) return
+    const first = intern.name.split(' ')[0]
+    const sharedText = intern.shared.length ? ` I saw we both enjoy ${joinNames(intern.shared)}!` : ''
+    const convId = await startConversation(
+      {
+        id: `intern-${intern.id}`,
+        title: `${intern.role} · ${intern.school}`,
+        score: intern.match,
+        hostName: intern.name,
+      },
+      `Hi ${first}! I'm also interning in the city this summer.${sharedText} Would love to connect or look for housing together!`,
+    )
+    router.push(`/messages?c=${convId}`)
   }
 
   return (
@@ -163,6 +180,20 @@ export default function MatchesPage() {
       <div className="relative mx-auto max-w-[1240px] px-7 pt-28">
 
         <header className="pb-7 pt-5 text-center">
+          <div className="mb-3 flex justify-center gap-3">
+            <Link
+              href="/matches"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white bg-white/80 px-4 py-2 text-sm font-semibold text-[#1E2B44] shadow-sm transition hover:-translate-y-0.5 hover:bg-white"
+            >
+              &larr; Housing matches
+            </Link>
+            <Link
+              href="/messages"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#1E2B44] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#2F4161]"
+            >
+              Open messages
+            </Link>
+          </div>
           <h1 className={`${serif} text-[44px] font-bold leading-[1.02] tracking-[-0.02em] md:text-[60px]`}>Your matches.</h1>
           <p className={`${serif} mt-1.5 text-[28px] italic text-[#2E7DB5]`}>Interns in Los Angeles who share your interests.</p>
         </header>
@@ -284,6 +315,13 @@ export default function MatchesPage() {
                   <div className="text-xs text-[#5C7FA0]">{m.shared.length} shared interests</div>
                 </div>
                 <span className={`${serif} text-lg font-bold text-[#2E7DB5]`}>{m.match}%</span>
+                <button
+                  type="button"
+                  onClick={() => contact(m.id)}
+                  className="rounded-full bg-[#EEF4FB] px-3 py-1.5 text-xs font-semibold text-[#245F90] transition hover:bg-[#2E7DB5] hover:text-white"
+                >
+                  Chat
+                </button>
               </div>
             ))}
           </aside>

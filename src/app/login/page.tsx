@@ -333,20 +333,57 @@ function LoginForm() {
     setIsError(false)
 
     if (isSignUp) {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+          },
+        },
+      })
       if (error) {
         setIsError(true)
         setMessage(error.message)
       } else {
-        setMessage('Success! Check your email for the confirmation link.')
+        try {
+          localStorage.setItem(
+            'subtle-user-v1',
+            JSON.stringify({
+              firstName: firstName.trim(),
+              lastName: lastName.trim(),
+              email: email.trim(),
+            }),
+          )
+        } catch {}
+        if (data.session) {
+          router.push('/home')
+          router.refresh()
+        } else {
+          setMessage('Success! Check your email for the confirmation link.')
+        }
       }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {
         setIsError(true)
         setMessage(error.message)
       } else {
-        router.push('/')
+        const meta = data.user?.user_metadata ?? {}
+        try {
+          localStorage.setItem(
+            'subtle-user-v1',
+            JSON.stringify({
+              firstName: (meta.first_name ?? meta.firstName ?? firstName ?? '').trim(),
+              lastName: (meta.last_name ?? meta.lastName ?? lastName ?? '').trim(),
+              email: data.user?.email ?? email.trim(),
+            }),
+          )
+        } catch {}
+        router.push('/home')
         router.refresh()
       }
     }
