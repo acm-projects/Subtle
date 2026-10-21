@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { getListings, getMyListings, type Listing as DbListing } from '../../lib/listings'
+import { getListings } from '../../lib/listings'
 import { dbListingToMatchListing, SAMPLE_LISTINGS, type Listing } from '../matches/listings'
-import { loadConversations, type Conversation } from '../messages/store'
 import { EMPTY, type QuizAnswers } from '../quiz/options'
 
 export type QuizStatus = 'none' | 'started' | 'done'
@@ -15,8 +14,6 @@ export type DashboardData = {
   quiz: QuizAnswers
   quizStatus: QuizStatus
   topMatches: Listing[]
-  conversations: Conversation[]
-  myListings: DbListing[]
 }
 
 // The quiz counts as done once the core questions are answered.
@@ -32,9 +29,7 @@ function quizStatusOf(q: QuizAnswers): QuizStatus {
   Everything the dashboard shows, in one place for backend:
   - name: Supabase user metadata, then the copy the login page saves
   - quiz: answers the questionnaire saves in this browser
-  - topMatches: real listings from Supabase first, then sample listings, best score first
-  - conversations: the messages store
-  - myListings: listings this user posted (Supabase)
+  - topMatches: real listings from Supabase plus sample listings, ranked purely by Subtle score
 */
 export function useDashboardData(): DashboardData {
   const [data, setData] = useState<DashboardData>({
@@ -43,8 +38,6 @@ export function useDashboardData(): DashboardData {
     quiz: EMPTY,
     quizStatus: 'none',
     topMatches: [],
-    conversations: [],
-    myListings: [],
   })
 
   useEffect(() => {
@@ -75,20 +68,10 @@ export function useDashboardData(): DashboardData {
           const { listings } = await getListings({ pageSize: 6 })
           real = (listings ?? []).map(dbListingToMatchListing)
         } catch {}
-        topMatches = [...real, ...SAMPLE_LISTINGS].sort((a, b) => b.score - a.score).slice(0, 3)
+        topMatches = [...real, ...SAMPLE_LISTINGS].sort((a, b) => b.score - a.score).slice(0, 6)
       }
 
-      let conversations: Conversation[] = []
-      try {
-        conversations = await loadConversations()
-      } catch {}
-
-      let myListings: DbListing[] = []
-      try {
-        myListings = await getMyListings()
-      } catch {}
-
-      if (alive) setData({ loading: false, firstName, quiz, quizStatus, topMatches, conversations, myListings })
+      if (alive) setData({ loading: false, firstName, quiz, quizStatus, topMatches })
     })()
     return () => {
       alive = false
