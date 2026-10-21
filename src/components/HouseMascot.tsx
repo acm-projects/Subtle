@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 
 /*
   Subtle's house mascot (design from the team's Framer component).
-  Same shapes and timing, rebuilt with plain CSS animation so it needs no extra packages.
+  Matches the Framer render (pointed roof, open smile, waving arm), rebuilt with plain CSS animation so it needs no extra packages.
   - bobs, sways and swings its arms on a loop (speed 1 = one bob every 1.6s)
   - pauses while it's off screen, and stays still for people who turn on "reduce motion"
 */
@@ -13,6 +13,9 @@ type Props = {
   gradientEnd?: string
   faceColor?: string
   shadowColor?: string
+  legColor?: string
+  footColor?: string
+  blushColor?: string
   animate?: boolean
   speed?: number
   label?: string
@@ -23,8 +26,11 @@ type Props = {
 export default function HouseMascot({
   gradientStart = '#B9D6F0',
   gradientEnd = '#F4E2CD',
-  faceColor = '#405367',
-  shadowColor = '#7D91A3',
+  faceColor = '#3E5068',
+  shadowColor = '#9FB2C4',
+  legColor = '#7E97AD',
+  footColor = '#B9D6F0',
+  blushColor = '#F4DCC6',
   animate = true,
   speed = 1,
   label = 'Subtle house mascot',
@@ -35,7 +41,6 @@ export default function HouseMascot({
   const [onScreen, setOnScreen] = useState(false)
   const gradientId = `house-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   const duration = `${Math.max(0.2, 1.6 / Math.max(0.1, speed))}s`
-  const fill = `url(#${gradientId})`
 
   useEffect(() => {
     const el = ref.current
@@ -53,46 +58,65 @@ export default function HouseMascot({
 
   return (
     <div ref={ref} role="img" aria-label={label} className={`house-mascot relative flex items-center justify-center ${className}`} style={style}>
-      <svg width="100%" height="100%" viewBox="0 0 420 470" preserveAspectRatio="xMidYMid meet" style={{ overflow: 'visible' }} aria-hidden="true">
+      <svg width="100%" height="100%" viewBox="190 80 470 490" preserveAspectRatio="xMidYMid meet" style={{ overflow: 'visible' }} aria-hidden="true">
         <defs>
-          <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+          <linearGradient id={`${gradientId}-roof`} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={gradientStart} />
+            <stop offset="100%" stopColor="#D6DDE3" />
+          </linearGradient>
+          <linearGradient id={`${gradientId}-body`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={gradientStart} />
+            <stop offset="55%" stopColor="#D8DEE3" />
+            <stop offset="100%" stopColor={gradientEnd} />
+          </linearGradient>
+          <linearGradient id={`${gradientId}-armL`} gradientUnits="userSpaceOnUse" x1="262" y1="333" x2="224" y2="410">
             <stop offset="0%" stopColor={gradientStart} />
             <stop offset="100%" stopColor={gradientEnd} />
           </linearGradient>
+          <linearGradient id={`${gradientId}-armR`} gradientUnits="userSpaceOnUse" x1="627" y1="215" x2="566" y2="272">
+            <stop offset="0%" stopColor={gradientStart} />
+            <stop offset="100%" stopColor={gradientEnd} />
+          </linearGradient>
+          <filter id={`${gradientId}-blur`} x="-30%" y="-100%" width="160%" height="300%">
+            <feGaussianBlur stdDeviation="9" />
+          </filter>
         </defs>
 
-        <ellipse cx="210" cy="436" rx="118" ry="24" fill={shadowColor} opacity={0.22} style={{ transformOrigin: '210px 436px', ...loop('houseShadow') }} />
+        {/* soft shadow */}
+        <ellipse cx="425" cy="532" rx="122" ry="18" fill={shadowColor} opacity={0.35} filter={`url(#${gradientId}-blur)`} style={{ transformOrigin: '425px 532px', ...loop('houseShadow') }} />
 
-        <g style={{ transformOrigin: '210px 216px', ...loop('houseBob') }}>
-          <g style={{ transformOrigin: '93px 220px', transform: 'rotate(10deg)', ...loop('houseArmL') }}>
-            <rect x="66" y="212" width="28" height="116" rx="14" fill={fill} />
+        <g style={{ transformOrigin: '415px 300px', ...loop('houseBob') }}>
+          {/* arms */}
+          <g style={{ transformOrigin: '262px 333px', ...loop('houseArmL') }}>
+            <line x1="262" y1="333" x2="224" y2="410" stroke={`url(#${gradientId}-armL)`} strokeWidth="24" strokeLinecap="round" />
           </g>
-          <g style={{ transformOrigin: '327px 220px', transform: 'rotate(-8deg)', ...loop('houseArmR') }}>
-            <rect x="326" y="212" width="28" height="116" rx="14" fill={fill} />
+          <g style={{ transformOrigin: '566px 272px', ...loop('houseArmR') }}>
+            <line x1="566" y1="272" x2="627" y2="215" stroke={`url(#${gradientId}-armR)`} strokeWidth="24" strokeLinecap="round" />
           </g>
-
-          {/* chimney */}
-          <rect x="302" y="58" width="32" height="66" rx="8" fill={faceColor} />
-          <rect x="296" y="52" width="44" height="18" rx="9" fill={faceColor} />
-
-          {/* roof + body */}
-          <path d="M55 155 Q210 8 365 155 L365 172 L55 172 Z" fill={fill} />
-          <rect x="90" y="140" width="240" height="184" rx="52" fill={fill} />
-
-          {/* face */}
-          <ellipse cx="124" cy="196" rx="12" ry="15" fill={faceColor} />
-          <ellipse cx="238" cy="196" rx="12" ry="15" fill={faceColor} />
-          <circle cx="127" cy="191" r="3.1" fill="#FFFFFF" />
-          <circle cx="241" cy="191" r="3.1" fill="#FFFFFF" />
-          <ellipse cx="154" cy="241" rx="17" ry="11" fill="#F2E6D6" />
-          <ellipse cx="266" cy="241" rx="17" ry="11" fill="#F2E6D6" />
-          <path d="M160 232 Q210 276 260 232" fill="none" stroke={faceColor} strokeWidth="6" strokeLinecap="round" />
 
           {/* legs + feet */}
-          <rect x="154" y="316" width="30" height="80" rx="15" fill={fill} />
-          <rect x="236" y="316" width="30" height="80" rx="15" fill={fill} />
-          <ellipse cx="168" cy="395" rx="34" ry="16" fill="#80A9D6" />
-          <ellipse cx="252" cy="395" rx="34" ry="16" fill="#80A9D6" />
+          <path d="M356 452 L349 492" stroke={legColor} strokeWidth="14" strokeLinecap="round" />
+          <path d="M482 448 L490 484" stroke={legColor} strokeWidth="14" strokeLinecap="round" />
+          <rect x="318" y="486" width="62" height="28" rx="11" fill={footColor} />
+          <rect x="466" y="478" width="64" height="28" rx="11" fill={footColor} />
+
+          {/* chimney (behind the roof) */}
+          <rect x="470" y="155" width="36" height="84" rx="7" fill={gradientEnd} />
+
+          {/* body */}
+          <path d="M283 268 L546 262 L550 418 Q551 446 523 447 L313 456 Q288 457 287 430 Z" fill={`url(#${gradientId}-body)`} />
+
+          {/* roof */}
+          <path d="M252 270 L398 112 Q404 105 410 112 L571 255 Q576 262 568 263 L256 278 Q245 279 252 270 Z" fill={`url(#${gradientId}-roof)`} />
+
+          {/* face */}
+          <ellipse cx="352" cy="333" rx="12" ry="16" fill={faceColor} />
+          <ellipse cx="478" cy="326" rx="12" ry="16" fill={faceColor} />
+          <circle cx="348.5" cy="324" r="3.4" fill="#FFFFFF" />
+          <circle cx="474.5" cy="317" r="3.4" fill="#FFFFFF" />
+          <ellipse cx="334" cy="367" rx="16" ry="7.5" fill={blushColor} />
+          <ellipse cx="502" cy="358" rx="16" ry="7.5" fill={blushColor} />
+          <path d="M396 355 Q395 352 399 352 L435 351 Q439 351 438 354 Q436 378 417 378 Q398 378 396 355 Z" fill={faceColor} />
         </g>
       </svg>
     </div>
