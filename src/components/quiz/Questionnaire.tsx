@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import AppNavbar from '../AppNavbar'
+import HouseMascot from '../HouseMascot'
 import Icon from './icons'
 import { Field, OptionRow, OptionTile, SidePanel } from './parts'
 import {
@@ -478,10 +479,8 @@ export default function Questionnaire() {
         <AppNavbar firstName={firstName} />
         <section className="flex min-h-screen flex-col justify-center px-4 pb-10 pt-28 md:px-8">
           <div className="mx-auto max-w-3xl animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.1)] rounded-[36px] border border-white bg-white/70 p-8 text-center shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-12">
-            <span aria-hidden="true" className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#1E2B44] text-white">
-              <Icon name="home" size={28} />
-            </span>
-            <h1 className="mt-5 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">
+            <HouseMascot label="Subtle's house mascot cheering" className="mx-auto h-40 w-40" />
+            <h1 className="mt-4 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">
               You&apos;re all set{firstName ? `, ${firstName}` : ''}.
             </h1>
             <p className="mx-auto mt-3 max-w-md text-lg text-[#4A5A75]">We&apos;ll use your answers to line up verified sublets near your office.</p>
