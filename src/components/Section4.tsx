@@ -28,12 +28,6 @@ export default function Section4() {
           </h2>
           <p className="mt-4 max-w-sm text-[17px] text-white">Join the students and interns booking safely with Subtle.</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <a href="/login?mode=signup" className="rounded-full bg-white px-6 py-3.5 text-[15px] font-semibold text-[#1E2B44] transition hover:-translate-y-0.5 hover:bg-[#FBF3EA]">
-              Create your account
-            </a>
-            <a href="#cities" className="rounded-full border border-white/60 bg-white/10 px-6 py-3.5 text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/20">
-              Browse cities
-            </a>
           </div>
         </div>
         <div
