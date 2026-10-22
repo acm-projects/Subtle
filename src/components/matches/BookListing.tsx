@@ -6,6 +6,7 @@ import FlowShell from './FlowShell'
 import { SAMPLE_CONTEXT, stayMonths, type Listing, type MatchContext } from './listings'
 import { Icon } from './parts'
 import { addBookingRequest } from './activity'
+import HouseMascot from '../HouseMascot'
 
 const STEPS = ['Choose your dates', 'Review the total', 'Send a request']
 
@@ -36,10 +37,8 @@ export default function BookListing({ listing, context = SAMPLE_CONTEXT }: { lis
     <FlowShell listing={listing} context={context} caption={`${listing.roomType} · ${listing.tags[0] ?? listing.homeType} · From ${listing.availableFrom}`}>
       {sent ? (
         <div className="my-auto animate-[fadeIn_.3s_ease-out] py-6" role="status">
-          <span aria-hidden="true" className="flex h-14 w-14 items-center justify-center rounded-full bg-[#1E2B44] text-white">
-            <Icon name="check" size={24} />
-          </span>
-          <h1 className="mt-5 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Request sent.</h1>
+          <HouseMascot label="Subtle's house mascot waving" className="-ml-2 h-32 w-32" />
+          <h1 className="mt-3 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Request sent.</h1>
           <p className="mt-3 text-[17px] text-[#4A5A75]">
             {host} usually confirms within a day. You won&apos;t be charged until they accept. (Demo only for now.)
           </p>

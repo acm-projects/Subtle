@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import AppNavbar from '../AppNavbar'
+import HouseMascot from '../HouseMascot'
 import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from '../matches/parts'
 import { BOOKING_STEPS } from '../matches/activity'
 import { useDashboardData } from './useDashboardData'
@@ -125,26 +126,23 @@ export default function Dashboard() {
                       ? 'Your answers are saved. Finish the last few questions and your best matches show up right here.'
                       : `Take the quick housing quiz, ${name}, and your best matches will show up right here, ranked by Subtle score.`}
                   </p>
+                  <ul className="mt-5 flex flex-wrap gap-2" aria-label="What the quiz asks">
+                    {QUIZ_TOPICS.map((t) => (
+                      <li key={t.title} className="inline-flex items-center gap-1.5 rounded-full border border-white bg-white/80 px-3 py-1.5 text-[13px] font-medium">
+                        <Icon name={t.icon} size={14} /> {t.title}
+                      </li>
+                    ))}
+                  </ul>
                   <div className="mt-7">
                     <Link href="/questionnaire" className={btnDark}>
                       {d.quizStatus === 'started' ? 'Finish the quiz' : 'Take the quiz'} <Icon name="arrowR" size={16} />
                     </Link>
                   </div>
                 </div>
-                <ul className="grid grid-cols-2 gap-4">
-                  {QUIZ_TOPICS.map((t, i) => (
-                    <li
-                      key={t.title}
-                      className="flex animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] flex-col gap-3 rounded-[24px] border border-white bg-white/80 p-5"
-                      style={{ animationDelay: `${200 + i * 80}ms` }}
-                    >
-                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF3F8]">
-                        <Icon name={t.icon} size={18} />
-                      </span>
-                      <span className="text-sm font-semibold leading-snug">{t.title}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="relative mx-auto flex h-64 w-full max-w-[300px] items-end justify-center md:h-72">
+                  <div aria-hidden="true" className="absolute inset-x-6 bottom-6 top-10 rounded-full bg-[#F3C9A0]/35 blur-3xl" />
+                  <HouseMascot label="Subtle's house mascot waving hello" className="relative h-full w-full" />
+                </div>
               </div>
             )}
           </section>
