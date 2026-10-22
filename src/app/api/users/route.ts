@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../../../lib/supabase'
 
 // '' (unanswered) -> null, so integer and enum columns don't reject it
@@ -128,6 +129,18 @@ export async function GET(request: Request) {
 }
 
 async function upsertUser(request: Request) {
+  // Build a per-request client that carries the caller's JWT so that
+  // every PostgREST query runs as 'authenticated' with the correct auth.uid().
+  const authHeader = request.headers.get('authorization') ?? ''
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+  const client = token
+    ? createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL as string,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
+        { global: { headers: { Authorization: `Bearer ${token}` } } },
+      )
+    : supabase
+
   let body: Record<string, any>
   try {
     body = await request.json()
@@ -143,7 +156,7 @@ async function upsertUser(request: Request) {
     return NextResponse.json({ error: 'Email is required' }, { status: 400 })
   }
 
-  const { data: existingRows } = await supabase
+  const { data: existingRows } = await client
     .from('users_table')
     .select('*')
     .eq('student_email', email)
@@ -163,7 +176,14 @@ async function upsertUser(request: Request) {
     last_name: lastName ?? existingUser?.last_name ?? 'Student',
   }
 
-  if (body.id || existingUser?.id) row.id = body.id ?? existingUser?.id
+  // Resolve the row's id: prefer body/existing, then fall back to auth.uid()
+  // so the RLS policy (auth.uid() = id) is satisfied for new rows.
+  if (body.id || existingUser?.id) {
+    row.id = body.id ?? existingUser?.id
+  } else if (token) {
+    const { data: authData } = await client.auth.getUser(token)
+    if (authData?.user?.id) row.id = authData.user.id
+  }
   if (body.city !== undefined) row.user_city = orNull(body.city)
   if (body.company !== undefined || body.company_name !== undefined) row.company_name = orNull(body.company ?? body.company_name)
   if (body.address !== undefined || body.office_address !== undefined) row.office_address = orNull(body.address ?? body.office_address)
@@ -197,7 +217,7 @@ async function upsertUser(request: Request) {
     }
   }
 
-  const { data: inserted, error: insertError } = await supabase
+  const { data: inserted, error: insertError } = await client
     .from('users_table')
     .insert(row)
     .select()
