@@ -143,9 +143,12 @@ export default function Questionnaire() {
           } catch {}
         }
 
+        // send the login token so the server saves the row as this user (the table only lets you write your own row)
+        const { data: sessionData } = await supabase.auth.getSession()
+        const token = sessionData.session?.access_token
         const res = await fetch('/api/users', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({
             firstName: fn || 'Intern',
             lastName: ln || 'Student',
@@ -174,12 +177,13 @@ export default function Questionnaire() {
           }),
         })
 
+        // answers are already saved in this browser, so a failed save never blocks the quiz
         if (!res.ok) {
-          const errData = await res.json()
-          console.error('Failed to save questionnaire responses to Supabase:', errData)
+          const errData = await res.json().catch(() => ({}))
+          console.warn(`Couldn't save quiz answers to Supabase (status ${res.status}):`, errData?.error ?? 'no details')
         }
       } catch (e) {
-        console.error('Error submitting questionnaire:', e)
+        console.warn("Couldn't reach /api/users to save quiz answers:", e)
       }
     }
   }
