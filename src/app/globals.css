@@ -37,4 +37,4 @@ html { scrollbar-gutter: stable; }
 body, button, [role='button'], optgroup, option { text-transform: lowercase; }
 .uppercase, .capitalize { text-transform: lowercase; }
 input, textarea, select, [contenteditable='true'] { text-transform: none; }
-@keyframes journeyHop { 0% { transform: translateY(0); } 35% { transform: translateY(-26px); } 65% { transform: translateY(0) scale(1.04, 0.95); } 100% { transform: none; } }
+@keyframes journeyHop { 0% { transform: translateY(0); } 30% { transform: translateY(-14%); } 60% { transform: translateY(0) scale(1.05, 0.94); } 80% { transform: translateY(0) scale(0.98, 1.02); } 100% { transform: none; } }
