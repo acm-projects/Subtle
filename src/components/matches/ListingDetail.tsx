@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { SAMPLE_CONTEXT, type Listing, type MatchContext } from './listings'
 import { commuteIcon, Icon, ListingPhoto, ScoreBadge, scoreColor } from './parts'
@@ -53,6 +53,13 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
 
   // saved homes live in activity.ts (TODO(backend) there)
   useEffect(() => setSaved(loadSaved().includes(listing.id)), [listing.id])
+  // count a view for the host's listing page (once per visit)
+  const counted = useRef<string | null>(null)
+  useEffect(() => {
+    if (counted.current === listing.id) return
+    counted.current = listing.id
+    fetch('/api/listing-views', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ listingId: listing.id }) }).catch(() => {})
+  }, [listing.id])
   const toggleSaved = () => setSaved(toggleSavedId(listing.id).includes(listing.id))
 
   const facts = [

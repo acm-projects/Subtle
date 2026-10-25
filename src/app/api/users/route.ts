@@ -224,7 +224,7 @@ async function upsertUser(request: Request) {
 
   if (insertError) {
     console.error('Error saving to users_table:', insertError)
-    return NextResponse.json({ error: insertError.message }, { status: 500 })
+    return NextResponse.json({ error: insertError.message || insertError.details || insertError.hint || insertError.code || 'Could not save the row' }, { status: 500 })
   }
 
   return NextResponse.json(inserted, { status: 201 })
