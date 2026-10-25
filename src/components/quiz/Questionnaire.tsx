@@ -13,13 +13,17 @@ import {
   buildSteps,
   CAR,
   COMMUTE_MODES,
+  allInterests,
   EMPTY,
+  HANGOUTS,
   HOUSING_TYPES,
   INTERESTS,
+  MIN_INTERESTS,
   label,
   MOVE_IN,
   type QuizAnswers,
   ROOMMATE_GROUPS,
+  SCHOOLS,
   SECTIONS,
   type StepId,
   TRANSIT_LEVELS,
@@ -60,7 +64,7 @@ export default function Questionnaire() {
   const steps = useMemo(() => buildSteps(a), [a])
   const step = steps[Math.min(index, steps.length - 1)]
   const set = <K extends keyof QuizAnswers>(key: K, value: QuizAnswers[K]) => setA((prev) => ({ ...prev, [key]: value }))
-  const toggle = (key: 'accommodations' | 'interests', id: string) =>
+  const toggle = (key: 'accommodations' | 'interests' | 'hangouts', id: string) =>
     setA((prev) => {
       const list = prev[key]
       if (key === 'accommodations') {
@@ -80,6 +84,7 @@ export default function Questionnaire() {
     : (qNum / Math.max(sectionSteps.length, 1)) * 100
 
   const canContinue: Record<StepId, boolean> = {
+    school: a.university.trim() !== '',
     work: a.company.trim() !== '' && a.address.trim() !== '',
     commute: a.commuteMode !== null,
     budget: a.budget !== null,
@@ -90,7 +95,8 @@ export default function Questionnaire() {
     car: a.car !== null,
     moveIn: a.moveIn !== null,
     transit: true,
-    interests: true,
+    interests: a.interests.length >= MIN_INTERESTS,
+    hangouts: true,
     done: true,
   }
 
@@ -135,7 +141,8 @@ export default function Questionnaire() {
             address: latestAnswers.address,
             budget: latestAnswers.budget,
             roommates: latestAnswers.roommates,
-            interests: latestAnswers.interests,
+            university: latestAnswers.university.trim(), // TODO(backend): add a university column in users_table and map it in /api/users
+            interests: allInterests(latestAnswers),
             housingType: latestAnswers.housingType,
             accommodations: latestAnswers.accommodations,
             moveIn: latestAnswers.moveIn,
@@ -172,7 +179,7 @@ export default function Questionnaire() {
   }
   const nextStep = steps[index + 1]
   const nextLabel =
-    step.id === 'interests'
+    step.id === 'hangouts'
       ? 'See my matches'
       : nextStep && nextStep.section !== step.section
         ? `Next section (${SECTIONS[nextStep.section]})`
@@ -182,6 +189,12 @@ export default function Questionnaire() {
 
   /* right-side panel copy, based on answers */
   const panel: Partial<Record<StepId, { tag: string; icon: string; title: string; caption: string }>> = {
+    school: {
+      tag: 'Your school',
+      icon: 'book',
+      title: a.university.trim() || 'Where you study',
+      caption: 'Interns from your school get a boost in your matches.',
+    },
     work: {
       tag: 'Commute radius',
       icon: 'map',
@@ -239,13 +252,48 @@ export default function Questionnaire() {
     interests: {
       tag: 'Interests',
       icon: 'music',
-      title: 'Shared tastes.',
-      caption: 'Helps us find people with similar interests.',
+      title: a.interests.length ? `${a.interests.length} picked.` : 'Shared tastes.',
+      caption: 'The more you pick, the better we match you with interns like you.',
+    },
+    hangouts: {
+      tag: 'Free time',
+      icon: 'people',
+      title: 'Your summer crew.',
+      caption: 'We use this to suggest meetups with interns near you.',
     },
   }
 
   /* question content */
   const content: Partial<Record<StepId, { title: string; sub?: string; body: React.ReactNode }>> = {
+    school: {
+      title: 'Where do you go to school?',
+      sub: 'Interns from your school show up higher in your intern matches, and it helps hosts know who you are.',
+      body: (
+        <div className="space-y-4">
+          <Field id="university" label="University" icon="book" value={a.university} onChange={(v) => set('university', v)} placeholder="e.g. UT Dallas" list="school-options" />
+          <datalist id="school-options">
+            {SCHOOLS.map((sch) => (
+              <option key={sch} value={sch} />
+            ))}
+          </datalist>
+          <div className="flex flex-wrap gap-2">
+            {SCHOOLS.slice(0, 6).map((sch) => (
+              <button
+                key={sch}
+                type="button"
+                aria-pressed={a.university === sch}
+                onClick={() => set('university', sch)}
+                className={`min-h-11 rounded-full border px-4 text-sm font-medium transition ${
+                  a.university === sch ? 'border-[#1E2B44] bg-[#1E2B44] text-white' : 'border-[#D5DFEA] bg-white/70 hover:bg-white'
+                }`}
+              >
+                {sch}
+              </button>
+            ))}
+          </div>
+        </div>
+      ),
+    },
     work: {
       title: 'Where will you be working this summer?',
       sub: 'We’ll use your office address to calculate commute routes and transit connections for every home we recommend.',
@@ -449,13 +497,66 @@ export default function Questionnaire() {
       ),
     },
     interests: {
-      title: 'What are your interests?',
-      sub: 'Select all that apply.',
+      title: 'What are you into?',
+      sub: `Pick at least ${MIN_INTERESTS}. This is how we find interns you’ll actually get along with.`,
       body: (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {INTERESTS.map((o) => (
-            <OptionTile key={o.id} multi selected={a.interests.includes(o.id)} onClick={() => toggle('interests', o.id)} icon={o.icon} title={o.title} body={o.body} />
-          ))}
+        <div>
+          <div className="mb-3 flex items-center justify-between gap-3 text-sm">
+            <span className={a.interests.length >= MIN_INTERESTS ? 'font-semibold' : 'text-[#4A5A75]'}>
+              {a.interests.length} selected{a.interests.length < MIN_INTERESTS ? ` · ${MIN_INTERESTS - a.interests.length} more to go` : ''}
+            </span>
+            {a.interests.length > 0 && (
+              <button type="button" onClick={() => set('interests', [])} className="font-semibold underline underline-offset-2 hover:text-[#A35F33]">
+                Clear
+              </button>
+            )}
+          </div>
+          <div role="group" aria-label="Interests" className="flex flex-wrap gap-2.5">
+            {INTERESTS.map((o) => {
+              const on = a.interests.includes(o.id)
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  title={o.body}
+                  onClick={() => toggle('interests', o.id)}
+                  className={`inline-flex min-h-12 items-center gap-2 rounded-full border px-4 text-[15px] font-semibold transition-all duration-200 hover:-translate-y-0.5 ${
+                    on ? 'border-[#1E2B44] bg-[#1E2B44] text-white shadow-[0_12px_24px_-16px_rgba(30,43,68,0.7)]' : 'border-[#D5DFEA] bg-white/70 hover:bg-white'
+                  }`}
+                >
+                  <Icon name={on ? 'check' : o.icon} size={16} />
+                  {o.title}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ),
+    },
+    hangouts: {
+      title: 'How do you like to spend free time?',
+      sub: 'Pick any that sound like your summer. We’ll use these for meetup ideas with your intern matches.',
+      body: (
+        <div className="space-y-5">
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {HANGOUTS.map((o) => (
+              <OptionRow key={o.id} multi selected={a.hangouts.includes(o.id)} onClick={() => toggle('hangouts', o.id)} icon={o.icon} title={o.title} body={o.body} />
+            ))}
+          </div>
+          <div>
+            <label htmlFor="other-interests" className="mb-1.5 block text-xs font-bold uppercase tracking-[0.1em]">
+              Anything else? <span className="font-medium normal-case tracking-normal text-[#4A5A75]">(optional, separate with commas)</span>
+            </label>
+            <input
+              id="other-interests"
+              value={a.otherInterests}
+              onChange={(e) => set('otherInterests', e.target.value)}
+              placeholder="e.g. pottery, chess, running club"
+              className="h-14 w-full rounded-2xl border border-[#D5DFEA] bg-white px-4 text-[15px] outline-none transition placeholder:text-[#8A97AB] focus:border-[#2F4161] focus:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]"
+            />
+          </div>
         </div>
       ),
     },
@@ -464,6 +565,7 @@ export default function Questionnaire() {
   /* finished screen */
   if (step.id === 'done') {
     const chips = [
+      a.university.trim() && `Studying at ${a.university.trim()}`,
       a.company && `Working at ${a.company}`,
       `${mins} min max commute`,
       a.commuteMode && label(COMMUTE_MODES, a.commuteMode),

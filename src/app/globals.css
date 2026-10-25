@@ -29,3 +29,9 @@ html { scrollbar-gutter: stable; }
 @media (prefers-reduced-motion: reduce) {
   .house-mascot * { animation: none !important; }
 }
+
+/* subtle. is all lowercase: every word on the site renders lowercase,
+   including labels that used to be ALL CAPS. What people type in fields stays as typed. */
+body, button, [role='button'], optgroup, option { text-transform: lowercase; }
+.uppercase, .capitalize { text-transform: lowercase; }
+input, textarea, select, [contenteditable='true'] { text-transform: none; }
