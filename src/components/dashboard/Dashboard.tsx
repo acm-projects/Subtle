@@ -135,7 +135,7 @@ export default function Dashboard() {
                   </ul>
                   <div className="mt-7">
                     <Link href="/questionnaire" className={btnDark}>
-                      {d.quizStatus === 'started' ? 'Finish the quiz' : 'Take the quiz'} <Icon name="arrowR" size={16} />
+                      {d.quizStatus === 'started' ? 'Finish the quiz' : 'Begin the quiz'} <Icon name="arrowR" size={16} />
                     </Link>
                   </div>
                 </div>
@@ -147,6 +147,7 @@ export default function Dashboard() {
             )}
           </section>
 
+          {d.quizStatus === 'done' && (
           <div className="mt-6 grid gap-6 lg:grid-cols-12">
             {/* saved homes */}
             <section className={`${glass} animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.05)_both] p-7 [animation-delay:120ms] md:p-8 lg:col-span-7`}>
@@ -245,6 +246,8 @@ export default function Dashboard() {
               )}
             </section>
           </div>
+
+          )}
 
           {/* intern community: locked until the quiz tells us their city and interests */}
           {d.quizStatus === 'done' ? (

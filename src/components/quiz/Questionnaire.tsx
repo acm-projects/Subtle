@@ -4,9 +4,9 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import AppNavbar from '../AppNavbar'
-import HouseMascot from '../HouseMascot'
 import Icon from './icons'
-import { Field, OptionRow, OptionTile, SidePanel } from './parts'
+import { Field, OptionRow, OptionTile } from './parts'
+import Journey from './Journey'
 import {
   ACCOMMODATIONS,
   BUDGETS,
@@ -57,12 +57,24 @@ export default function Questionnaire() {
       const ln = ((meta.last_name ?? meta.lastName ?? '') as string).trim()
       if (fn) setFirstName(fn)
       if (ln) setLastName(ln)
-      if (data.user?.email) setUserEmail(data.user.email)
+      if (data.user?.email) {
+        setUserEmail(data.user.email)
+        // answers saved in this browser belong to whoever took the quiz; a different account starts fresh
+        try {
+          if (localStorage.getItem('subtle-quiz-owner') !== data.user.email.toLowerCase()) {
+            setA(EMPTY)
+            setIndex(0)
+          }
+        } catch {}
+      }
     })
   }, [])
 
   const steps = useMemo(() => buildSteps(a), [a])
   const step = steps[Math.min(index, steps.length - 1)]
+  // the journey panel: one stop per question (roommate extras don't count)
+  const journeySteps = steps.filter((s) => s.id !== 'done' && !s.extra)
+  const journeyAt = Math.max(0, journeySteps.findIndex((s) => s.id === step.id))
   const set = <K extends keyof QuizAnswers>(key: K, value: QuizAnswers[K]) => setA((prev) => ({ ...prev, [key]: value }))
   const toggle = (key: 'accommodations' | 'interests' | 'hangouts', id: string) =>
     setA((prev) => {
@@ -103,6 +115,7 @@ export default function Questionnaire() {
   const saveQuizProgress = async (nextStepId?: StepId, latestAnswers: QuizAnswers = a) => {
     try {
       localStorage.setItem('subtle-quiz-v1', JSON.stringify(latestAnswers))
+      if (userEmail) localStorage.setItem('subtle-quiz-owner', userEmail.toLowerCase())
     } catch {}
     if (nextStepId === 'done') {
       try {
@@ -180,7 +193,7 @@ export default function Questionnaire() {
   const nextStep = steps[index + 1]
   const nextLabel =
     step.id === 'hangouts'
-      ? 'See my matches'
+      ? 'Finish'
       : nextStep && nextStep.section !== step.section
         ? `Next section (${SECTIONS[nextStep.section]})`
         : 'Next question'
@@ -581,7 +594,7 @@ export default function Questionnaire() {
         <AppNavbar firstName={firstName} />
         <section className="flex min-h-screen flex-col justify-center px-4 pb-10 pt-28 md:px-8">
           <div className="mx-auto max-w-3xl animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.1)] rounded-[36px] border border-white bg-white/70 p-8 text-center shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-12">
-            <HouseMascot label="Subtle's house mascot cheering" className="mx-auto h-40 w-40" />
+            <Journey compact complete position={journeySteps.length} total={journeySteps.length} />
             <h1 className="mt-4 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">
               You&apos;re all set{firstName ? `, ${firstName}` : ''}.
             </h1>
@@ -594,14 +607,14 @@ export default function Questionnaire() {
               ))}
             </ul>
             <div className="mt-10 flex flex-wrap justify-center gap-3">
-              <Link href="/matches" className="rounded-full bg-[#1E2B44] px-7 py-3.5 text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
-                See my matches
+              <Link href="/home" className="rounded-full bg-[#1E2B44] px-7 py-3.5 text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
+                Go to my dashboard
+              </Link>
+              <Link href="/matches" className="rounded-full border border-[#D5DFEA] bg-white px-7 py-3.5 text-[15px] font-semibold transition hover:-translate-y-0.5">
+                See all matches
               </Link>
               <Link href="/internMatches" className="rounded-full border border-[#D5DFEA] bg-white px-7 py-3.5 text-[15px] font-semibold transition hover:-translate-y-0.5">
                 Intern matches
-              </Link>
-              <Link href="/home" className="rounded-full border border-[#D5DFEA] bg-white px-7 py-3.5 text-[15px] font-semibold transition hover:-translate-y-0.5">
-                Back to home
               </Link>
               <button type="button" onClick={() => go(0)} className="rounded-full border border-[#D5DFEA] bg-white px-7 py-3.5 text-[15px] font-semibold transition hover:-translate-y-0.5">
                 Edit my answers
@@ -677,7 +690,7 @@ export default function Questionnaire() {
             </div>
           </div>
 
-          {!wide && p && <SidePanel step={step.id} tag={p.tag} icon={p.icon} title={p.title} caption={p.caption} />}
+          {!wide && <Journey position={journeyAt} total={journeySteps.length} caption={p ? { tag: p.tag, title: p.title, text: p.caption } : undefined} />}
         </div>
         <p className="mt-8 text-center text-[13px] text-[#4A5A75]">&copy; 2026 Subtle Technologies, Inc. All rights reserved.</p>
       </section>
