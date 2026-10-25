@@ -63,6 +63,9 @@ export function useDashboardData(): DashboardData {
         const meta = auth.user?.user_metadata ?? {}
         const fromAccount = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
         if (fromAccount) firstName = fromAccount
+        // quiz answers in this browser only count if this account took the quiz
+        const email = auth.user?.email?.toLowerCase()
+        if (email && localStorage.getItem('subtle-quiz-owner') !== email) quiz = EMPTY
       } catch {}
 
       const quizStatus = quizStatusOf(quiz)

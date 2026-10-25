@@ -86,6 +86,8 @@ export function Field({
   value,
   onChange,
   placeholder,
+  list,
+  required = true,
 }: {
   id: string
   label: string
@@ -93,6 +95,8 @@ export function Field({
   value: string
   onChange: (v: string) => void
   placeholder: string
+  list?: string // id of a <datalist> with suggestions
+  required?: boolean
 }) {
   return (
     <div>
@@ -100,7 +104,7 @@ export function Field({
         <label htmlFor={id} className="text-xs font-bold uppercase tracking-[0.1em]">
           {label}
         </label>
-        <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A35F33]">Required</span>
+        {required && <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A35F33]">Required</span>}
       </div>
       <div className="flex h-14 items-center gap-3 rounded-2xl border border-[#D5DFEA] bg-white px-4 transition focus-within:border-[#2F4161] focus-within:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]">
         <span className="text-[#4A5A75]">
@@ -111,6 +115,8 @@ export function Field({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
+          list={list}
+          autoComplete="off"
           className="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#8A97AB]"
         />
       </div>
