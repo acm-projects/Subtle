@@ -7,6 +7,7 @@ import { SAMPLE_CONTEXT, stayMonths, type Listing, type MatchContext } from './l
 import { Icon } from './parts'
 import { addBookingRequest } from './activity'
 import HouseMascot from '../HouseMascot'
+import { supabase } from '../../lib/supabase'
 
 const STEPS = ['Choose your dates', 'Review the total', 'Send a request']
 
@@ -35,6 +36,14 @@ export default function BookListing({ listing, context = SAMPLE_CONTEXT }: { lis
           if (u.email) guestEmail = u.email
           if (u.firstName) guestName = `${u.firstName} ${u.lastName ?? ''}`.trim()
         }
+      } catch {}
+      try {
+        const { data } = await supabase.auth.getUser()
+        if (data.user?.email) guestEmail = data.user.email
+        const meta = data.user?.user_metadata ?? {}
+        const fn = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
+        const ln = ((meta.last_name ?? meta.lastName ?? '') as string).trim()
+        if (fn) guestName = `${fn} ${ln}`.trim()
       } catch {}
 
       await fetch('/api/bookings', {
