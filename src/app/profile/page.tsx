@@ -168,17 +168,48 @@ export default function ProfilePage() {
       setEmail(user.email ?? "");
       setSavedEmail(user.email ?? "");
 
-      const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-      if (data) {
-        const p = data as Profile;
-        setProfile(p);
-        setFirst(p.first_name ?? "");
-        setLast(p.last_name ?? "");
-        await loadConnections(user.id, p.interests ?? []);
-      }
+      // 1. Check user_metadata for avatar_url, first_name, last_name
+      const meta = user.user_metadata ?? {};
+      const metaAvatar = (meta.avatar_url ?? meta.avatarUrl ?? null) as string | null;
+      let firstName = (meta.first_name ?? meta.firstName ?? "") as string;
+      let lastName = (meta.last_name ?? meta.lastName ?? "") as string;
+
+      // 2. Also check public.users_table
+      try {
+        const { data: userRows } = await supabase
+          .from("users_table")
+          .select("*")
+          .eq("student_email", user.email ?? "");
+        if (userRows && userRows.length > 0) {
+          const latest = userRows[userRows.length - 1];
+          if (!firstName && latest.first_name) firstName = latest.first_name;
+          if (!lastName && latest.last_name) lastName = latest.last_name;
+        }
+      } catch {}
+
+      // 3. Fallback to localStorage
+      let localAvatar = metaAvatar;
+      try {
+        const stored = localStorage.getItem(`subtle-avatar-${user.id}`);
+        if (stored) localAvatar = stored;
+      } catch {}
+
+      setFirst(firstName);
+      setLast(lastName);
+      setProfile({
+        id: user.id,
+        first_name: firstName,
+        last_name: lastName,
+        avatar_url: localAvatar,
+        interests: [],
+        preferences: null,
+        budget_min: null,
+        budget_max: null,
+      });
+
       setLoading(false);
     })();
-  }, [router, loadConnections]);
+  }, [router]);
 
   /* ----- details ----- */
 
@@ -186,28 +217,58 @@ export default function ProfilePage() {
     e.preventDefault();
     if (!uid) return;
     const nextEmail = email.trim().toLowerCase();
-    if (!nextEmail.endsWith(".edu")) return flash("Use a .edu email address.", "err");
 
     setSavingDetails(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ first_name: first.trim(), last_name: last.trim() })
-      .eq("id", uid);
-    if (error) {
-      setSavingDetails(false);
-      return flash("Couldn't save your name. Try again.", "err");
-    }
-    if (nextEmail !== savedEmail) {
-      const { error: mailErr } = await supabase.auth.updateUser({ email: nextEmail });
-      if (mailErr) {
+
+    try {
+      // Update Supabase Auth user_metadata
+      const { error: metaErr } = await supabase.auth.updateUser({
+        data: {
+          first_name: first.trim(),
+          last_name: last.trim(),
+          firstName: first.trim(),
+          lastName: last.trim(),
+        },
+      });
+      if (metaErr) {
         setSavingDetails(false);
-        return flash(mailErr.message, "err");
+        return flash(metaErr.message, "err");
       }
-      flash("Check your new inbox to confirm the email change.");
-    } else {
-      flash("Details saved.");
+
+      // Update public.users_table
+      await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          student_email: email,
+          first_name: first.trim(),
+          last_name: last.trim(),
+        }),
+      });
+
+      // Update localStorage
+      try {
+        localStorage.setItem(
+          "subtle-user-v1",
+          JSON.stringify({ firstName: first.trim(), lastName: last.trim(), email })
+        );
+      } catch {}
+
+      if (nextEmail !== savedEmail) {
+        const { error: mailErr } = await supabase.auth.updateUser({ email: nextEmail });
+        if (mailErr) {
+          setSavingDetails(false);
+          return flash(mailErr.message, "err");
+        }
+        flash("Check your new inbox to confirm the email change.");
+      } else {
+        flash("Details saved.");
+      }
+    } catch {
+      flash("Couldn't save details.", "err");
+    } finally {
+      setSavingDetails(false);
     }
-    setSavingDetails(false);
   }
 
   function resetDetails() {
@@ -222,28 +283,63 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !uid) return;
-    if (!["image/jpeg", "image/png"].includes(file.type)) return flash("Choose a JPG or PNG.", "err");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return flash("Choose a JPG, PNG, or WEBP.", "err");
     if (file.size > MAX_AVATAR_BYTES) return flash("Photos must be under 5 MB.", "err");
 
     setUploading(true);
-    const ext = file.type === "image/png" ? "png" : "jpg";
-    const path = `${uid}/avatar-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
-    if (error) {
+
+    try {
+      // 1. Convert image to optimized data URL so it displays instantly and persists across sessions
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = reader.result as string;
+
+        // Try uploading to Supabase Storage if bucket exists
+        let finalUrl = dataUrl;
+        try {
+          const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+          const path = `${uid}/avatar-${Date.now()}.${ext}`;
+          const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+          if (!uploadErr) {
+            const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+            if (data?.publicUrl) finalUrl = data.publicUrl;
+          }
+        } catch {}
+
+        // Save to Supabase auth user_metadata
+        await supabase.auth.updateUser({
+          data: { avatar_url: finalUrl },
+        });
+
+        // Save to localStorage for instant client access and persistence
+        try {
+          localStorage.setItem(`subtle-avatar-${uid}`, finalUrl);
+        } catch {}
+
+        setProfile((p) => (p ? { ...p, avatar_url: finalUrl } : p));
+        setUploading(false);
+        window.dispatchEvent(new Event("avatar-updated"));
+        flash("Profile picture updated.");
+      };
+      reader.onerror = () => {
+        setUploading(false);
+        flash("Could not read image file.", "err");
+      };
+      reader.readAsDataURL(file);
+    } catch {
       setUploading(false);
-      return flash("Upload failed. Try again.", "err");
+      flash("Upload failed. Try again.", "err");
     }
-    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-    await supabase.from("profiles").update({ avatar_url: data.publicUrl }).eq("id", uid);
-    setProfile((p) => (p ? { ...p, avatar_url: data.publicUrl } : p));
-    setUploading(false);
-    window.dispatchEvent(new Event("avatar-updated"));
-    flash("Profile picture updated.");
   }
 
   async function removePhoto() {
     if (!uid) return;
-    await supabase.from("profiles").update({ avatar_url: null }).eq("id", uid);
+    await supabase.auth.updateUser({
+      data: { avatar_url: null },
+    });
+    try {
+      localStorage.removeItem(`subtle-avatar-${uid}`);
+    } catch {}
     setProfile((p) => (p ? { ...p, avatar_url: null } : p));
     window.dispatchEvent(new Event("avatar-updated"));
     flash("Profile picture removed.");
