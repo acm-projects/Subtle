@@ -65,10 +65,32 @@ export default function RenterDashboard() {
   const [listings, setListings] = useState<Listing[]>([])
   const [activity, setActivity] = useState<Record<string, Activity>>({})
   const [copied, setCopied] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+
+  // accept or decline a booking request; the intern sees the result on their dashboard
+  // TODO(backend): PATCH /api/bookings keeps this in server memory until bookings move to Supabase
+  const decide = async (listingId: string, bookingId: string, status: 'accepted' | 'declined' | 'pending') => {
+    setBusy(bookingId)
+    try {
+      const res = await fetch('/api/bookings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: bookingId, status }),
+      })
+      if (res.ok) {
+        const updated = (await res.json()) as Booking
+        setActivity((all) => ({
+          ...all,
+          [listingId]: { ...all[listingId], bookings: all[listingId].bookings.map((b) => (b.id === bookingId ? { ...b, status: updated.status } : b)) },
+        }))
+      }
+    } catch {}
+    setBusy(null)
+  }
 
   useEffect(() => {
     let alive = true
-    ;(async () => {
+    const load = async () => {
       let mine: Listing[] = []
       try {
         mine = await getMyListings()
@@ -85,8 +107,17 @@ export default function RenterDashboard() {
       setListings(mine)
       setActivity(Object.fromEntries(entries))
       setLoading(false)
-    })()
+    }
+    load()
+    // refresh when you come back to the tab (and every 20s), so new requests and host replies show up
+    const onFocus = () => document.visibilityState === 'visible' && load()
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    const timer = setInterval(onFocus, 20000)
     return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+      clearInterval(timer)
       alive = false
     }
   }, [])
@@ -206,21 +237,62 @@ export default function RenterDashboard() {
                         </p>
                       ) : (
                         <ul className="mt-3 grid gap-3 md:grid-cols-2">
-                          {act.bookings.map((b) => (
+                          {[...act.bookings].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).map((b) => (
                             <li key={b.id} className="flex items-start gap-3 rounded-[22px] border border-white bg-white/80 p-4">
                               <span aria-hidden="true" className={`${serif} flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#C9DBEA] text-lg font-medium`}>
                                 {(b.guestName || 'I').charAt(0).toUpperCase()}
                               </span>
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-baseline justify-between gap-2">
-                                  <p className="truncate font-semibold">{b.guestName || 'An intern'}</p>
+                                  <p className="truncate font-semibold">
+                                    {b.guestName || 'An intern'}
+                                    {b.status === 'pending' && <span className="ml-2 rounded-full bg-[#1E2B44] px-2 py-0.5 align-middle text-[10px] font-bold text-white">new</span>}
+                                  </p>
                                   <span className="shrink-0 text-xs text-[#4A5A75]">{ago(b.createdAt)}</span>
                                 </div>
                                 <p className="text-sm text-[#4A5A75]">
                                   Wants to book · {b.moveIn || 'Flexible'} – {b.moveOut || 'Flexible'}
                                 </p>
                                 {b.note && <p className="mt-1 line-clamp-2 text-sm">&ldquo;{b.note}&rdquo;</p>}
-                                <span className="mt-2 inline-block rounded-full bg-[#EEF3F8] px-2.5 py-1 text-xs font-bold capitalize">{b.status}</span>
+                                {b.status === 'pending' ? (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      disabled={busy === b.id}
+                                      onClick={() => decide(l.id, b.id, 'accepted')}
+                                      className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-[#1E2B44] px-4 text-sm font-semibold text-white transition hover:bg-[#2F4161] disabled:opacity-50"
+                                    >
+                                      <Icon name="check" size={14} /> Accept
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={busy === b.id}
+                                      onClick={() => decide(l.id, b.id, 'declined')}
+                                      className="inline-flex min-h-10 items-center rounded-full border border-[#D5DFEA] bg-white px-4 text-sm font-semibold transition hover:bg-[#F7F9FB] disabled:opacity-50"
+                                    >
+                                      Decline
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                                    <span
+                                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+                                        b.status === 'accepted' ? 'bg-[#E3F1E8] text-[#2E6B45]' : 'bg-[#FBEDE4] text-[#8A4B26]'
+                                      }`}
+                                    >
+                                      {b.status === 'accepted' && <Icon name="check" size={12} />}
+                                      {b.status === 'accepted' ? 'Accepted' : 'Declined'}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={busy === b.id}
+                                      onClick={() => decide(l.id, b.id, 'pending')}
+                                      className="text-xs font-semibold text-[#4A5A75] underline underline-offset-2 hover:text-[#1E2B44]"
+                                    >
+                                      Undo
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </li>
                           ))}

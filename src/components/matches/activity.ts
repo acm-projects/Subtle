@@ -38,9 +38,10 @@ export function toggleSavedId(id: string): string[] {
 
 // ---- booking requests ----
 
-export type BookingStatus = 'requested' | 'accepted' | 'booked'
+export type BookingStatus = 'requested' | 'accepted' | 'booked' | 'declined'
 
 export type Booking = {
+  id?: string // server id (from /api/bookings)
   listingId: string
   title: string
   hostName: string
@@ -76,4 +77,33 @@ export function addBookingRequest(l: Listing): Booking {
   }
   write(BOOKINGS_KEY, [booking, ...loadBookings().filter((b) => b.listingId !== l.id)])
   return booking
+}
+
+// Booking requests this user sent, from the server (so a host's accept/decline shows up),
+// merged with any older ones saved in this browser. Newest first.
+export async function loadMyBookings(email: string | null): Promise<Booking[]> {
+  const local = loadBookings()
+  if (!email) return local
+  let server: Booking[] = []
+  try {
+    const res = await fetch(`/api/bookings?email=${encodeURIComponent(email)}`, { cache: 'no-store' })
+    if (res.ok) {
+      const json = await res.json()
+      server = (Array.isArray(json.bookings) ? json.bookings : []).map(
+        (b: { id: string; listingId: string; listingTitle: string; hostName: string; moveIn: string; moveOut: string; monthlyRent: number; status: string; createdAt: string }) => ({
+          id: b.id,
+          listingId: b.listingId,
+          title: b.listingTitle,
+          hostName: b.hostName,
+          availableFrom: b.moveIn,
+          availableTo: b.moveOut,
+          price: b.monthlyRent,
+          status: b.status === 'accepted' ? 'accepted' : b.status === 'declined' ? 'declined' : 'requested',
+          requestedAt: b.createdAt,
+        }),
+      )
+    }
+  } catch {}
+  const seen = new Set(server.map((b) => b.listingId))
+  return [...server, ...local.filter((b) => !seen.has(b.listingId))].sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
 }
