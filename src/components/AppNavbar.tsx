@@ -5,13 +5,14 @@ import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
 
-// Navbar for logged-in pages: logo (back to the dashboard), Messages, Post a listing, Log out (with a confirm step), and a View profile button with the user's avatar.
-export default function AppNavbar({ firstName }: { firstName: string }) {
+// Navbar for logged-in pages: logo (back to the dashboard), Messages, Post a listing, Your listings, and Log out (with a confirm step).
+export default function AppNavbar({ firstName: _firstName }: { firstName: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const viewingProfile = pathname?.startsWith('/profile')
   const posting = pathname?.startsWith('/post')
   const messaging = pathname?.startsWith('/messages')
+  const hosting = pathname?.startsWith('/my-listings')
   const [confirming, setConfirming] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -82,6 +83,19 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
             </svg>
             <span className="hidden md:inline">Post a listing</span>
             <span className="md:hidden">Post</span>
+          </Link>
+          <Link
+            href="/my-listings"
+            aria-current={hosting ? 'page' : undefined}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2.5 text-sm font-semibold transition-colors md:px-4 md:py-3 ${
+              hosting ? 'bg-[#1E2B44] text-white' : 'hover:bg-[#1E2B44]/[0.06]'
+            }`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />
+            </svg>
+            <span className="hidden md:inline">Your listings</span>
+            <span className="sr-only md:hidden">Your listings</span>
           </Link>
           <button
             type="button"

@@ -1,6 +1,7 @@
 // Questionnaire data: answer shape, options and step order.
 
 export type QuizAnswers = {
+  university: string
   company: string
   address: string
   maxCommute: number // minutes, one way
@@ -14,9 +15,12 @@ export type QuizAnswers = {
   moveIn: string | null
   transitImportance: number // 0 = not important, 1 = nice to have, 2 = very important
   interests: string[]
+  hangouts: string[] // how they like to spend free time with other interns
+  otherInterests: string // anything else, typed in
 }
 
 export const EMPTY: QuizAnswers = {
+  university: '',
   company: '',
   address: '',
   maxCommute: 20,
@@ -30,6 +34,8 @@ export const EMPTY: QuizAnswers = {
   moveIn: null,
   transitImportance: 1,
   interests: [],
+  hangouts: [],
+  otherInterests: '',
 }
 
 export const COMMUTE_MODES = [
@@ -66,14 +72,52 @@ export const MOVE_IN = [
   { id: 'july', title: 'July', body: 'A later start.', icon: 'sunset' },
   { id: 'flexible', title: "I'm flexible.", body: 'Show the whole summer.', icon: 'flex' },
 ]
+// ids are the labels we store and match on (same words other interns pick)
 export const INTERESTS = [
-  { id: 'cooking', title: 'Cooking', body: 'Home meals', icon: 'pot' },
-  { id: 'fitness', title: 'Fitness', body: 'Gym or runs', icon: 'run' },
-  { id: 'music', title: 'Music', body: 'Shows and playlists', icon: 'music' },
-  { id: 'outdoors', title: 'Outdoors', body: 'Parks and hikes', icon: 'tree' },
-  { id: 'nightlife', title: 'Nightlife', body: 'Going out', icon: 'moon' },
-  { id: 'reading', title: 'Reading', body: 'Quiet nights in', icon: 'book' },
+  { id: 'Cooking', title: 'Cooking', body: 'Home meals', icon: 'pot' },
+  { id: 'Fitness', title: 'Fitness', body: 'Gym or classes', icon: 'run' },
+  { id: 'Live music', title: 'Live music', body: 'Shows and concerts', icon: 'music' },
+  { id: 'Hiking', title: 'Hiking', body: 'Trails and parks', icon: 'tree' },
+  { id: 'Nightlife', title: 'Nightlife', body: 'Going out', icon: 'moon' },
+  { id: 'Reading', title: 'Reading', body: 'Quiet nights in', icon: 'book' },
+  { id: 'Film', title: 'Film', body: 'Movies and shows', icon: 'sparkle' },
+  { id: 'Photography', title: 'Photography', body: 'Photo walks', icon: 'map' },
+  { id: 'Basketball', title: 'Basketball', body: 'Pickup games', icon: 'run' },
+  { id: 'Soccer', title: 'Soccer', body: 'Leagues or pickup', icon: 'run' },
+  { id: 'Yoga', title: 'Yoga', body: 'Slow mornings', icon: 'sun' },
+  { id: 'Gaming', title: 'Gaming', body: 'Console or PC', icon: 'sparkle' },
+  { id: 'Coffee', title: 'Coffee', body: 'Cafe hopping', icon: 'pot' },
+  { id: 'Travel', title: 'Travel', body: 'Weekend trips', icon: 'map' },
+  { id: 'Art', title: 'Art', body: 'Museums and making', icon: 'sparkle' },
+  { id: 'Volunteering', title: 'Volunteering', body: 'Giving back', icon: 'people' },
 ]
+export const MIN_INTERESTS = 3
+
+export const HANGOUTS = [
+  { id: 'Exploring the city', title: 'Exploring the city', body: 'New neighborhoods every weekend', icon: 'map' },
+  { id: 'Trying food spots', title: 'Trying food spots', body: 'Brunch, food trucks, hidden gems', icon: 'pot' },
+  { id: 'Concerts and shows', title: 'Concerts and shows', body: 'Live music, comedy, theater', icon: 'music' },
+  { id: 'Game nights', title: 'Game nights', body: 'Board games or video games in', icon: 'people' },
+  { id: 'Pickup sports', title: 'Pickup sports', body: 'Basketball, soccer, volleyball', icon: 'run' },
+  { id: 'Outdoor trips', title: 'Outdoor trips', body: 'Hikes, beaches, day trips', icon: 'tree' },
+  { id: 'Co-working', title: 'Coffee and co-working', body: 'Side projects together', icon: 'building' },
+  { id: 'Quiet nights', title: 'Quiet nights', body: 'Movies, reading, cooking in', icon: 'moon' },
+]
+
+export const SCHOOLS = [
+  'UT Dallas', 'UT Austin', 'Texas A&M', 'Rice', 'SMU', 'UCLA', 'USC', 'UC Berkeley', 'Stanford', 'UCSD',
+  'University of Washington', 'NYU', 'Columbia', 'MIT', 'Harvard', 'Georgia Tech', 'Michigan', 'Northwestern',
+  'Duke', 'Carnegie Mellon', 'UIUC', 'Purdue', 'Cornell', 'Howard', 'Brown', 'Yale',
+]
+
+// Everything they told us they're into, as one list (what we save and match on)
+export function allInterests(a: QuizAnswers) {
+  const typed = a.otherInterests
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)
+  return Array.from(new Set([...a.interests, ...a.hangouts, ...typed]))
+}
 export const ROOMMATE_GROUPS = [
   { id: 'gender', label: 'Preferred gender', options: ['Women', 'Men', 'Nonbinary', 'No preference'] },
   { id: 'noise', label: 'Noise level', options: ['Quiet', 'Moderate', 'Lively'] },
@@ -86,11 +130,12 @@ export const ROOMMATE_GROUPS = [
 ]
 export const TRANSIT_LEVELS = ['Not important', 'Nice to have', 'Very important']
 
-export const SECTIONS: Record<number, string> = { 1: 'Work & location', 2: 'Housing', 3: 'Priorities', 4: 'Interests' }
+export const SECTIONS: Record<number, string> = { 1: 'You & your work', 2: 'Housing', 3: 'Priorities', 4: 'Interests' }
 
 export const label = (list: { id: string; title: string }[], id: string | null) => list.find((o) => o.id === id)?.title ?? ''
 
 export type StepId =
+  | 'school'
   | 'work'
   | 'commute'
   | 'budget'
@@ -102,6 +147,7 @@ export type StepId =
   | 'moveIn'
   | 'transit'
   | 'interests'
+  | 'hangouts'
   | 'done'
 
 export type Step = { id: StepId; section: number; extra?: boolean }
@@ -109,6 +155,7 @@ export type Step = { id: StepId; section: number; extra?: boolean }
 // Roommate preferences only show up if they said yes to roommates.
 export function buildSteps(a: QuizAnswers): Step[] {
   return [
+    { id: 'school', section: 1 },
     { id: 'work', section: 1 },
     { id: 'commute', section: 1 },
     { id: 'budget', section: 2 },
@@ -120,6 +167,7 @@ export function buildSteps(a: QuizAnswers): Step[] {
     { id: 'moveIn', section: 2 },
     { id: 'transit', section: 3 },
     { id: 'interests', section: 4 },
+    { id: 'hangouts', section: 4 },
     { id: 'done', section: 5 },
   ]
 }

@@ -229,8 +229,8 @@ export default function PostListing() {
               <Link href="/home" className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white font-semibold transition hover:-translate-y-0.5">
                 Back to home
               </Link>
-              <Link href="/matches" className="flex min-h-12 items-center justify-center rounded-full bg-[#1E2B44] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
-                Browse matches
+              <Link href="/my-listings" className="flex min-h-12 items-center justify-center rounded-full bg-[#1E2B44] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
+                See your listing
               </Link>
             </div>
             <div className="mt-4">

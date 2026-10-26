@@ -22,11 +22,39 @@ export default function BookListing({ listing, context = SAMPLE_CONTEXT }: { lis
   const months = stayMonths(listing.availableFrom, listing.availableTo)
   const host = listing.hostName.split(' ')[0]
 
-  // TODO(backend): POST the booking request { listingId: listing.id, moveIn, moveOut, note }
+  // POST the booking request to /api/bookings
   const requestBooking = async () => {
     setSending(true)
-    await new Promise((r) => setTimeout(r, 500))
-    addBookingRequest(listing)
+    try {
+      let guestEmail = 'intern@subtle.edu'
+      let guestName = 'Summer Intern'
+      try {
+        const savedUser = localStorage.getItem('subtle-user-v1')
+        if (savedUser) {
+          const u = JSON.parse(savedUser)
+          if (u.email) guestEmail = u.email
+          if (u.firstName) guestName = `${u.firstName} ${u.lastName ?? ''}`.trim()
+        }
+      } catch {}
+
+      await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listingId: listing.id,
+          listingTitle: listing.title,
+          hostName: listing.hostName,
+          moveIn: listing.availableFrom,
+          moveOut: listing.availableTo,
+          monthlyRent: listing.price,
+          note,
+          guestEmail,
+          guestName,
+        }),
+      })
+    } catch (e) {
+      console.error('Error submitting booking:', e)
+    }
     setSending(false)
     setSent(true)
   }

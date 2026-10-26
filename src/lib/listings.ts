@@ -92,7 +92,22 @@ export async function createListing(input: NewListing, files: File[] = []): Prom
   validateListing(input)
 
   const id = crypto.randomUUID()
-  let insertPayload: Record<string, any> = { ...input, id, user_id: userId }
+  let insertPayload: Record<string, any> = {
+    id,
+    user_id: userId,
+    title: input.title,
+    building_type: input.building_type,
+    room_type: input.room_type,
+    monthly_rent: input.monthly_rent,
+    address: input.address,
+    neighborhood: input.neighborhood,
+    city: input.city,
+    move_in: input.start_date,
+    end_date: input.end_date,
+    amenities: input.amenities,
+    company_tags: input.company_tags || [],
+    about: input.about,
+  }
 
   let { data, error } = await supabase.from(TABLE).insert(insertPayload).select().single()
 

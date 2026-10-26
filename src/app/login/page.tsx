@@ -359,6 +359,23 @@ function LoginForm() {
             }),
           )
         } catch {}
+
+        // Persist user record into Supabase users_table immediately upon signup
+        try {
+          await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: data.user?.id ?? null,
+              firstName: firstName.trim(),
+              lastName: lastName.trim(),
+              email: email.trim(),
+            }),
+          })
+        } catch (apiErr) {
+          console.error('Failed to create user record in users_table:', apiErr)
+        }
+
         if (data.session) {
           router.push('/home')
           router.refresh()

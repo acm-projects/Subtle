@@ -4,22 +4,26 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import AppNavbar from '../AppNavbar'
-import HouseMascot from '../HouseMascot'
 import Icon from './icons'
-import { Field, OptionRow, OptionTile, SidePanel } from './parts'
+import { Field, OptionRow, OptionTile } from './parts'
+import Journey from './Journey'
 import {
   ACCOMMODATIONS,
   BUDGETS,
   buildSteps,
   CAR,
   COMMUTE_MODES,
+  allInterests,
   EMPTY,
+  HANGOUTS,
   HOUSING_TYPES,
   INTERESTS,
+  MIN_INTERESTS,
   label,
   MOVE_IN,
   type QuizAnswers,
   ROOMMATE_GROUPS,
+  SCHOOLS,
   SECTIONS,
   type StepId,
   TRANSIT_LEVELS,
@@ -53,14 +57,26 @@ export default function Questionnaire() {
       const ln = ((meta.last_name ?? meta.lastName ?? '') as string).trim()
       if (fn) setFirstName(fn)
       if (ln) setLastName(ln)
-      if (data.user?.email) setUserEmail(data.user.email)
+      if (data.user?.email) {
+        setUserEmail(data.user.email)
+        // answers saved in this browser belong to whoever took the quiz; a different account starts fresh
+        try {
+          if (localStorage.getItem('subtle-quiz-owner') !== data.user.email.toLowerCase()) {
+            setA(EMPTY)
+            setIndex(0)
+          }
+        } catch {}
+      }
     })
   }, [])
 
   const steps = useMemo(() => buildSteps(a), [a])
   const step = steps[Math.min(index, steps.length - 1)]
+  // the journey panel: one stop per question (roommate extras don't count)
+  const journeySteps = steps.filter((s) => s.id !== 'done' && !s.extra)
+  const journeyAt = Math.max(0, journeySteps.findIndex((s) => s.id === step.id))
   const set = <K extends keyof QuizAnswers>(key: K, value: QuizAnswers[K]) => setA((prev) => ({ ...prev, [key]: value }))
-  const toggle = (key: 'accommodations' | 'interests', id: string) =>
+  const toggle = (key: 'accommodations' | 'interests' | 'hangouts', id: string) =>
     setA((prev) => {
       const list = prev[key]
       if (key === 'accommodations') {
@@ -80,6 +96,7 @@ export default function Questionnaire() {
     : (qNum / Math.max(sectionSteps.length, 1)) * 100
 
   const canContinue: Record<StepId, boolean> = {
+    school: a.university.trim() !== '',
     work: a.company.trim() !== '' && a.address.trim() !== '',
     commute: a.commuteMode !== null,
     budget: a.budget !== null,
@@ -90,59 +107,97 @@ export default function Questionnaire() {
     car: a.car !== null,
     moveIn: a.moveIn !== null,
     transit: true,
-    interests: true,
+    interests: a.interests.length >= MIN_INTERESTS,
+    hangouts: true,
     done: true,
   }
 
-  const saveQuizProgress = async (nextStepId?: StepId) => {
+  const saveQuizProgress = async (nextStepId?: StepId, latestAnswers: QuizAnswers = a) => {
     try {
-      localStorage.setItem('subtle-quiz-v1', JSON.stringify(a))
+      localStorage.setItem('subtle-quiz-v1', JSON.stringify(latestAnswers))
+      if (userEmail) localStorage.setItem('subtle-quiz-owner', userEmail.toLowerCase())
     } catch {}
     if (nextStepId === 'done') {
       try {
-        await fetch('/api/users', {
+        let email = userEmail
+        let fn = firstName
+        let ln = lastName
+
+        if (!email) {
+          const { data } = await supabase.auth.getUser()
+          if (data.user?.email) email = data.user.email
+          const meta = data.user?.user_metadata ?? {}
+          if (!fn) fn = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
+          if (!ln) ln = ((meta.last_name ?? meta.lastName ?? '') as string).trim()
+        }
+
+        if (!email) {
+          try {
+            const savedUser = localStorage.getItem('subtle-user-v1')
+            if (savedUser) {
+              const u = JSON.parse(savedUser)
+              if (u.email) email = u.email
+              if (!fn && u.firstName) fn = u.firstName
+              if (!ln && u.lastName) ln = u.lastName
+            }
+          } catch {}
+        }
+
+        // send the login token so the server saves the row as this user (the table only lets you write your own row)
+        const { data: sessionData } = await supabase.auth.getSession()
+        const token = sessionData.session?.access_token
+        const res = await fetch('/api/users', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({
-            firstName: firstName || 'Intern',
-            lastName: lastName || 'Student',
-            email: userEmail || 'intern@subtle.edu',
-            company: a.company,
-            address: a.address,
-            budget: a.budget,
-            roommates: a.roommates,
-            interests: a.interests,
-            housingType: a.housingType,
-            accommodations: a.accommodations,
-            moveIn: a.moveIn,
-            commuteMode: a.commuteMode,
-            car: a.car,
-            maxCommute: a.maxCommute,
-            transitImportance: a.transitImportance,
-            gender: a.roommatePrefs.gender,
-            numRoommates: a.roommatePrefs.count,
-            noise: a.roommatePrefs.noise,
-            cleanliness: a.roommatePrefs.cleanliness,
-            guests: a.roommatePrefs.guests,
-            sleep: a.roommatePrefs.schedule,
-            temperature: a.roommatePrefs.temperature,
-            age: a.roommatePrefs.age,
+            firstName: fn || 'Intern',
+            lastName: ln || 'Student',
+            email: email || 'intern@subtle.edu',
+            company: latestAnswers.company,
+            address: latestAnswers.address,
+            budget: latestAnswers.budget,
+            roommates: latestAnswers.roommates,
+            university: latestAnswers.university.trim(), // TODO(backend): add a university column in users_table and map it in /api/users
+            interests: allInterests(latestAnswers),
+            housingType: latestAnswers.housingType,
+            accommodations: latestAnswers.accommodations,
+            moveIn: latestAnswers.moveIn,
+            commuteMode: latestAnswers.commuteMode,
+            car: latestAnswers.car,
+            maxCommute: latestAnswers.maxCommute,
+            transitImportance: latestAnswers.transitImportance,
+            gender: latestAnswers.roommatePrefs.gender,
+            numRoommates: latestAnswers.roommatePrefs.count,
+            noise: latestAnswers.roommatePrefs.noise,
+            cleanliness: latestAnswers.roommatePrefs.cleanliness,
+            guests: latestAnswers.roommatePrefs.guests,
+            sleep: latestAnswers.roommatePrefs.schedule,
+            temperature: latestAnswers.roommatePrefs.temperature,
+            age: latestAnswers.roommatePrefs.age,
           }),
         })
-      } catch {}
+
+        // answers are already saved in this browser, so a failed save never blocks the quiz
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}))
+          console.warn(`Couldn't save quiz answers to Supabase (status ${res.status}):`, errData?.error ?? 'no details')
+        }
+      } catch (e) {
+        console.warn("Couldn't reach /api/users to save quiz answers:", e)
+      }
     }
   }
 
   const go = (i: number) => {
     const clamped = Math.max(0, Math.min(i, steps.length - 1))
-    void saveQuizProgress(steps[clamped]?.id)
+    void saveQuizProgress(steps[clamped]?.id, a)
     setIndex(clamped)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const nextStep = steps[index + 1]
   const nextLabel =
-    step.id === 'interests'
-      ? 'See my matches'
+    step.id === 'hangouts'
+      ? 'Finish'
       : nextStep && nextStep.section !== step.section
         ? `Next section (${SECTIONS[nextStep.section]})`
         : 'Next question'
@@ -151,6 +206,12 @@ export default function Questionnaire() {
 
   /* right-side panel copy, based on answers */
   const panel: Partial<Record<StepId, { tag: string; icon: string; title: string; caption: string }>> = {
+    school: {
+      tag: 'Your school',
+      icon: 'book',
+      title: a.university.trim() || 'Where you study',
+      caption: 'Interns from your school get a boost in your matches.',
+    },
     work: {
       tag: 'Commute radius',
       icon: 'map',
@@ -208,13 +269,48 @@ export default function Questionnaire() {
     interests: {
       tag: 'Interests',
       icon: 'music',
-      title: 'Shared tastes.',
-      caption: 'Helps us find people with similar interests.',
+      title: a.interests.length ? `${a.interests.length} picked.` : 'Shared tastes.',
+      caption: 'The more you pick, the better we match you with interns like you.',
+    },
+    hangouts: {
+      tag: 'Free time',
+      icon: 'people',
+      title: 'Your summer crew.',
+      caption: 'We use this to suggest meetups with interns near you.',
     },
   }
 
   /* question content */
   const content: Partial<Record<StepId, { title: string; sub?: string; body: React.ReactNode }>> = {
+    school: {
+      title: 'Where do you go to school?',
+      sub: 'Interns from your school show up higher in your intern matches, and it helps hosts know who you are.',
+      body: (
+        <div className="space-y-4">
+          <Field id="university" label="University" icon="book" value={a.university} onChange={(v) => set('university', v)} placeholder="e.g. UT Dallas" list="school-options" />
+          <datalist id="school-options">
+            {SCHOOLS.map((sch) => (
+              <option key={sch} value={sch} />
+            ))}
+          </datalist>
+          <div className="flex flex-wrap gap-2">
+            {SCHOOLS.slice(0, 6).map((sch) => (
+              <button
+                key={sch}
+                type="button"
+                aria-pressed={a.university === sch}
+                onClick={() => set('university', sch)}
+                className={`min-h-11 rounded-full border px-4 text-sm font-medium transition ${
+                  a.university === sch ? 'border-[#1E2B44] bg-[#1E2B44] text-white' : 'border-[#D5DFEA] bg-white/70 hover:bg-white'
+                }`}
+              >
+                {sch}
+              </button>
+            ))}
+          </div>
+        </div>
+      ),
+    },
     work: {
       title: 'Where will you be working this summer?',
       sub: 'We’ll use your office address to calculate commute routes and transit connections for every home we recommend.',
@@ -418,13 +514,66 @@ export default function Questionnaire() {
       ),
     },
     interests: {
-      title: 'What are your interests?',
-      sub: 'Select all that apply.',
+      title: 'What are you into?',
+      sub: `Pick at least ${MIN_INTERESTS}. This is how we find interns you’ll actually get along with.`,
       body: (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {INTERESTS.map((o) => (
-            <OptionTile key={o.id} multi selected={a.interests.includes(o.id)} onClick={() => toggle('interests', o.id)} icon={o.icon} title={o.title} body={o.body} />
-          ))}
+        <div>
+          <div className="mb-3 flex items-center justify-between gap-3 text-sm">
+            <span className={a.interests.length >= MIN_INTERESTS ? 'font-semibold' : 'text-[#4A5A75]'}>
+              {a.interests.length} selected{a.interests.length < MIN_INTERESTS ? ` · ${MIN_INTERESTS - a.interests.length} more to go` : ''}
+            </span>
+            {a.interests.length > 0 && (
+              <button type="button" onClick={() => set('interests', [])} className="font-semibold underline underline-offset-2 hover:text-[#A35F33]">
+                Clear
+              </button>
+            )}
+          </div>
+          <div role="group" aria-label="Interests" className="flex flex-wrap gap-2.5">
+            {INTERESTS.map((o) => {
+              const on = a.interests.includes(o.id)
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  title={o.body}
+                  onClick={() => toggle('interests', o.id)}
+                  className={`inline-flex min-h-12 items-center gap-2 rounded-full border px-4 text-[15px] font-semibold transition-all duration-200 hover:-translate-y-0.5 ${
+                    on ? 'border-[#1E2B44] bg-[#1E2B44] text-white shadow-[0_12px_24px_-16px_rgba(30,43,68,0.7)]' : 'border-[#D5DFEA] bg-white/70 hover:bg-white'
+                  }`}
+                >
+                  <Icon name={on ? 'check' : o.icon} size={16} />
+                  {o.title}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ),
+    },
+    hangouts: {
+      title: 'How do you like to spend free time?',
+      sub: 'Pick any that sound like your summer. We’ll use these for meetup ideas with your intern matches.',
+      body: (
+        <div className="space-y-5">
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {HANGOUTS.map((o) => (
+              <OptionRow key={o.id} multi selected={a.hangouts.includes(o.id)} onClick={() => toggle('hangouts', o.id)} icon={o.icon} title={o.title} body={o.body} />
+            ))}
+          </div>
+          <div>
+            <label htmlFor="other-interests" className="mb-1.5 block text-xs font-bold uppercase tracking-[0.1em]">
+              Anything else? <span className="font-medium normal-case tracking-normal text-[#4A5A75]">(optional, separate with commas)</span>
+            </label>
+            <input
+              id="other-interests"
+              value={a.otherInterests}
+              onChange={(e) => set('otherInterests', e.target.value)}
+              placeholder="e.g. pottery, chess, running club"
+              className="h-14 w-full rounded-2xl border border-[#D5DFEA] bg-white px-4 text-[15px] outline-none transition placeholder:text-[#8A97AB] focus:border-[#2F4161] focus:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]"
+            />
+          </div>
         </div>
       ),
     },
@@ -433,6 +582,7 @@ export default function Questionnaire() {
   /* finished screen */
   if (step.id === 'done') {
     const chips = [
+      a.university.trim() && `Studying at ${a.university.trim()}`,
       a.company && `Working at ${a.company}`,
       `${mins} min max commute`,
       a.commuteMode && label(COMMUTE_MODES, a.commuteMode),
@@ -448,7 +598,7 @@ export default function Questionnaire() {
         <AppNavbar firstName={firstName} />
         <section className="flex min-h-screen flex-col justify-center px-4 pb-10 pt-28 md:px-8">
           <div className="mx-auto max-w-3xl animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.1)] rounded-[36px] border border-white bg-white/70 p-8 text-center shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-12">
-            <HouseMascot label="Subtle's house mascot cheering" className="mx-auto h-40 w-40" />
+            <Journey compact complete position={journeySteps.length} total={journeySteps.length} />
             <h1 className="mt-4 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">
               You&apos;re all set{firstName ? `, ${firstName}` : ''}.
             </h1>
@@ -461,14 +611,14 @@ export default function Questionnaire() {
               ))}
             </ul>
             <div className="mt-10 flex flex-wrap justify-center gap-3">
-              <Link href="/matches" className="rounded-full bg-[#1E2B44] px-7 py-3.5 text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
-                See my matches
+              <Link href="/home" className="rounded-full bg-[#1E2B44] px-7 py-3.5 text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
+                Go to my dashboard
+              </Link>
+              <Link href="/matches" className="rounded-full border border-[#D5DFEA] bg-white px-7 py-3.5 text-[15px] font-semibold transition hover:-translate-y-0.5">
+                See all matches
               </Link>
               <Link href="/internMatches" className="rounded-full border border-[#D5DFEA] bg-white px-7 py-3.5 text-[15px] font-semibold transition hover:-translate-y-0.5">
                 Intern matches
-              </Link>
-              <Link href="/home" className="rounded-full border border-[#D5DFEA] bg-white px-7 py-3.5 text-[15px] font-semibold transition hover:-translate-y-0.5">
-                Back to home
               </Link>
               <button type="button" onClick={() => go(0)} className="rounded-full border border-[#D5DFEA] bg-white px-7 py-3.5 text-[15px] font-semibold transition hover:-translate-y-0.5">
                 Edit my answers
@@ -544,7 +694,7 @@ export default function Questionnaire() {
             </div>
           </div>
 
-          {!wide && p && <SidePanel step={step.id} tag={p.tag} icon={p.icon} title={p.title} caption={p.caption} />}
+          {!wide && <Journey position={journeyAt} total={journeySteps.length} caption={p ? { tag: p.tag, title: p.title, text: p.caption } : undefined} />}
         </div>
         <p className="mt-8 text-center text-[13px] text-[#4A5A75]">&copy; 2026 Subtle Technologies, Inc. All rights reserved.</p>
       </section>
