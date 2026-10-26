@@ -5,15 +5,35 @@ import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
 
-// Navbar for logged-in pages: logo (back to the dashboard), Messages, Post a listing, and Log out (with a confirm step).
-export default function AppNavbar({ firstName: _firstName }: { firstName: string }) {
+// Navbar for logged-in pages: logo (back to the dashboard), Messages, Post a listing, Your listings, and Log out (with a confirm step).
+export default function AppNavbar({ firstName }: { firstName: string }) {
   const router = useRouter()
   const pathname = usePathname()
+  const viewingProfile = pathname?.startsWith('/profile')
   const posting = pathname?.startsWith('/post')
   const messaging = pathname?.startsWith('/messages')
+  const hosting = pathname?.startsWith('/my-listings')
   const [confirming, setConfirming] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const stayRef = useRef<HTMLButtonElement>(null)
+
+  // load the signed-in user's profile picture; refresh when they change it on the profile page
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      const { data: auth } = await supabase.auth.getUser()
+      if (!auth.user) return
+      const { data } = await supabase.from('profiles').select('avatar_url').eq('id', auth.user.id).single()
+      if (active) setAvatarUrl(data?.avatar_url ?? null)
+    }
+    load()
+    window.addEventListener('avatar-updated', load)
+    return () => {
+      active = false
+      window.removeEventListener('avatar-updated', load)
+    }
+  }, [pathname])
 
   // focus "Stay signed in" when the dialog opens, close on Escape
   useEffect(() => {
@@ -64,6 +84,19 @@ export default function AppNavbar({ firstName: _firstName }: { firstName: string
             <span className="hidden md:inline">Post a listing</span>
             <span className="md:hidden">Post</span>
           </Link>
+          <Link
+            href="/my-listings"
+            aria-current={hosting ? 'page' : undefined}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2.5 text-sm font-semibold transition-colors md:px-4 md:py-3 ${
+              hosting ? 'bg-[#1E2B44] text-white' : 'hover:bg-[#1E2B44]/[0.06]'
+            }`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />
+            </svg>
+            <span className="hidden md:inline">Your listings</span>
+            <span className="sr-only md:hidden">Your listings</span>
+          </Link>
           <button
             type="button"
             onClick={() => setConfirming(true)}
@@ -71,6 +104,34 @@ export default function AppNavbar({ firstName: _firstName }: { firstName: string
           >
             Log out
           </button>
+          <Link
+            href="/profile"
+            aria-label="View profile"
+            aria-current={viewingProfile ? 'page' : undefined}
+            className={`ml-1 inline-flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-1.5 text-sm font-semibold transition-colors sm:pr-4 ${
+              viewingProfile ? 'bg-[#1E2B44] text-white' : 'hover:bg-[#1E2B44]/[0.06]'
+            }`}
+          >
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="" className="h-9 w-9 rounded-full border-2 border-white object-cover" />
+            ) : (
+              <span
+                aria-hidden="true"
+                className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${
+                  viewingProfile ? 'bg-white text-[#1E2B44]' : 'bg-[#1E2B44] text-white'
+                }`}
+              >
+                {firstName?.[0]?.toUpperCase() ?? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
+                  </svg>
+                )}
+              </span>
+            )}
+            <span className="hidden sm:inline">View profile</span>
+          </Link>
         </nav>
       </div>
 

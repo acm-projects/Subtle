@@ -160,18 +160,26 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
                 </p>
               </section>
 
-              <div className="mt-auto grid grid-cols-3 gap-2">
+              <div className="mt-auto flex flex-col gap-2">
+                <div className="grid grid-cols-3 gap-2">
+                  <Link
+                    href="/matches"
+                    className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white text-[15px] font-semibold transition hover:-translate-y-0.5"
+                  >
+                    Back
+                  </Link>
+                  <Link href={`/matches/${listing.id}/book`} className="flex min-h-12 items-center justify-center rounded-full bg-[#1E2B44] text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
+                    Book
+                  </Link>
+                  <Link href={`/matches/${listing.id}/contact`} className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white text-[15px] font-semibold transition hover:-translate-y-0.5">
+                    Contact
+                  </Link>
+                </div>
                 <Link
-                  href="/matches"
-                  className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white text-[15px] font-semibold transition hover:-translate-y-0.5"
+                  href={`/my-listings/${listing.id}/edit`}
+                  className="flex min-h-10 items-center justify-center rounded-full border border-dashed border-[#A9C7E8] bg-white/70 text-xs font-semibold text-[#1E2B44] transition hover:bg-white"
                 >
-                  Back
-                </Link>
-                <Link href={`/matches/${listing.id}/book`} className="flex min-h-12 items-center justify-center rounded-full bg-[#1E2B44] text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
-                  Book
-                </Link>
-                <Link href={`/matches/${listing.id}/contact`} className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white text-[15px] font-semibold transition hover:-translate-y-0.5">
-                  Contact
+                  Edit this listing
                 </Link>
               </div>
             </div>
