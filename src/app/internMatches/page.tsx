@@ -411,19 +411,25 @@ const contact = async (id: string) => {
             </div>
 
             {/* side column */}
-            <div className="grid gap-5 lg:grid-rows-[1fr_auto]">
+            <div className="grid content-start gap-5">
               <div className={card}>
                 <div className="mb-3 flex items-baseline justify-between">
                   <h2 className={`${serif} text-2xl font-medium`}>Top matches</h2>
                   <span className={label}>Score</span>
                 </div>
-                <div>
+                {/* 5 rows (57px each) are visible; scroll for the rest */}
+                <div
+                  tabIndex={0}
+                  role="region"
+                  aria-label="All matches, scrollable"
+                  className="max-h-[285px] overflow-y-auto overscroll-contain rounded-xl pr-1 outline-none focus-visible:ring-2 focus-visible:ring-[#1E2B44]/40"
+                >
                   {matches.map((m) => (
                     <div
                       key={m.id}
                       onMouseEnter={() => setHoverId(m.id)}
                       onMouseLeave={() => setHoverId(null)}
-                      className={`flex items-center gap-3 border-t border-[#E3ECF5] px-1 py-2.5 transition-colors ${hoverId === m.id ? 'bg-[#F4F7FB]' : ''}`}
+                      className={`flex h-[57px] items-center gap-3 border-t border-[#E3ECF5] px-1 transition-colors ${hoverId === m.id ? 'bg-[#F4F7FB]' : ''}`}
                     >
                       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white" style={{ backgroundColor: scoreColor(m.match ?? 0) }}>
                         {m.match}
@@ -446,6 +452,7 @@ const contact = async (id: string) => {
                     </div>
                   ))}
                 </div>
+                {matches.length > 5 && <p className="mt-2 text-center text-[11px] text-[#4A5A75]">Scroll for {matches.length - 5} more</p>}
               </div>
 
               <div className={card}>
@@ -489,9 +496,10 @@ const contact = async (id: string) => {
               <p className="mb-5 mt-1 text-sm text-[#4A5A75]">Ideas based on what you share with your matches. Sample ideas.</p>
               <div className="grid gap-3">
                 {meetups.map((m) => (
-                  <div key={m.interest} className="flex items-center gap-4 rounded-2xl border border-[#EADFD0] bg-[#e6eff7] p-4">
-                    <span className={`${pillShared} shrink-0`}>{m.interest}</span>
-                    <div className="min-w-0 flex-1">
+                  // fixed first column so every idea title starts at the same x position
+                  <div key={m.interest} className="grid grid-cols-[8.5rem_minmax(0,1fr)] items-center gap-4 rounded-2xl border border-[#EADFD0] bg-[#e6eff7] p-4">
+                    <span className={`${pillShared} block truncate text-center`}>{m.interest}</span>
+                    <div className="min-w-0">
                       <div className={`${serif} text-[17px] font-medium leading-snug`}>{m.idea}</div>
                       <div className="text-xs text-[#4A5A75]">
                         {joinNames(m.people.slice(0, 3).map((p) => p.name.split(' ')[0]))}

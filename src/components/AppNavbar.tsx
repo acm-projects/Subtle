@@ -9,12 +9,31 @@ import { supabase } from '../lib/supabase'
 export default function AppNavbar({ firstName: _firstName }: { firstName: string }) {
   const router = useRouter()
   const pathname = usePathname()
+  const viewingProfile = pathname?.startsWith('/profile')
   const posting = pathname?.startsWith('/post')
   const messaging = pathname?.startsWith('/messages')
   const hosting = pathname?.startsWith('/my-listings')
   const [confirming, setConfirming] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const stayRef = useRef<HTMLButtonElement>(null)
+
+  // load the signed-in user's profile picture; refresh when they change it on the profile page
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      const { data: auth } = await supabase.auth.getUser()
+      if (!auth.user) return
+      const { data } = await supabase.from('profiles').select('avatar_url').eq('id', auth.user.id).single()
+      if (active) setAvatarUrl(data?.avatar_url ?? null)
+    }
+    load()
+    window.addEventListener('avatar-updated', load)
+    return () => {
+      active = false
+      window.removeEventListener('avatar-updated', load)
+    }
+  }, [pathname])
 
   // focus "Stay signed in" when the dialog opens, close on Escape
   useEffect(() => {
@@ -85,6 +104,34 @@ export default function AppNavbar({ firstName: _firstName }: { firstName: string
           >
             Log out
           </button>
+          <Link
+            href="/profile"
+            aria-label="View profile"
+            aria-current={viewingProfile ? 'page' : undefined}
+            className={`ml-1 inline-flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-1.5 text-sm font-semibold transition-colors sm:pr-4 ${
+              viewingProfile ? 'bg-[#1E2B44] text-white' : 'hover:bg-[#1E2B44]/[0.06]'
+            }`}
+          >
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="" className="h-9 w-9 rounded-full border-2 border-white object-cover" />
+            ) : (
+              <span
+                aria-hidden="true"
+                className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${
+                  viewingProfile ? 'bg-white text-[#1E2B44]' : 'bg-[#1E2B44] text-white'
+                }`}
+              >
+                {firstName?.[0]?.toUpperCase() ?? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
+                  </svg>
+                )}
+              </span>
+            )}
+            <span className="hidden sm:inline">View profile</span>
+          </Link>
         </nav>
       </div>
 
