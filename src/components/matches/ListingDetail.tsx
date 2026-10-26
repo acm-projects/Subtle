@@ -148,8 +148,8 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
                   The place
                 </h2>
                 <ul className="mt-4 flex flex-wrap gap-2 text-[13px] font-medium">
-                  {featuresFor(listing).map((f) => (
-                    <li key={f} className="rounded-full border border-[#D5DFEA] bg-white px-3 py-1.5">
+                  {featuresFor(listing).map((f, idx) => (
+                    <li key={`${f}-${idx}`} className="rounded-full border border-[#D5DFEA] bg-white px-3 py-1.5">
                       {f}
                     </li>
                   ))}
