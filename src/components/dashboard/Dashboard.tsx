@@ -147,7 +147,7 @@ export default function Dashboard() {
             )}
           </section>
 
-          {d.quizStatus === 'done' && (
+          {(d.quizStatus === 'done' || d.bookings.length > 0 || d.savedHomes.length > 0) && (
           <div className="mt-6 grid gap-6 lg:grid-cols-12">
             {/* saved homes */}
             <section className={`${glass} animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.05)_both] p-7 [animation-delay:120ms] md:p-8 lg:col-span-7`}>
@@ -208,10 +208,10 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <ul className="mt-4 space-y-4">
-                  {d.bookings.slice(0, 2).map((b) => {
+                  {d.bookings.slice(0, 3).map((b) => {
                     const at = BOOKING_STEPS.findIndex((s) => s.id === b.status)
                     return (
-                      <li key={b.listingId} className="rounded-[22px] border border-white bg-white/80 p-4">
+                      <li key={b.id ?? b.listingId} className="rounded-[22px] border border-white bg-white/80 p-4">
                         <div className="flex items-baseline justify-between gap-3">
                           <Link href={`/matches/${b.listingId}`} className={`${serif} truncate text-xl font-medium hover:underline hover:underline-offset-4`}>
                             {b.title}
@@ -220,6 +220,12 @@ export default function Dashboard() {
                             {b.availableFrom} – {b.availableTo}
                           </span>
                         </div>
+                        {b.status === 'declined' ? (
+                          <p className="mt-3 flex items-center gap-2 rounded-2xl bg-[#FBF3EA] px-3 py-2 text-sm">
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-[#A35F33]" />
+                            {b.hostName.split(' ')[0]} can't host you this time. Your other matches are still open.
+                          </p>
+                        ) : (
                         <ol className="mt-4 flex items-center" aria-label={`Status: ${BOOKING_STEPS[at]?.label}`}>
                           {BOOKING_STEPS.map((s, i) => (
                             <li key={s.id} className={`flex items-center ${i < BOOKING_STEPS.length - 1 ? 'flex-1' : ''}`}>
@@ -238,6 +244,8 @@ export default function Dashboard() {
                             </li>
                           ))}
                         </ol>
+                        )}
+                        {b.status === 'accepted' && <p className="mt-3 text-sm font-semibold text-[#2E6B45]">{b.hostName.split(' ')[0]} accepted your request. Message them to sort out the next steps.</p>}
                         {b.status === 'requested' && <p className="mt-3 text-sm text-[#4A5A75]">Waiting on {b.hostName.split(' ')[0]} to reply.</p>}
                       </li>
                     )

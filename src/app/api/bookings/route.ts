@@ -103,3 +103,31 @@ export async function POST(request: Request) {
   return NextResponse.json(booking, { status: 201 })
 }
 
+
+/**
+ * PATCH /api/bookings
+ * Body: { id: string, status: 'accepted' | 'declined' | 'pending' }
+ * The host accepts or declines a request. Returns the updated booking.
+ * TODO(backend): check that the caller owns the listing once bookings move to Supabase.
+ */
+export async function PATCH(request: Request) {
+  let body: Record<string, any>
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const id = (body.id ?? '').toString().trim()
+  const status = body.status
+  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
+  if (status !== 'accepted' && status !== 'declined' && status !== 'pending') {
+    return NextResponse.json({ error: "status must be 'accepted', 'declined' or 'pending'" }, { status: 400 })
+  }
+
+  const booking = getBookingsStore().find((b) => b.id === id)
+  if (!booking) return NextResponse.json({ error: `Booking "${id}" not found` }, { status: 404 })
+
+  booking.status = status
+  return NextResponse.json(booking)
+}
