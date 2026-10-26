@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { getListing as getDbListing, getListings } from '../../lib/listings'
-import { loadBookings, loadSaved, type Booking } from '../matches/activity'
+import { loadMyBookings, loadSaved, type Booking } from '../matches/activity'
 import { dbListingToMatchListing, SAMPLE_LISTINGS, type Listing } from '../matches/listings'
 import { EMPTY, type QuizAnswers } from '../quiz/options'
 
@@ -48,7 +48,7 @@ export function useDashboardData(): DashboardData {
 
   useEffect(() => {
     let alive = true
-    ;(async () => {
+    const load = async () => {
       let firstName = ''
       let quiz: QuizAnswers = EMPTY
       try {
@@ -63,6 +63,9 @@ export function useDashboardData(): DashboardData {
         const meta = auth.user?.user_metadata ?? {}
         const fromAccount = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
         if (fromAccount) firstName = fromAccount
+        // quiz answers in this browser only count if this account took the quiz
+        const email = auth.user?.email?.toLowerCase()
+        if (email && localStorage.getItem('subtle-quiz-owner') !== email) quiz = EMPTY
       } catch {}
 
       const quizStatus = quizStatusOf(quiz)
@@ -89,11 +92,26 @@ export function useDashboardData(): DashboardData {
           if (db) savedHomes.push(dbListingToMatchListing(db))
         } catch {}
       }
-      const bookings = loadBookings()
+      let myEmail: string | null = null
+      try {
+        const { data: auth } = await supabase.auth.getUser()
+        myEmail = auth.user?.email ?? null
+        if (!myEmail) myEmail = JSON.parse(localStorage.getItem('subtle-user-v1') ?? '{}').email ?? null
+      } catch {}
+      const bookings = await loadMyBookings(myEmail)
 
       if (alive) setData({ loading: false, firstName, quiz, quizStatus, topMatches, savedHomes, bookings })
-    })()
+    }
+    load()
+    // refresh when you come back to the tab (and every 20s), so new requests and host replies show up
+    const onFocus = () => document.visibilityState === 'visible' && load()
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    const timer = setInterval(onFocus, 20000)
     return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+      clearInterval(timer)
       alive = false
     }
   }, [])

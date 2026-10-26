@@ -25,7 +25,16 @@ html { scrollbar-gutter: stable; }
 @keyframes houseBob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-18px) rotate(2deg); } }
 @keyframes houseArmL { 0%, 100% { transform: rotate(6deg); } 50% { transform: rotate(-6deg); } }
 @keyframes houseArmR { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(14deg); } }
+@keyframes houseJump { 0%, 100% { transform: translateY(0) scale(1, 1); } 18% { transform: translateY(0) scale(1.06, 0.92); } 45% { transform: translateY(-60px) scale(0.96, 1.05); } 72% { transform: translateY(0) scale(1.05, 0.94); } 86% { transform: translateY(0) scale(1, 1); } }
 @keyframes houseShadow { 0%, 100% { transform: scale(1, 1); opacity: 0.22; } 50% { transform: scale(0.9, 0.85); opacity: 0.15; } }
 @media (prefers-reduced-motion: reduce) {
   .house-mascot * { animation: none !important; }
+  [class*='journeyHop'] { animation: none !important; }
 }
+
+/* subtle. is all lowercase: every word on the site renders lowercase,
+   including labels that used to be ALL CAPS. What people type in fields stays as typed. */
+body, button, [role='button'], optgroup, option { text-transform: lowercase; }
+.uppercase, .capitalize { text-transform: lowercase; }
+input, textarea, select, [contenteditable='true'] { text-transform: none; }
+@keyframes journeyHop { 0% { transform: translateY(0); } 30% { transform: translateY(-14%); } 60% { transform: translateY(0) scale(1.05, 0.94); } 80% { transform: translateY(0) scale(0.98, 1.02); } 100% { transform: none; } }
