@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import AppNavbar from '../../components/AppNavbar'
 import { startConversation } from '../../components/messages/store'
-import { loadConnections, sendConnectionRequest, type Connection } from '../../components/connections/store'
 import { supabase } from '../../lib/supabase'
 
 //Backend: replace these 
@@ -82,34 +81,18 @@ const polar = (angle: number, radius: number) => ({
   y: round2(50 + radius * 100 * 0.86 * Math.sin((angle * Math.PI) / 180)),
 })
 
-// "UT Dallas" and "The University of Texas at Dallas" should count as the same school
-const normSchool = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/\b(the|university|of|at|college)\b/g, '')
-    .replace(/[^a-z0-9]/g, '')
-const sameSchool = (a: string, b: string) => {
-  const x = normSchool(a)
-  const y = normSchool(b)
-  return x.length > 1 && y.length > 1 && (x === y || x.includes(y) || y.includes(x))
-}
-
 const joinNames = (list: string[]) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0] ?? '')
 
-type Placed = Intern & { x: number; y: number; shared: string[]; schoolMatch: boolean }
+type Placed = Intern & { x: number; y: number; shared: string[] }
 
 function Tooltip({
   intern,
   contacted,
   onContact,
-  connection,
-  onConnect,
 }: {
   intern: Placed
   contacted: boolean
   onContact: (id: string) => void
-  connection?: Connection
-  onConnect: (id: string) => void
 }) {
   const matched = intern.match !== undefined
   return (
@@ -126,7 +109,6 @@ function Tooltip({
           <div className="text-xs text-[#4A5A75]">
             {intern.role} · {intern.school}
           </div>
-          {intern.schoolMatch && <span className="mt-1 inline-block rounded-full bg-[#F3E3D2] px-2 py-0.5 text-[11px] font-semibold text-[#7A4A2A]">Same school</span>}
         </div>
       </div>
 
@@ -142,14 +124,9 @@ function Tooltip({
         {matched ? `Subtle score ${intern.match}. You both like ${joinNames(intern.shared)}.` : 'Not matched yet.'}
       </p>
 
-      <div className="mt-3.5 grid grid-cols-2 gap-2">
-        <button type="button" disabled={!!connection} onClick={() => onConnect(intern.id)} className={`py-2.5 ${connection ? btnLight : btnDark}`}>
-          {connection ? (connection.status === 'connected' ? 'Connected' : 'Requested') : 'Connect'}
-        </button>
-        <button type="button" disabled={contacted} onClick={() => onContact(intern.id)} className={`py-2.5 ${btnLight}`}>
-          {contacted ? 'Sent' : 'Message'}
-        </button>
-      </div>
+      <button type="button" disabled={contacted} onClick={() => onContact(intern.id)} className={`mt-3.5 w-full py-2.5 ${contacted ? btnLight : btnDark}`}>
+        {contacted ? 'Request sent' : `Contact ${intern.name.split(' ')[0]}`}
+      </button>
     </div>
   )
 }
@@ -162,17 +139,6 @@ export default function MatchesPage() {
   const [matchesOnly, setMatchesOnly] = useState(false)
   const [myInterests, setMyInterests] = useState<string[]>(MY_INTERESTS)
   const [internList, setInternList] = useState<Intern[]>(INTERNS)
-  const [university, setUniversity] = useState('')
-  const [connections, setConnections] = useState<Connection[]>([])
-
-  // your school (from the quiz) and connection requests you've sent
-  useEffect(() => {
-    setConnections(loadConnections())
-    try {
-      const raw = localStorage.getItem('subtle-quiz-v1')
-      if (raw) setUniversity((JSON.parse(raw).university ?? '').trim())
-    } catch {}
-  }, [])
 
   // AppNavbar takes the user's first name; also fetch live intern matches from /api/intern-matches
   useEffect(() => {
@@ -201,19 +167,12 @@ export default function MatchesPage() {
 
   const interns: Placed[] = useMemo(
     () =>
-      internList.map((i) => {
-        const schoolMatch = !!university && sameSchool(i.school, university)
-        // same school factors into the Subtle score: a boost for matches, and a match for classmates
-        const match = i.match !== undefined ? (schoolMatch ? Math.min(99, i.match + 5) : i.match) : schoolMatch ? 74 : undefined
-        return {
-          ...i,
-          ...polar(i.angle, i.radius),
-          match,
-          schoolMatch,
-          shared: i.interests.filter((x) => myInterests.some((m) => m.toLowerCase() === x.toLowerCase())),
-        }
-      }),
-    [internList, myInterests, university],
+      internList.map((i) => ({
+        ...i,
+        ...polar(i.angle, i.radius),
+        shared: i.interests.filter((x) => myInterests.includes(x)),
+      })),
+    [internList, myInterests],
   )
   const matches = interns.filter((i) => i.match !== undefined).sort((a, b) => (b.match ?? 0) - (a.match ?? 0))
   const visible = matchesOnly ? matches : interns
@@ -229,22 +188,13 @@ export default function MatchesPage() {
   // meetup ideas for the interests you share with your matches
   const meetups = useMemo(
     () =>
-      myInterests.filter((x) => MEETUP_IDEAS[x])
+      MY_INTERESTS.filter((x) => MEETUP_IDEAS[x])
         .map((interest) => ({ interest, idea: MEETUP_IDEAS[interest], people: matches.filter((m) => m.shared.includes(interest)) }))
         .filter((m) => m.people.length > 0)
         .sort((a, b) => b.people.length - a.people.length)
         .slice(0, 4),
-    [matches, myInterests],
+    [matches],
   )
-
-const connectionFor = (id: string) => connections.find((c) => c.internId === id)
-
-// TODO(backend): sendConnectionRequest in components/connections/store.ts
-const connect = (id: string) => {
-  const intern = interns.find((x) => x.id === id)
-  if (!intern || connectionFor(id)) return
-  setConnections(sendConnectionRequest({ id: intern.id, name: intern.name, role: intern.role, school: intern.school }))
-}
 
 const contact = async (id: string) => {
   const intern = interns.find((x) => x.id === id)
@@ -293,23 +243,13 @@ const contact = async (id: string) => {
               <p className="mt-2 text-[15px] text-[#4A5A75]">Interns living in Los Angeles this summer who share your interests.</p>
             </div>
 
-            <div className="max-w-md">
-              <div className="mb-2.5 mt-[22px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#3C6285]">Your interests</div>
-              <div className="flex flex-wrap gap-1.5">
-                {university && (
-                  <span className="rounded-full bg-[#F3E3D2] px-2.5 py-1 text-[11px] font-semibold text-[#7A4A2A]">{university}</span>
-                )}
-                {myInterests.map((i) => (
-                  <span key={i} className="rounded-full bg-[#DCEBF6] px-2.5 py-1 text-[11px] font-semibold text-[#245F90] ring-[1.5px] ring-inset ring-[#2E7DB5]">
-                    {i}
-                  </span>
-                ))}
-              </div>
-              {connections.length > 0 && (
-                <p className="mt-2 text-xs text-[#4A5A75]">
-                  {connections.filter((c) => c.status === 'pending').length} connection requests sent
-                </p>
-              )}
+            <div className="mb-2.5 mt-[22px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#3C6285]">Your interests</div>
+            <div className="flex flex-wrap gap-1.5">
+              {myInterests.map((i) => (
+                <span key={i} className="rounded-full bg-[#DCEBF6] px-2.5 py-1 text-[11px] font-semibold text-[#245F90] ring-[1.5px] ring-inset ring-[#2E7DB5]">
+                  {i}
+                </span>
+              ))}
             </div>
           </header>
 
@@ -395,7 +335,7 @@ const contact = async (id: string) => {
                         up ? 'bottom-full pb-3' : 'top-full pt-3'
                       } ${active ? '!visible !opacity-100' : ''}`}
                     >
-                      <Tooltip intern={i} contacted={contacted.has(i.id)} onContact={contact} connection={connectionFor(i.id)} onConnect={connect} />
+                      <Tooltip intern={i} contacted={contacted.has(i.id)} onContact={contact} />
                     </div>
                   </div>
                 )
@@ -436,18 +376,10 @@ const contact = async (id: string) => {
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold">{m.name}</div>
-                        <div className="text-xs text-[#4A5A75]">
-                          {m.schoolMatch ? 'Same school · ' : ''}
-                          {m.shared.length} shared interests
-                        </div>
+                        <div className="text-xs text-[#4A5A75]">{m.shared.length} shared interests</div>
                       </div>
-                      <button
-                        type="button"
-                        disabled={!!connectionFor(m.id)}
-                        onClick={() => connect(m.id)}
-                        className={`px-3 py-1.5 text-xs ${connectionFor(m.id) ? btnLight : btnDark}`}
-                      >
-                        {connectionFor(m.id) ? (connectionFor(m.id)?.status === 'connected' ? 'Connected' : 'Requested') : 'Connect'}
+                      <button type="button" disabled={contacted.has(m.id)} onClick={() => contact(m.id)} className={`px-3 py-1.5 text-xs ${btnLight}`}>
+                        {contacted.has(m.id) ? 'Sent' : 'Contact'}
                       </button>
                     </div>
                   ))}
@@ -458,7 +390,7 @@ const contact = async (id: string) => {
               <div className={card}>
                 <div className={label}>Matched on your interests</div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {myInterests.map((i) => (
+                  {MY_INTERESTS.map((i) => (
                     <span key={i} className={pillShared}>
                       {i}
                     </span>
@@ -475,7 +407,7 @@ const contact = async (id: string) => {
               <p className="mb-5 mt-1 text-sm text-[#4A5A75]">What interns in your city are into. Yours are in navy.</p>
               <div className="grid gap-3.5">
                 {popular.map(([interest, count]) => {
-                  const mine = myInterests.some((m) => m.toLowerCase() === interest.toLowerCase())
+                  const mine = MY_INTERESTS.includes(interest)
                   return (
                     <div key={interest}>
                       <div className="mb-1 flex justify-between text-sm font-semibold">
