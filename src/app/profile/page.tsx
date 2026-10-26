@@ -315,6 +315,7 @@ export default function ProfilePage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">Your profile</p>
             <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">{fullName}</h1>
+            <p className="mt-2 text-[17px] text-[#4A5A75]"> manage your account settings </p>
           </div>
           <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2.5 text-xs font-semibold text-[#2f6b3f]">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
