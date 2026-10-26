@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
 
 // Navbar for logged-in pages: logo (back to the dashboard), Messages, Post a listing, Your listings, and Log out (with a confirm step).
-export default function AppNavbar({ firstName: _firstName }: { firstName: string }) {
+export default function AppNavbar({ firstName }: { firstName: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const viewingProfile = pathname?.startsWith('/profile')
