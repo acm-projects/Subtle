@@ -31,18 +31,6 @@ type Connection = {
 
 type Tab = "connected" | "requests" | "sent";
 
-const INTERESTS = [
-  "Hiking", "Cooking", "Film", "Photography", "Basketball", "Live music",
-  "Running", "Gaming", "Reading", "Yoga",
-];
-
-const QUIZ = [
-  { key: "sleep", label: "Sleep schedule", options: ["Early bird", "Flexible", "Night owl"] },
-  { key: "clean", label: "Cleanliness", options: ["Relaxed", "Tidy", "Spotless"] },
-  { key: "guests", label: "Guests over", options: ["Rarely", "Sometimes", "Often"] },
-  { key: "commute", label: "Getting to work", options: ["Walk", "Transit", "Drive"] },
-];
-
 const AVATAR_COLORS = ["#6f8fbf", "#c07a45", "#4f6a9a", "#7a6f9a", "#8a6f4f"];
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
@@ -103,31 +91,6 @@ function Avatar({
   );
 }
 
-function Segmented({
-  label, options, value, onChange,
-}: { label: string; options: string[]; value?: string; onChange: (v: string) => void }) {
-  return (
-    <div role="group" aria-label={label}>
-      <span className={labelCls}>{label}</span>
-      <div className="flex gap-0.5 rounded-full bg-[#e8edf7] p-1">
-        {options.map((o) => (
-          <button
-            key={o}
-            type="button"
-            aria-pressed={value === o}
-            onClick={() => onChange(o)}
-            className={`h-10 flex-1 rounded-full text-[13px] transition focus-visible:ring-2 focus-visible:ring-[#1f2a44] ${
-              value === o ? "bg-white font-semibold text-[#1f2a44] shadow-md" : "font-medium text-[#3d4a6b]"
-            }`}
-          >
-            {o}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /* ---------- page ---------- */
 
 export default function ProfilePage() {
@@ -152,12 +115,6 @@ export default function ProfilePage() {
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [savingPw, setSavingPw] = useState(false);
-
-  // preferences
-  const [interests, setInterests] = useState<string[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [budget, setBudget] = useState<[number, number]>([1200, 2000]);
-  const [savingPrefs, setSavingPrefs] = useState(false);
 
   // connections
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -217,9 +174,6 @@ export default function ProfilePage() {
         setProfile(p);
         setFirst(p.first_name ?? "");
         setLast(p.last_name ?? "");
-        setInterests(p.interests ?? []);
-        setAnswers(p.preferences ?? {});
-        setBudget([p.budget_min ?? 1200, p.budget_max ?? 2000]);
         await loadConnections(user.id, p.interests ?? []);
       }
       setLoading(false);
@@ -319,23 +273,6 @@ export default function ProfilePage() {
     setNewPw("");
     setConfirmPw("");
     flash("Password updated.");
-  }
-
-  /* ----- preferences ----- */
-
-  const toggleInterest = (i: string) =>
-    setInterests((cur) => (cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i]));
-
-  async function savePrefs() {
-    if (!uid) return;
-    setSavingPrefs(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ interests, preferences: answers, budget_min: budget[0], budget_max: budget[1] })
-      .eq("id", uid);
-    setSavingPrefs(false);
-    if (error) return flash("Couldn't update preferences. Try again.", "err");
-    flash("Preferences updated. New matches will reflect them.");
   }
 
   /* ----- connections ----- */
@@ -483,80 +420,6 @@ export default function ProfilePage() {
                   </button>
                 </div>
               </form>
-            </Card>
-
-            {/* Preferences */}
-            <Card eyebrow="Questionnaire" title="Your preferences">
-              <p className="mt-2.5 text-[13px] text-[#3d4a6b]">
-                These answers shape your Subtle score. Changes apply to your next set of matches.
-              </p>
-
-              <div className="mt-6" role="group" aria-label="Interests">
-                <span className={labelCls}>Interests</span>
-                <div className="flex flex-wrap gap-2">
-                  {INTERESTS.map((i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      aria-pressed={interests.includes(i)}
-                      onClick={() => toggleInterest(i)}
-                      className={`h-10 rounded-full border px-4 text-[13px] font-medium transition focus-visible:ring-2 focus-visible:ring-[#1f2a44] ${
-                        interests.includes(i)
-                          ? "border-[#1f2a44] bg-[#1f2a44] text-white"
-                          : "border-[#cfd8ea] bg-white text-[#1f2a44]"
-                      }`}
-                    >
-                      {i}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-col gap-5">
-                {QUIZ.map((q) => (
-                  <Segmented
-                    key={q.key}
-                    label={q.label}
-                    options={q.options}
-                    value={answers[q.key]}
-                    onChange={(v) => setAnswers((a) => ({ ...a, [q.key]: v }))}
-                  />
-                ))}
-
-                <div>
-                  <span className={labelCls}>Monthly budget</span>
-                  <p className="mb-3 text-[13px] font-semibold">
-                    ${budget[0].toLocaleString()} to ${budget[1].toLocaleString()}
-                  </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="text-xs text-[#3d4a6b]">
-                      Minimum
-                      <input
-                        type="range" min={500} max={4000} step={50}
-                        value={budget[0]}
-                        onChange={(e) => setBudget(([, hi]) => [Math.min(Number(e.target.value), hi), hi])}
-                        className="mt-1 w-full accent-[#1f2a44]"
-                      />
-                    </label>
-                    <label className="text-xs text-[#3d4a6b]">
-                      Maximum
-                      <input
-                        type="range" min={500} max={4000} step={50}
-                        value={budget[1]}
-                        onChange={(e) => setBudget(([lo]) => [lo, Math.max(Number(e.target.value), lo)])}
-                        className="mt-1 w-full accent-[#1f2a44]"
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-7 flex flex-wrap justify-end gap-2.5">
-                <button type="button" onClick={() => router.push("/quiz")} className={btnCls}>Retake full quiz</button>
-                <button type="button" onClick={savePrefs} disabled={savingPrefs} className={btnDark}>
-                  {savingPrefs ? "Saving…" : "Update preferences"}
-                </button>
-              </div>
             </Card>
           </div>
 
