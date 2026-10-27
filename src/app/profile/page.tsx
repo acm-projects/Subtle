@@ -401,16 +401,17 @@ export default function ProfilePage() {
     return <main className="min-h-screen bg-gradient-to-b from-[#c3d5ee] to-[#f6e6d2] p-10 text-[#1f2a44]">Loading…</main>;
   }
 
-  const fullName = `${first} ${last}`.trim() || "Your profile";
+  const fullName = `${first} ${last}`.trim() || "your profile.";
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#c3d5ee] via-[#e6ebf4] to-[#f6e6d2] px-6 pb-16 pt-28 text-[#1f2a44]">
+    <main className="min-h-screen bg-gradient-to-b from-[#c3d5ee] via-[#e6ebf4] to-[#f6e6d2] px-3 pb-16 pt-32 text-[#1f2a44] md:px-4">
       <AppNavbar firstName={first} />
-      <div className="mx-auto flex max-w-[960px] flex-col gap-7">
-        <header className="flex flex-wrap items-end justify-between gap-6">
+      <div className="mx-auto flex max-w-[1240px] flex-col gap-7">
+        <header className="flex animate-[fadeIn_.5s_ease-out] flex-wrap items-end justify-between gap-6 md:pl-10">
           <div>
-            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-[#4a5878]">Your profile</p>
-            <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium leading-tight sm:text-[56px]">{fullName}</h1>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">Your profile</p>
+            <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">{fullName}</h1>
+            <p className="mt-2 text-[17px] text-[#4A5A75]"> manage your account settings </p>
           </div>
           <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2.5 text-xs font-semibold text-[#2f6b3f]">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -424,7 +425,7 @@ export default function ProfilePage() {
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="flex min-w-0 flex-col gap-6">
             {/* Details + photo */}
-            <Card eyebrow="Account" title="Your details">
+            <Card eyebrow="Account" title="your details.">
               <form onSubmit={saveDetails} className="mt-6 flex flex-col gap-5">
                 <div className="flex flex-wrap items-center gap-5">
                   <div className="relative h-[88px] w-[88px] shrink-0">
@@ -483,7 +484,7 @@ export default function ProfilePage() {
             </Card>
 
             {/* Password */}
-            <Card eyebrow="Security" title="Password">
+            <Card eyebrow="Security" title="password.">
               <form onSubmit={changePassword} className="mt-6 flex flex-col gap-5">
                 <div>
                   <label htmlFor="pw0" className={labelCls}>Current password</label>
@@ -519,10 +520,11 @@ export default function ProfilePage() {
             </Card>
           </div>
 
-          {/* Connections */}
+          {/* Right column: connections, then preferences */}
+          <div className="flex min-w-0 flex-col gap-6">
           <aside className="rounded-[28px] bg-white/70 p-6 shadow-[0_10px_40px_rgba(31,42,68,0.08)] backdrop-blur">
             <p className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-[#4a5878]">Your people</p>
-            <h2 className="font-[family-name:var(--font-serif)] text-[28px] font-medium">Connections</h2>
+            <h2 className="font-[family-name:var(--font-serif)] text-[28px] font-medium">connections.</h2>
             <p className="mb-4 mt-1 text-xs text-[#4a5878]">
               {connected.length} connected · {requests.length} {requests.length === 1 ? "request" : "requests"} waiting
             </p>
@@ -596,10 +598,23 @@ export default function ProfilePage() {
               ))}
             </ul>
 
-            <button type="button" onClick={() => router.push("/matches")} className={`${btnCls} mt-5 w-full`}>
+            <button type="button" onClick={() => router.push("/internMatches")} className={`${btnCls} mt-5 w-full`}>
               Find more matches
             </button>
           </aside>
+
+            {/* Preferences entry point */}
+            <Card eyebrow="Questionnaire" title="my preferences.">
+              <p className="mt-2.5 text-[13px] text-[#3d4a6b]">
+                Review your questionnaire answers and update them any time. Changes apply to your next set of matches.
+              </p>
+              <div className="mt-6 flex justify-end">
+                <button type="button" onClick={() => router.push("/profile/preferences")} className={btnDark}>
+                  Edit my preferences
+                </button>
+              </div>
+            </Card>
+          </div>
         </div>
       </div>
 

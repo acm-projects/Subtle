@@ -259,12 +259,14 @@ export default function PostListing() {
   return (
     <>
       <AppNavbar firstName={firstName} />
-      <section className="px-4 pb-16 pt-32 md:px-8">
+      <section className="px-4 pb-16 pt-32 md:px-8"> 
         <div className="mx-auto w-full max-w-[1240px]">
           <header className="animate-[fadeIn_.5s_ease-out]">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">For sub-leasers</p>
-            <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-7xl">Post your place.</h1>
-            <p className="mt-2 font-[family-name:var(--font-serif)] text-2xl italic text-[#2F4161]">Find a subletter who actually fits.</p>
+            <div className="md:pl-10">
+              <p className="text-xs font-bold tracking-[0.14em] text-[#4A5A75]">for sub-leasers</p>
+              <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">post your place.</h1>
+              <p className="mt-2 text-[17px] text-[#4A5A75]">find a subletter who actually fits.</p>
+            </div>
 
             {!user && !checkingAuth && (
               <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-white bg-white/70 px-5 py-3 text-sm shadow-sm backdrop-blur-md">

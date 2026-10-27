@@ -90,14 +90,10 @@ export default function Messages() {
   const list = (
     <div className={`flex min-h-0 flex-col border-[#E4EAF1] md:border-r ${selected ? 'hidden md:flex' : 'flex'}`}>
       <div className="p-5 pb-3 md:p-6 md:pb-3">
-        <div className="flex items-baseline justify-between gap-3">
-          <h1 className="font-[family-name:var(--font-serif)] text-4xl font-medium tracking-[-0.02em]">Messages</h1>
-          {unreadCount > 0 && <span className="rounded-full bg-[#1E2B44] px-2.5 py-0.5 text-xs font-bold text-white">{unreadCount} new</span>}
-        </div>
         <label htmlFor="msg-search" className="sr-only">
           Search messages
         </label>
-        <div className="mt-4 flex min-h-11 items-center gap-2 rounded-full border border-[#D5DFEA] bg-white px-4 focus-within:border-[#2F4161] focus-within:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]">
+        <div className="flex min-h-11 items-center gap-2 rounded-full border border-[#D5DFEA] bg-white px-4 focus-within:border-[#2F4161] focus-within:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="text-[#4A5A75]">
             <circle cx="11" cy="11" r="7" />
             <path d="M20 20l-3.5-3.5" />
@@ -276,10 +272,23 @@ export default function Messages() {
   return (
     <>
       <AppNavbar firstName="" />
-      <section className="px-4 pb-10 pt-28 md:px-8">
-        <div className="mx-auto grid h-[calc(100dvh-10rem)] min-h-[560px] w-full max-w-[1240px] animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] grid-rows-[minmax(0,1fr)] overflow-hidden rounded-[36px] border border-white bg-white/60 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
-          {list}
-          {thread}
+      <section className="px-4 pb-10 pt-32 md:px-8">
+        <div className="mx-auto w-full max-w-[1240px]">
+          {/* same heading treatment as "your listings." on the renter dashboard */}
+          <header className="flex animate-[fadeIn_.5s_ease-out] flex-wrap items-end justify-between gap-4 md:pl-10">
+            <div>
+              <p className="text-xs font-bold tracking-[0.14em] text-[#4A5A75]">for hosts</p>
+              <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">messages.</h1>
+              <p className="mt-2 text-[17px] text-[#4A5A75]">pick up where you left off with hosts and interns.</p>
+            </div>
+            {unreadCount > 0 && <span className="mb-2 rounded-full bg-[#1E2B44] px-3 py-1 text-xs font-bold text-white">{unreadCount} new</span>}
+          </header>
+
+          {/* height leaves room for the navbar, the heading and the footer gap */}
+          <div className="mt-6 grid h-[calc(100dvh-17rem)] min-h-[520px] w-full animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] grid-rows-[minmax(0,1fr)] overflow-hidden rounded-[36px] border border-white bg-white/60 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
+            {list}
+            {thread}
+          </div>
         </div>
       </section>
     </>

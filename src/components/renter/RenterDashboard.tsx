@@ -138,7 +138,7 @@ export default function RenterDashboard() {
           <header className="flex animate-[fadeIn_.5s_ease-out] flex-wrap items-end justify-between gap-6 md:pl-10">
             <div>
               <p className={eyebrow}>For hosts</p>
-              <h1 className={`${serif} mt-2 text-5xl font-medium tracking-[-0.02em] md:text-6xl`}>Your listings</h1>
+              <h1 className={`${serif} mt-2 text-5xl font-medium tracking-[-0.02em] md:text-6xl`}>your listings.</h1>
               <p className="mt-2 text-[17px] text-[#4A5A75]">See who&apos;s looking at your place and who wants to talk.</p>
             </div>
             <Link href="/post" className={btnLight}>
