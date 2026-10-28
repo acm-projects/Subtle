@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AppNavbar from "../../components/AppNavbar";
+import { BUDGETS, COMMUTE_MODES, EMPTY, HOUSING_TYPES, label, MOVE_IN, type QuizAnswers } from "../../components/quiz/options";
 
 /* ---------- types & constants ---------- */
 
@@ -63,10 +64,9 @@ const btnDark =
   "h-11 rounded-full bg-[#1f2a44] px-5 text-[13px] font-semibold text-white transition hover:bg-[#2b3a5e] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#1f2a44] disabled:opacity-50";
 const smBtn = "!h-9 !px-4 !text-xs";
 
-function Card({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-[28px] bg-white/70 p-7 shadow-[0_10px_40px_rgba(31,42,68,0.08)] backdrop-blur">
-      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-[#4a5878]">{eyebrow}</p>
       <h2 className="font-[family-name:var(--font-serif)] text-[28px] font-medium">{title}</h2>
       {children}
     </section>
@@ -120,6 +120,15 @@ export default function ProfilePage() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [tab, setTab] = useState<Tab>("connected");
 
+  // saved questionnaire answers, used for the preference tags
+  const [answers, setAnswers] = useState<QuizAnswers>(EMPTY);
+
+  // log out and delete account
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteText, setDeleteText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
   const flash = useCallback((text: string, tone: "ok" | "err" = "ok") => {
     setToast({ tone, text });
     window.setTimeout(() => setToast(null), 4000);
@@ -168,6 +177,13 @@ export default function ProfilePage() {
       setEmail(user.email ?? "");
       setSavedEmail(user.email ?? "");
 
+      try {
+        // answers saved in this browser only count if they belong to this account
+        const owner = localStorage.getItem("subtle-quiz-owner");
+        const raw = localStorage.getItem("subtle-quiz-v1");
+        if (raw && (!owner || owner === (user.email ?? "").toLowerCase())) setAnswers({ ...EMPTY, ...JSON.parse(raw) });
+      } catch {}
+
       const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
       if (data) {
         const p = data as Profile;
@@ -179,6 +195,13 @@ export default function ProfilePage() {
       setLoading(false);
     })();
   }, [router, loadConnections]);
+
+  useEffect(() => {
+    if (!confirmDelete) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !deleting && setConfirmDelete(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirmDelete, deleting]);
 
   /* ----- details ----- */
 
@@ -294,6 +317,52 @@ export default function ProfilePage() {
     await respond(c, false);
   }
 
+  /* ----- log out & delete account ----- */
+
+  async function logOut() {
+    setLoggingOut(true);
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
+  }
+
+  async function deleteAccount() {
+    setDeleting(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const res = await fetch("/api/account", {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+    } catch {
+      setDeleting(false);
+      return flash("Couldn't delete your account. Try again.", "err");
+    }
+    try {
+      localStorage.removeItem("subtle-quiz-v1");
+      localStorage.removeItem("subtle-quiz-owner");
+      localStorage.removeItem("subtle-user-v1");
+    } catch {}
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
+  }
+
+  /* ----- preference tags (the main answers only) ----- */
+
+  const mins = answers.maxCommute >= 60 ? "60+" : String(answers.maxCommute);
+  const budget = BUDGETS.find((b) => b.id === answers.budget);
+  const prefTags = [
+    budget && `Budget ${budget.range ?? budget.title}`,
+    answers.housingType && label(HOUSING_TYPES, answers.housingType),
+    answers.roommates === "yes" ? "With roommates" : answers.roommates === "no" ? "Living alone" : null,
+    answers.car && (answers.car === "car" ? "Has a car" : answers.car === "either" ? "Car or transit" : "No car"),
+    answers.commuteMode && `${label(COMMUTE_MODES, answers.commuteMode)}, up to ${mins} min`,
+    answers.moveIn && (answers.moveIn === "flexible" ? "Flexible move-in" : `${label(MOVE_IN, answers.moveIn)} move-in`),
+  ].filter(Boolean) as string[];
+
   const connected = connections.filter((c) => c.status === "accepted");
   const requests = connections.filter((c) => c.status === "pending" && c.incoming);
   const sent = connections.filter((c) => c.status === "pending" && !c.incoming);
@@ -313,9 +382,8 @@ export default function ProfilePage() {
       <div className="mx-auto flex max-w-[1240px] flex-col gap-7">
         <header className="flex animate-[fadeIn_.5s_ease-out] flex-wrap items-end justify-between gap-6 md:pl-10">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">Your profile</p>
-            <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">{fullName}</h1>
-            <p className="mt-2 text-[17px] text-[#4A5A75]"> manage your account settings </p>
+            <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">{fullName}</h1>
+            <p className="mt-2 text-[17px] text-[#4A5A75]">manage your account settings</p>
           </div>
           <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2.5 text-xs font-semibold text-[#2f6b3f]">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -329,7 +397,7 @@ export default function ProfilePage() {
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="flex min-w-0 flex-col gap-6">
             {/* Details + photo */}
-            <Card eyebrow="Account" title="your details.">
+            <Card title="your details.">
               <form onSubmit={saveDetails} className="mt-6 flex flex-col gap-5">
                 <div className="flex flex-wrap items-center gap-5">
                   <div className="relative h-[88px] w-[88px] shrink-0">
@@ -388,7 +456,7 @@ export default function ProfilePage() {
             </Card>
 
             {/* Password */}
-            <Card eyebrow="Security" title="password.">
+            <Card title="password.">
               <form onSubmit={changePassword} className="mt-6 flex flex-col gap-5">
                 <div>
                   <label htmlFor="pw0" className={labelCls}>Current password</label>
@@ -427,7 +495,6 @@ export default function ProfilePage() {
           {/* Right column: connections, then preferences */}
           <div className="flex min-w-0 flex-col gap-6">
           <aside className="rounded-[28px] bg-white/70 p-6 shadow-[0_10px_40px_rgba(31,42,68,0.08)] backdrop-blur">
-            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-[#4a5878]">Your people</p>
             <h2 className="font-[family-name:var(--font-serif)] text-[28px] font-medium">connections.</h2>
             <p className="mb-4 mt-1 text-xs text-[#4a5878]">
               {connected.length} connected · {requests.length} {requests.length === 1 ? "request" : "requests"} waiting
@@ -508,7 +575,7 @@ export default function ProfilePage() {
           </aside>
 
             {/* Preferences entry point */}
-            <Card eyebrow="Questionnaire" title="my preferences.">
+            <Card title="my preferences.">
               <p className="mt-2.5 text-[13px] text-[#3d4a6b]">
                 Review your questionnaire answers and update them any time. Changes apply to your next set of matches.
               </p>
@@ -517,10 +584,85 @@ export default function ProfilePage() {
                   Edit my preferences
                 </button>
               </div>
+              <div className="mt-5 border-t border-[#e4eaf1] pt-4">
+                {prefTags.length > 0 ? (
+                  <ul className="flex flex-wrap gap-2" aria-label="Your main preferences">
+                    {prefTags.map((t) => (
+                      <li key={t} className="rounded-full border border-[#cfd8ea] bg-white px-3 py-1.5 text-xs font-medium text-[#1f2a44]">
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-[#4a5878]">No saved answers on this device yet.</p>
+                )}
+              </div>
             </Card>
           </div>
         </div>
+
+        {/* account actions */}
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+          <button type="button" onClick={logOut} disabled={loggingOut} className={btnCls}>
+            {loggingOut ? "Logging out…" : "Log out"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteText("");
+              setConfirmDelete(true);
+            }}
+            className="h-11 rounded-full border border-[#e3b5a8] bg-white px-5 text-[13px] font-semibold text-[#8a3a2a] transition hover:bg-[#fbeee9] focus-visible:ring-2 focus-visible:ring-[#8a3a2a]"
+          >
+            Delete account
+          </button>
+        </div>
       </div>
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close"
+            disabled={deleting}
+            onClick={() => setConfirmDelete(false)}
+            className="absolute inset-0 bg-[#1f2a44]/30 backdrop-blur-sm"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-title"
+            className="relative w-full max-w-sm rounded-[28px] border border-white bg-white/95 p-7 text-center text-[#1f2a44] shadow-[0_40px_90px_-40px_rgba(30,43,68,0.6)]"
+          >
+            <h2 id="delete-title" className="font-[family-name:var(--font-serif)] text-3xl font-medium">Delete account?</h2>
+            <p className="mt-2 text-[15px] text-[#4a5878]">
+              This permanently removes your profile, photo and connections. It can&apos;t be undone.
+            </p>
+            <label htmlFor="delete-confirm" className={`${labelCls} mt-5 text-left`}>Type DELETE to confirm</label>
+            <input
+              id="delete-confirm"
+              autoFocus
+              autoComplete="off"
+              className={inputCls}
+              value={deleteText}
+              onChange={(e) => setDeleteText(e.target.value)}
+            />
+            <div className="mt-5 flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={deleteAccount}
+                disabled={deleteText.trim().toUpperCase() !== "DELETE" || deleting}
+                className="h-12 rounded-full bg-[#8a3a2a] px-6 text-[15px] font-semibold text-white transition hover:bg-[#6f2e21] disabled:opacity-40"
+              >
+                {deleting ? "Deleting…" : "Delete my account"}
+              </button>
+              <button type="button" onClick={() => setConfirmDelete(false)} disabled={deleting} className="h-12 rounded-full border border-[#cfd8ea] bg-white px-6 text-[15px] font-semibold transition hover:bg-[#f2f5fb] disabled:opacity-50">
+                Keep my account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-6 flex justify-center px-4">
         {toast && (

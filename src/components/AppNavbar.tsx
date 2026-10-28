@@ -10,7 +10,7 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const viewingProfile = pathname?.startsWith('/profile')
-  const posting = pathname?.startsWith('/post')
+  const matching = pathname?.startsWith('/internMatches')  
   const messaging = pathname?.startsWith('/messages')
   const hosting = pathname?.startsWith('/my-listings')
   const [confirming, setConfirming] = useState(false)
@@ -72,30 +72,19 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
             <span className="sr-only sm:hidden">Messages</span>
           </Link>
           <Link
-            href="/post"
-            aria-current={posting ? 'page' : undefined}
+            href="/internMatches"
+            aria-current={matching ? 'page' : undefined}
             className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2.5 text-sm font-semibold transition-colors md:px-4 md:py-3 ${
-              posting ? 'bg-[#1E2B44] text-white' : 'hover:bg-[#1E2B44]/[0.06]'
-            }`}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            <span className="hidden md:inline">Post a listing</span>
-            <span className="md:hidden">Post</span>
-          </Link>
-          <Link
-            href="/my-listings"
-            aria-current={hosting ? 'page' : undefined}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2.5 text-sm font-semibold transition-colors md:px-4 md:py-3 ${
-              hosting ? 'bg-[#1E2B44] text-white' : 'hover:bg-[#1E2B44]/[0.06]'
+              matching ? 'bg-[#1E2B44] text-white' : 'hover:bg-[#1E2B44]/[0.06]'
             }`}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />
+              <circle cx="9" cy="8" r="3.5" />
+              <path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6" />
+              <path d="M16 5a3.5 3.5 0 0 1 0 6M18 14c2 .7 3.5 2.6 3.5 6" />
             </svg>
-            <span className="hidden md:inline">Your listings</span>
-            <span className="sr-only md:hidden">Your listings</span>
+            <span className="hidden md:inline">Intern Matches</span>
+            <span className="md:hidden">Matches</span>
           </Link>
           <button
             type="button"
