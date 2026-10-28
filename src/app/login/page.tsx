@@ -25,7 +25,7 @@ function passwordStrength(pw: string): number {
   return kinds >= 3 && pw.length >= 12 ? 3 : 2
 }
 
-const CONSENT_ERROR = 'Please agree to share your name with other users to create an account.'
+const CONSENT_ERROR = 'Please agree to name sharing with other users to create an account.'
 
 function LoginForm() {
   const [firstName, setFirstName] = useState<string>('')
@@ -121,7 +121,7 @@ function LoginForm() {
           router.push('/home')
           router.refresh()
         } else {
-          setMessage('Success! Check your email for the confirmation link.')
+          setMessage('Success! Check email for the confirmation link.')
         }
       }
     } else {
@@ -172,12 +172,12 @@ function LoginForm() {
           <div className="sb-headline">
             {isSignUpMode ? (
               <>
-                <h1>create your account<span className="sb-dot">.</span></h1>
+                <h1>Create an Account<span className="sb-dot">.</span></h1>
                 <p>Join the verified students and interns booking safely with <em>subtle.</em></p>
               </>
             ) : (
               <>
-                <h1>welcome back<span className="sb-dot">.</span></h1>
+                <h1>Welcome Back<span className="sb-dot">.</span></h1>
                 <p>Log in to pick up where you left off.</p>
               </>
             )}
@@ -248,7 +248,7 @@ function LoginForm() {
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter your password"
+                  placeholder="Enter password"
                   autoComplete={isSignUpMode ? 'new-password' : 'current-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

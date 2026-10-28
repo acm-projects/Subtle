@@ -56,7 +56,7 @@ const MEETUP_IDEAS: Record<string, string> = {
 }
 
 const serif = 'font-[family-name:var(--font-serif)]'
-const label = 'text-[11px] font-semibold uppercase tracking-[0.14em] text-[#4A5A75]'
+const label = 'text-[15px] font-semibold text-[#4A5A75]'
 const card = 'rounded-[28px] border border-white bg-white/80 p-6 shadow-[0_20px_50px_-30px_rgba(30,43,68,0.35)]'
 const pill = 'rounded-full border border-[#D5DFEA] bg-white px-3 py-1 text-xs font-medium text-[#1E2B44]'
 const pillShared = 'rounded-full border border-[#86abcc] bg-[#86abcc] px-3 py-1 text-xs font-medium text-white'
@@ -238,12 +238,11 @@ const contact = async (id: string) => {
           {/* header */}
           <header className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className={label}>Ranked for you</div>
-              <h1 className={`${serif} mt-1.5 text-[44px] font-medium leading-[1.02] tracking-[-0.02em] md:text-[56px]`}>Your matches</h1>
-              <p className="mt-2 text-[15px] text-[#4A5A75]">Interns living in Los Angeles this summer who share your interests.</p>
+              <h1 className={`${serif} text-[44px] font-medium leading-[1.02] tracking-[-0.02em] md:text-[56px]`}>Intern Matches</h1>
+              <p className="mt-2 text-[15px] text-[#4A5A75]">Interns living in Los Angeles this summer with shared interests.</p>
             </div>
 
-            <div className="mb-2.5 mt-[22px] text-[13px] font-semibold uppercase tracking-[0.08em] text-[#3C6285]">Your interests</div>
+            <div className="mb-2.5 mt-[22px] text-[15px] font-semibold text-[#3C6285]">Interests</div>
             <div className="flex flex-wrap gap-1.5">
               {myInterests.map((i) => (
                 <span key={i} className="rounded-full bg-[#DCEBF6] px-2.5 py-1 text-[11px] font-semibold text-[#245F90] ring-[1.5px] ring-inset ring-[#2E7DB5]">
@@ -354,7 +353,7 @@ const contact = async (id: string) => {
             <div className="grid content-start gap-5">
               <div className={card}>
                 <div className="mb-3 flex items-baseline justify-between">
-                  <h2 className={`${serif} text-2xl font-medium`}>Top matches</h2>
+                  <h2 className={`${serif} text-2xl font-medium`}>Top Matches</h2>
                   <span className={label}>Score</span>
                 </div>
                 {/* 5 rows (57px each) are visible; scroll for the rest */}
@@ -384,11 +383,10 @@ const contact = async (id: string) => {
                     </div>
                   ))}
                 </div>
-                {matches.length > 5 && <p className="mt-2 text-center text-[11px] text-[#4A5A75]">Scroll for {matches.length - 5} more</p>}
               </div>
 
               <div className={card}>
-                <div className={label}>Matched on your interests</div>
+                <div className={label}>Shared Interests</div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {MY_INTERESTS.map((i) => (
                     <span key={i} className={pillShared}>
@@ -404,7 +402,7 @@ const contact = async (id: string) => {
           <div className="mt-5 grid gap-5 lg:grid-cols-2">
             <div className={card}>
               <h2 className={`${serif} text-2xl font-medium`}>Popular in Los Angeles</h2>
-              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">What interns in your city are into. Yours are in navy.</p>
+              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">What interns in the city are into. Shared ones are in navy.</p>
               <div className="grid gap-3.5">
                 {popular.map(([interest, count]) => {
                   const mine = MY_INTERESTS.includes(interest)
@@ -424,8 +422,8 @@ const contact = async (id: string) => {
             </div>
 
             <div className={card}>
-              <h2 className={`${serif} text-2xl font-medium`}>Ways to meet up</h2>
-              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">Ideas based on what you share with your matches. Sample ideas.</p>
+              <h2 className={`${serif} text-2xl font-medium`}>Ways to Meet Up</h2>
+              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">Ideas based on shared interests. Sample ideas.</p>
               <div className="grid gap-3">
                 {meetups.map((m) => (
                   // fixed first column so every idea title starts at the same x position

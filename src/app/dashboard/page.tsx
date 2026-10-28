@@ -67,7 +67,7 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <h2>Your Database Records</h2>
+      <h2>Database Records</h2>
       {dataLoading ? (
         <p>Loading table data...</p>
       ) : (

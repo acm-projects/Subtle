@@ -54,7 +54,6 @@ export type Booking = {
 
 export const BOOKING_STEPS: { id: BookingStatus; label: string }[] = [
   { id: 'requested', label: 'Requested' },
-  { id: 'accepted', label: 'Host accepted' },
   { id: 'booked', label: 'Booked' },
 ]
 
@@ -98,7 +97,7 @@ export async function loadMyBookings(email: string | null): Promise<Booking[]> {
           availableFrom: b.moveIn,
           availableTo: b.moveOut,
           price: b.monthlyRent,
-          status: b.status === 'accepted' ? 'accepted' : b.status === 'declined' ? 'declined' : 'requested',
+          status: b.status === 'accepted' ? 'booked' : b.status === 'declined' ? 'declined' : 'requested',
           requestedAt: b.createdAt,
         }),
       )

@@ -56,17 +56,16 @@ const STRENGTH_LABEL = ["Too short", "Okay", "Good", "Strong"];
 
 const inputCls =
   "h-12 w-full rounded-2xl border border-[#cfd8ea] bg-white px-4 text-sm text-[#1f2a44] outline-none placeholder:text-[#6b7691] focus-visible:ring-2 focus-visible:ring-[#1f2a44]";
-const labelCls = "mb-2 block text-[11px] font-bold uppercase tracking-widest text-[#3d4a6b]";
+const labelCls = "mb-2 block text-[15px] font-semibold text-[#3d4a6b]";
 const btnCls =
-  "h-11 rounded-full border border-[#cfd8ea] bg-white px-5 text-[13px] font-semibold text-[#1f2a44] transition hover:bg-[#f2f5fb] focus-visible:ring-2 focus-visible:ring-[#1f2a44] disabled:opacity-50";
+  "h-11 rounded-full border border-[#cfd8ea] bg-white px-5 text-sm font-semibold text-[#1f2a44] transition hover:bg-[#f2f5fb] focus-visible:ring-2 focus-visible:ring-[#1f2a44] disabled:opacity-50";
 const btnDark =
-  "h-11 rounded-full bg-[#1f2a44] px-5 text-[13px] font-semibold text-white transition hover:bg-[#2b3a5e] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#1f2a44] disabled:opacity-50";
-const smBtn = "!h-9 !px-4 !text-xs";
+  "h-11 rounded-full bg-[#1f2a44] px-5 text-sm font-semibold text-white transition hover:bg-[#2b3a5e] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#1f2a44] disabled:opacity-50";
+const smBtn = "!h-9 !px-4 !text-sm";
 
-function Card({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
+function Card({ title, children }: { eyebrow?: string; title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-[28px] bg-white/70 p-7 shadow-[0_10px_40px_rgba(31,42,68,0.08)] backdrop-blur">
-      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-[#4a5878]">{eyebrow}</p>
       <h2 className="font-[family-name:var(--font-serif)] text-[28px] font-medium">{title}</h2>
       {children}
     </section>
@@ -195,7 +194,7 @@ export default function ProfilePage() {
       .eq("id", uid);
     if (error) {
       setSavingDetails(false);
-      return flash("Couldn't save your name. Try again.", "err");
+      return flash("Couldn't save the name. Try again.", "err");
     }
     if (nextEmail !== savedEmail) {
       const { error: mailErr } = await supabase.auth.updateUser({ email: nextEmail });
@@ -203,7 +202,7 @@ export default function ProfilePage() {
         setSavingDetails(false);
         return flash(mailErr.message, "err");
       }
-      flash("Check your new inbox to confirm the email change.");
+      flash("Check the new inbox to confirm the email change.");
     } else {
       flash("Details saved.");
     }
@@ -290,7 +289,7 @@ export default function ProfilePage() {
   }
 
   async function removeConnection(c: Connection) {
-    if (!window.confirm(`Remove ${c.name} from your connections?`)) return;
+    if (!window.confirm(`Remove ${c.name} from connections?`)) return;
     await respond(c, false);
   }
 
@@ -305,7 +304,7 @@ export default function ProfilePage() {
     return <main className="min-h-screen bg-gradient-to-b from-[#c3d5ee] to-[#f6e6d2] p-10 text-[#1f2a44]">Loading…</main>;
   }
 
-  const fullName = `${first} ${last}`.trim() || "your profile.";
+  const fullName = `${first} ${last}`.trim() || "Profile";
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#c3d5ee] via-[#e6ebf4] to-[#f6e6d2] px-3 pb-16 pt-32 text-[#1f2a44] md:px-4">
@@ -313,11 +312,10 @@ export default function ProfilePage() {
       <div className="mx-auto flex max-w-[1240px] flex-col gap-7">
         <header className="flex animate-[fadeIn_.5s_ease-out] flex-wrap items-end justify-between gap-6 md:pl-10">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">Your profile</p>
-            <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">{fullName}</h1>
-            <p className="mt-2 text-[17px] text-[#4A5A75]"> manage your account settings </p>
+            <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">{fullName}</h1>
+            <p className="mt-2 text-[17px] text-[#4A5A75]">Manage account settings.</p>
           </div>
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2.5 text-xs font-semibold text-[#2f6b3f]">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2.5 text-sm font-semibold text-[#2f6b3f]">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6l8-3z" />
               <path d="M8.5 12l2.5 2.5 4.5-5" />
@@ -329,7 +327,7 @@ export default function ProfilePage() {
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="flex min-w-0 flex-col gap-6">
             {/* Details + photo */}
-            <Card eyebrow="Account" title="your details.">
+            <Card eyebrow="Account" title="Details">
               <form onSubmit={saveDetails} className="mt-6 flex flex-col gap-5">
                 <div className="flex flex-wrap items-center gap-5">
                   <div className="relative h-[88px] w-[88px] shrink-0">
@@ -351,7 +349,7 @@ export default function ProfilePage() {
                   </div>
                   <div className="min-w-[200px] flex-1">
                     <span className={`${labelCls} !mb-1`}>Profile picture</span>
-                    <p className="mb-3 text-xs text-[#4a5878]">JPG or PNG, up to 5 MB. Shown to your matches and connections.</p>
+                    <p className="mb-3 text-sm text-[#4a5878]">JPG or PNG, up to 5 MB.</p>
                     <div className="flex flex-wrap gap-2">
                       <button type="button" disabled={uploading} onClick={() => fileRef.current?.click()} className={`${btnDark} ${smBtn}`}>
                         {uploading ? "Uploading…" : "Upload photo"}
@@ -376,7 +374,7 @@ export default function ProfilePage() {
                 <div>
                   <label htmlFor="em" className={labelCls}>Student email</label>
                   <input id="em" type="email" className={inputCls} value={email} onChange={(e) => setEmail(e.target.value)} required />
-                  <p className="mt-1.5 text-xs text-[#4a5878]">Changing your email sends a confirmation link. Only .edu addresses are accepted.</p>
+                  <p className="mt-1.5 text-sm text-[#4a5878]">Only .edu addresses are accepted.</p>
                 </div>
                 <div className="flex flex-wrap justify-end gap-2.5">
                   <button type="button" onClick={resetDetails} className={btnCls}>Cancel</button>
@@ -388,11 +386,11 @@ export default function ProfilePage() {
             </Card>
 
             {/* Password */}
-            <Card eyebrow="Security" title="password.">
+            <Card eyebrow="Security" title="Password">
               <form onSubmit={changePassword} className="mt-6 flex flex-col gap-5">
                 <div>
                   <label htmlFor="pw0" className={labelCls}>Current password</label>
-                  <input id="pw0" type="password" autoComplete="current-password" className={inputCls} value={curPw} onChange={(e) => setCurPw(e.target.value)} placeholder="Enter your current password" required />
+                  <input id="pw0" type="password" autoComplete="current-password" className={inputCls} value={curPw} onChange={(e) => setCurPw(e.target.value)} placeholder="Enter current password" required />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
@@ -415,7 +413,7 @@ export default function ProfilePage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs text-[#4a5878]">Signed up with Google? Manage your password in your Google account.</p>
+                  <p className="text-sm text-[#4a5878]">Signed up with Google? Manage the password in Google.</p>
                   <button type="submit" disabled={savingPw} className={btnDark}>
                     {savingPw ? "Updating…" : "Update password"}
                   </button>
@@ -427,9 +425,8 @@ export default function ProfilePage() {
           {/* Right column: connections, then preferences */}
           <div className="flex min-w-0 flex-col gap-6">
           <aside className="rounded-[28px] bg-white/70 p-6 shadow-[0_10px_40px_rgba(31,42,68,0.08)] backdrop-blur">
-            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-[#4a5878]">Your people</p>
-            <h2 className="font-[family-name:var(--font-serif)] text-[28px] font-medium">connections.</h2>
-            <p className="mb-4 mt-1 text-xs text-[#4a5878]">
+            <h2 className="font-[family-name:var(--font-serif)] text-[28px] font-medium">Connections</h2>
+            <p className="mb-4 mt-1 text-[15px] text-[#4a5878]">
               {connected.length} connected · {requests.length} {requests.length === 1 ? "request" : "requests"} waiting
             </p>
 
@@ -462,7 +459,7 @@ export default function ProfilePage() {
             <ul className="flex flex-col gap-2.5" role="tabpanel">
               {visible.length === 0 && (
                 <li className="rounded-2xl bg-white p-4 text-[13px] text-[#4a5878]">
-                  {tab === "connected" && "No connections yet. Find interns who share your interests."}
+                  {tab === "connected" && "No connections yet. Find interns with shared interests."}
                   {tab === "requests" && "No requests waiting on you."}
                   {tab === "sent" && "You haven't sent any requests."}
                 </li>
@@ -508,13 +505,13 @@ export default function ProfilePage() {
           </aside>
 
             {/* Preferences entry point */}
-            <Card eyebrow="Questionnaire" title="my preferences.">
-              <p className="mt-2.5 text-[13px] text-[#3d4a6b]">
-                Review your questionnaire answers and update them any time. Changes apply to your next set of matches.
+            <Card eyebrow="Questionnaire" title="Preferences">
+              <p className="mt-2.5 text-[15px] text-[#3d4a6b]">
+                Review questionnaire answers and update them any time. Changes apply to the next set of matches.
               </p>
               <div className="mt-6 flex justify-end">
                 <button type="button" onClick={() => router.push("/profile/preferences")} className={btnDark}>
-                  Edit my preferences
+                  Edit Preferences
                 </button>
               </div>
             </Card>
@@ -524,7 +521,7 @@ export default function ProfilePage() {
 
       <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-6 flex justify-center px-4">
         {toast && (
-          <p className={`pointer-events-auto rounded-full px-5 py-3 text-[13px] font-semibold text-white shadow-lg ${toast.tone === "ok" ? "bg-[#1f2a44]" : "bg-[#8a3a2a]"}`}>
+          <p className={`pointer-events-auto rounded-full px-5 py-3 text-sm font-semibold text-white shadow-lg ${toast.tone === "ok" ? "bg-[#1f2a44]" : "bg-[#8a3a2a]"}`}>
             {toast.text}
           </p>
         )}

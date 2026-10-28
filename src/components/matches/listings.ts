@@ -55,7 +55,7 @@ export const SAMPLE_LISTINGS: Listing[] = [
     amenities: ['In-unit laundry', 'Wi-Fi', 'Desk', 'Furnished'],
     hostName: 'Maya',
     subtitle: 'Private room in a furnished apartment',
-    whyScore: ['Walk to the office · 11 minutes', 'Dates match your summer · June 1', 'Pets allowed · Verified sublet'],
+    whyScore: ['Walk to the office · 11 minutes', 'Dates match the summer · June 1', 'Pets allowed · Verified sublet'],
     features: ['Apartment', 'Private room', 'Pets allowed', 'Furnished', 'Washer', '4th floor'],
     hostEmail: 'maya@example.edu',
     hostVerified: true,

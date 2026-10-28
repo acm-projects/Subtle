@@ -4,26 +4,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import AppNavbar from "../../../components/AppNavbar";
-// Adjust this folder name if your questionnaire lives somewhere else.
 import { Field } from '../../../components/quiz/parts'
+import DateRange from '../../../components/quiz/DateRange'
 
 
 import {
   ACCOMMODATIONS,
   allInterests,
   BUDGETS,
-  CAR,
-  COMMUTE_MODES,
   EMPTY,
-  HANGOUTS,
-  HOUSING_TYPES,
   INTERESTS,
   MIN_INTERESTS,
-  MOVE_IN,
+  monthIdFor,
   type QuizAnswers,
-  ROOMMATE_GROUPS,
   SCHOOLS,
-  TRANSIT_LEVELS,
 } from '../../../components/quiz/options'
 
 /* ---------- small UI pieces ---------- */
@@ -31,7 +25,7 @@ import {
 type Opt = { id: string; title: string; body?: string }
 
 const card = 'rounded-[28px] border border-white bg-white/70 p-6 shadow-[0_10px_40px_rgba(31,42,68,0.08)] backdrop-blur md:p-7'
-const labelCls = 'text-xs font-bold uppercase tracking-[0.1em] text-[#1E2B44]'
+const labelCls = 'text-[15px] font-semibold text-[#1E2B44]'
 const btnLight =
   'min-h-11 rounded-full border border-[#D5DFEA] bg-white px-5 text-sm font-semibold text-[#1E2B44] transition hover:bg-[#F7F9FB] focus-visible:ring-2 focus-visible:ring-[#1E2B44] disabled:cursor-not-allowed disabled:opacity-50'
 const btnDark =
@@ -46,12 +40,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function Row({ label, note, children }: { label: string; note?: string; children: React.ReactNode }) {
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div role="group" aria-label={label}>
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+      <div className="mb-2">
         <span className={labelCls}>{label}</span>
-        {note && <span className="text-xs text-[#4A5A75]">{note}</span>}
       </div>
       {children}
     </div>
@@ -65,7 +58,7 @@ function Chip({ on, onClick, title, children }: { on: boolean; onClick: () => vo
       aria-pressed={on}
       title={title}
       onClick={onClick}
-      className={`min-h-10 rounded-full border px-4 text-[13px] font-medium transition focus-visible:ring-2 focus-visible:ring-[#1E2B44] ${
+      className={`min-h-10 rounded-full border px-4 text-sm font-medium transition focus-visible:ring-2 focus-visible:ring-[#1E2B44] ${
         on ? 'border-[#1E2B44] bg-[#1E2B44] text-white' : 'border-[#D5DFEA] bg-white text-[#1E2B44] hover:bg-[#F7F9FB]'
       }`}
     >
@@ -133,7 +126,7 @@ export default function PreferencesPage() {
 
   const set = <K extends keyof QuizAnswers>(key: K, value: QuizAnswers[K]) => setA((prev) => ({ ...prev, [key]: value }))
 
-  const toggle = (key: 'accommodations' | 'interests' | 'hangouts', id: string) =>
+  const toggle = (key: 'accommodations' | 'interests', id: string) =>
     setA((prev) => {
       const list = prev[key]
       if (key === 'accommodations') {
@@ -152,13 +145,9 @@ export default function PreferencesPage() {
     !a.university.trim() && 'school',
     !a.company.trim() && 'company',
     !a.address.trim() && 'office address',
-    a.commuteMode === null && 'how you commute',
     a.budget === null && 'budget',
-    a.roommates === null && 'roommates',
-    a.housingType === null && 'housing type',
     a.accommodations.length === 0 && 'accommodations',
-    a.car === null && 'car',
-    a.moveIn === null && 'move-in date',
+    !(a.moveInDate && a.moveOutDate) && 'move-in and move-out dates',
     a.interests.length < MIN_INTERESTS && `at least ${MIN_INTERESTS} interests`,
   ].filter(Boolean) as string[]
 
@@ -190,7 +179,8 @@ export default function PreferencesPage() {
           interests: allInterests(a),
           housingType: a.housingType,
           accommodations: a.accommodations,
-          moveIn: a.moveIn,
+          moveIn: a.moveInDate || a.moveIn,
+          moveOut: a.moveOutDate, // TODO(backend): save the move-out date (users_table has no column yet)
           commuteMode: a.commuteMode,
           car: a.car,
           maxCommute: a.maxCommute,
@@ -210,7 +200,7 @@ export default function PreferencesPage() {
       flash('Preferences updated. New matches will reflect them.')
     } catch (e) {
       console.warn("Couldn't save preferences:", e)
-      flash("Saved on this device, but we couldn't update your account. Try again.", 'err')
+      flash("Saved on this device, but we couldn't update the account. Try again.", 'err')
     }
     setSaving(false)
   }
@@ -231,14 +221,13 @@ export default function PreferencesPage() {
           <button
             type="button"
             onClick={() => router.push('/profile')}
-            className="mb-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-[#1E2B44]/80 px-4 text-xs text-white font-semibold transition hover:bg-[#1E2B44] focus-visible:ring-2 focus-visible:ring-white"
+            className="mb-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-[#1E2B44]/80 px-4 text-sm text-white font-semibold transition hover:bg-[#1E2B44] focus-visible:ring-2 focus-visible:ring-white"
           >
             <span aria-hidden="true">←</span> Back to profile
           </button>
-          <p className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-[#4A5A75]">Questionnaire</p>
-          <h1 className="mt-2 font-medium text-5xl font-[family-name:var(--font-serif)] tracking-[-0.02em] md:text-6xl">My preferences.</h1>
+          <h1 className="mt-2 font-medium text-5xl font-[family-name:var(--font-serif)] tracking-[-0.02em] md:text-6xl">Preferences</h1>
           <p className="mt-2 text-[15px] text-[#3D4A6B]">
-            Every answer from your questionnaire is below. Change any of them and save to refresh your matches.
+            Every questionnaire answer is below. Change any of them and save to refresh matches.
           </p>
           {noAnswers && (
             <p className="mt-3 rounded-2xl border border-white bg-white/70 px-4 py-3 text-sm">
@@ -248,7 +237,7 @@ export default function PreferencesPage() {
         </header>
 
         {/* About you */}
-        <Section title="school.">
+        <Section title="School">
           <div>
             <Field id="university" label="University" icon="book" value={a.university} onChange={(v: string) => set('university', v)} placeholder="e.g. UT Dallas" list="school-options" />
             <datalist id="school-options">
@@ -260,97 +249,47 @@ export default function PreferencesPage() {
         </Section>
 
         {/* Work & commute */}
-        <Section title="work and commute.">
+        <Section title="Work and Commute">
           <Field id="company" label="Company or internship" icon="building" value={a.company} onChange={(v: string) => set('company', v)} placeholder="e.g. Stripe" />
           <Field id="address" label="Office address or city" icon="pin" value={a.address} onChange={(v: string) => set('address', v)} placeholder="e.g. 500 Howard St, San Francisco, CA" />
 
           <div>
             <div className="flex items-center justify-between gap-3">
-              <label htmlFor="commute-range" className={labelCls}>Max one-way commute</label>
+              <label htmlFor="commute-range" className={labelCls}>Max One-Way Commute</label>
               <span className="rounded-full bg-[#1E2B44] px-3 py-1 text-sm font-semibold tabular-nums text-white">{mins} min</span>
             </div>
             <input id="commute-range" type="range" min={5} max={60} step={5} value={a.maxCommute} onChange={(e) => set('maxCommute', Number(e.target.value))} className="mt-3 w-full accent-[#1E2B44]" />
           </div>
 
-          <Row label="Main way of getting to work">
-            <Choices options={COMMUTE_MODES} isOn={(id) => a.commuteMode === id} onPick={(id) => set('commuteMode', id as QuizAnswers['commuteMode'])} />
-          </Row>
         </Section>
 
         {/* Budget & housing */}
-        <Section title="budget and housing.">
+        <Section title="Budget and Housing">
           <Row label="Monthly housing budget">
             <Choices options={BUDGETS} isOn={(id) => a.budget === id} onPick={(id) => set('budget', id as QuizAnswers['budget'])} />
           </Row>
 
-          <Row label="Looking for roommates?">
-            <Choices
-              options={[{ id: 'yes', title: 'Yes, roommates' }, { id: 'no', title: 'No, live alone' }]}
-              isOn={(id) => a.roommates === id}
-              onPick={(id) => set('roommates', id as QuizAnswers['roommates'])}
-            />
-          </Row>
-
-          {a.roommates === 'yes' && (
-            <div className="grid gap-5 rounded-2xl bg-white/60 p-4 md:grid-cols-2">
-              {ROOMMATE_GROUPS.map((g) => (
-                <Row key={g.id} label={g.label} note="Optional">
-                  <div className="flex flex-wrap gap-2">
-                    {g.options.map((o: string) => {
-                      const on = a.roommatePrefs[g.id] === o
-                      return (
-                        <Chip key={o} on={on} onClick={() => set('roommatePrefs', { ...a.roommatePrefs, [g.id]: on ? '' : o })}>
-                          {o}
-                        </Chip>
-                      )
-                    })}
-                  </div>
-                </Row>
-              ))}
-            </div>
-          )}
-
-          <Row label="Housing type">
-            <Choices options={HOUSING_TYPES} isOn={(id) => a.housingType === id} onPick={(id) => set('housingType', id as QuizAnswers['housingType'])} />
-          </Row>
-
-          <Row label="Accommodations" note="Select all that apply">
+          <Row label="Accommodations">
             <Choices options={ACCOMMODATIONS} isOn={(id) => a.accommodations.includes(id)} onPick={(id) => toggle('accommodations', id)} />
           </Row>
 
-          <Row label="Do you have a car?">
-            <Choices options={CAR} isOn={(id) => a.car === id} onPick={(id) => set('car', id as QuizAnswers['car'])} />
-          </Row>
-
-          <Row label="Move-in">
-            <Choices options={MOVE_IN} isOn={(id) => a.moveIn === id} onPick={(id) => set('moveIn', id as QuizAnswers['moveIn'])} />
-          </Row>
-
-          <div>
-            <div className="flex items-center justify-between gap-3">
-              <label htmlFor="transit-range" className={labelCls}>Public transit importance</label>
-              <span className="rounded-full bg-[#1E2B44] px-3 py-1 text-sm font-semibold text-white">{TRANSIT_LEVELS[a.transitImportance]}</span>
-            </div>
-            <input
-              id="transit-range" type="range" min={0} max={2} step={1} value={a.transitImportance}
-              onChange={(e) => set('transitImportance', Number(e.target.value))}
-              aria-valuetext={TRANSIT_LEVELS[a.transitImportance]}
-              className="mt-3 w-full accent-[#1E2B44]"
+          <Row label="Move-In and Move-Out">
+            <DateRange
+              start={a.moveInDate}
+              end={a.moveOutDate}
+              onChange={(start, end) => setA((prev) => ({ ...prev, moveInDate: start, moveOutDate: end, moveIn: start ? monthIdFor(start) : null }))}
             />
-          </div>
+          </Row>
         </Section>
 
         {/* Interests */}
-        <Section title="interests and free time.">
-          <Row label="Interests" note={`${a.interests.length} selected · pick at least ${MIN_INTERESTS}`}>
+        <Section title="Interests">
+          <Row label={`Pick at least ${MIN_INTERESTS}`}>
             <Choices options={INTERESTS} isOn={(id) => a.interests.includes(id)} onPick={(id) => toggle('interests', id)} />
-          </Row>
-          <Row label="Free time" note="Optional">
-            <Choices options={HANGOUTS} isOn={(id) => a.hangouts.includes(id)} onPick={(id) => toggle('hangouts', id)} />
           </Row>
           <div>
             <label htmlFor="other-interests" className={`${labelCls} mb-2 block`}>
-              Anything else? <span className="font-medium normal-case tracking-normal text-[#4A5A75]">(optional, separate with commas)</span>
+              Anything else?
             </label>
             <input
               id="other-interests"
@@ -380,7 +319,7 @@ export default function PreferencesPage() {
 
       <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-24 flex justify-center px-4">
         {toast && (
-          <p className={`pointer-events-auto rounded-full px-5 py-3 text-[13px] font-semibold text-white shadow-lg ${toast.tone === 'ok' ? 'bg-[#1E2B44]' : 'bg-[#8A3A2A]'}`}>
+          <p className={`pointer-events-auto rounded-full px-5 py-3 text-sm font-semibold text-white shadow-lg ${toast.tone === 'ok' ? 'bg-[#1E2B44]' : 'bg-[#8A3A2A]'}`}>
             {toast.text}
           </p>
         )}

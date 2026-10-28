@@ -9,16 +9,15 @@ import { BOOKING_STEPS } from '../matches/activity'
 import { useDashboardData } from './useDashboardData'
 
 const glass = 'rounded-[32px] border border-white bg-white/65 shadow-[0_30px_70px_-40px_rgba(30,43,68,0.38)] backdrop-blur-xl'
-const eyebrow = 'text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]'
 const serif = 'font-[family-name:var(--font-serif)]'
 const btnDark = 'inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#1E2B44] px-6 text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]'
 const btnLight = 'inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#D5DFEA] bg-white/80 px-6 text-[15px] font-semibold transition hover:-translate-y-0.5 hover:bg-white'
 
 const QUIZ_TOPICS = [
   { icon: 'building', title: 'Where you work' },
-  { icon: 'dollar', title: 'Your budget' },
-  { icon: 'home', title: 'Your kind of home' },
-  { icon: 'people', title: 'Roommates and interests' },
+  { icon: 'dollar', title: 'Budget' },
+  { icon: 'calendar', title: 'Move-in dates' },
+  { icon: 'people', title: 'Interests' },
 ]
 
 function greeting() {
@@ -34,7 +33,7 @@ export default function Dashboard() {
   const d = useDashboardData()
   const [hello, setHello] = useState('Welcome back')
   useEffect(() => setHello(greeting()), [])
-  const name = d.firstName || 'there'
+  const name = d.firstName || 'friend'
   const rowRef = useRef<HTMLOListElement>(null)
   const scrollRow = (dir: number) => rowRef.current?.scrollBy({ left: dir * 340, behavior: 'smooth' })
 
@@ -44,8 +43,7 @@ export default function Dashboard() {
       <section className="px-4 pb-16 pt-32 md:px-8">
         <div className="mx-auto w-full max-w-[1240px]">
           <header className="animate-[fadeIn_.5s_ease-out] pl-2 md:pl-10">
-            <p className={eyebrow}>Your dashboard</p>
-            <h1 className={`${serif} mt-2 text-5xl font-medium tracking-[-0.02em] md:text-6xl`}>
+            <h1 className={`${serif} text-5xl font-medium tracking-[-0.02em] md:text-6xl`}>
               {hello}, {name}.
             </h1>
           </header>
@@ -64,10 +62,7 @@ export default function Dashboard() {
             ) : d.quizStatus === 'done' ? (
               <>
                 <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <p className={eyebrow}>Ranked by Subtle score · scroll for more</p>
-                    <h2 className={`${serif} mt-1 text-4xl font-medium`}>Your best matches</h2>
-                  </div>
+                  <h2 className={`${serif} text-4xl font-medium`}>Best Matches</h2>
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={() => scrollRow(-1)} aria-label="Scroll matches left" className="flex h-12 w-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white/80 transition hover:bg-white">
                       <Icon name="arrowL" size={18} />
@@ -82,7 +77,7 @@ export default function Dashboard() {
                 </div>
                 <ol
                   ref={rowRef}
-                  aria-label="Your best matches, scroll sideways for more"
+                  aria-label="Best matches, scroll sideways for more"
                   tabIndex={0}
                   className="-mx-2 mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-px-2 px-2 pb-4 outline-none [scrollbar-color:#C9DBEA_transparent] [scrollbar-width:thin] focus-visible:ring-4 focus-visible:ring-[#A9C7E8]/60"
                 >
@@ -95,7 +90,7 @@ export default function Dashboard() {
                       >
                         <div className="relative">
                           <ListingPhoto listing={l} seed={i} className="h-52" />
-                          <span className="absolute right-2.5 top-2.5 rounded-full bg-[#1E2B44] px-2.5 py-1 text-xs font-bold text-white">#{i + 1}</span>
+                          <span className="absolute right-2.5 top-2.5 rounded-full bg-[#1E2B44] px-3 py-1 text-sm font-bold text-white">#{i + 1}</span>
                         </div>
                         <div className="flex items-start gap-3 px-1.5 pb-1.5 pt-4">
                           <ScoreBadge score={l.score} size={44} />
@@ -104,7 +99,7 @@ export default function Dashboard() {
                             <p className="text-sm">
                               <strong>${l.price.toLocaleString()}</strong> / month
                             </p>
-                            <p className="mt-1 flex items-center gap-1.5 truncate text-[13px] text-[#4A5A75]">
+                            <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-[#4A5A75]">
                               <Icon name={commuteIcon(l)} size={14} /> {commuteText(l)}
                             </p>
                           </div>
@@ -117,18 +112,17 @@ export default function Dashboard() {
             ) : (
               <div className="grid items-center gap-10 py-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
                 <div>
-                  <p className={eyebrow}>{d.quizStatus === 'started' ? 'Almost there' : 'Your matches'}</p>
-                  <h2 className={`${serif} mt-2 text-4xl font-medium leading-tight`}>
+                  <h2 className={`${serif} text-4xl font-medium leading-tight`}>
                     {d.quizStatus === 'started' ? `Pick up where you left off, ${name}.` : 'Don’t see anything yet? No worries.'}
                   </h2>
                   <p className="mt-3 max-w-md text-[16px] leading-relaxed text-[#4A5A75]">
                     {d.quizStatus === 'started'
-                      ? 'Your answers are saved. Finish the last few questions and your best matches show up right here.'
-                      : `Take the quick housing quiz, ${name}, and your best matches will show up right here, ranked by Subtle score.`}
+                      ? 'Answers are saved. Finish the last few questions and the best matches show up right here.'
+                      : `Take the quick housing quiz, ${name}, and the best matches will show up right here, ranked by Subtle score.`}
                   </p>
                   <ul className="mt-5 flex flex-wrap gap-2" aria-label="What the quiz asks">
                     {QUIZ_TOPICS.map((t) => (
-                      <li key={t.title} className="inline-flex items-center gap-1.5 rounded-full border border-white bg-white/80 px-3 py-1.5 text-[13px] font-medium">
+                      <li key={t.title} className="inline-flex items-center gap-1.5 rounded-full border border-white bg-white/80 px-3.5 py-1.5 text-sm font-medium">
                         <Icon name={t.icon} size={14} /> {t.title}
                       </li>
                     ))}
@@ -152,7 +146,7 @@ export default function Dashboard() {
             {/* saved homes */}
             <section className={`${glass} animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.05)_both] p-7 [animation-delay:120ms] md:p-8 lg:col-span-7`}>
               <div className="flex items-center justify-between gap-3">
-                <p className={eyebrow}>Saved homes</p>
+                <h2 className={`${serif} text-3xl font-medium`}>Saved Homes</h2>
                 {d.savedHomes.length > 0 && (
                   <Link href="/matches" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold hover:underline hover:underline-offset-4">
                     All matches <Icon name="arrowR" size={16} />
@@ -165,14 +159,14 @@ export default function Dashboard() {
                   <Skeleton className="h-20" />
                 </div>
               ) : d.savedHomes.length === 0 ? (
-                <div className="mt-4 flex items-start gap-4">
+                <div className="mt-5 flex items-start gap-4">
                   <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#EEF3F8] text-[#A35F33]">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z" />
                     </svg>
                   </span>
                   <div>
-                    <h2 className={`${serif} text-2xl font-medium`}>Nothing saved yet</h2>
+                    <p className="text-[17px] font-semibold">Nothing saved yet</p>
                     <p className="mt-1 text-[15px] text-[#4A5A75]">Tap the heart on any home and it waits for you here.</p>
                   </div>
                 </div>
@@ -198,13 +192,13 @@ export default function Dashboard() {
 
             {/* booking requests */}
             <section className={`${glass} animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.05)_both] p-7 [animation-delay:180ms] md:p-8 lg:col-span-5`}>
-              <p className={eyebrow}>Booking requests</p>
+              <h2 className={`${serif} text-3xl font-medium`}>Booking Requests</h2>
               {d.loading ? (
                 <Skeleton className="mt-5 h-28" />
               ) : d.bookings.length === 0 ? (
-                <div className="mt-4">
-                  <h2 className={`${serif} text-2xl font-medium`}>No requests yet</h2>
-                  <p className="mt-1 text-[15px] text-[#4A5A75]">When you request to book a home, you can follow it here from request to keys.</p>
+                <div className="mt-5">
+                  <p className="text-[17px] font-semibold">No requests yet</p>
+                  <p className="mt-1 text-[15px] text-[#4A5A75]">Request to book a home and follow it here from request to keys.</p>
                 </div>
               ) : (
                 <ul className="mt-4 space-y-4">
@@ -223,7 +217,7 @@ export default function Dashboard() {
                         {b.status === 'declined' ? (
                           <p className="mt-3 flex items-center gap-2 rounded-2xl bg-[#FBF3EA] px-3 py-2 text-sm">
                             <span className="h-2 w-2 shrink-0 rounded-full bg-[#A35F33]" />
-                            {b.hostName.split(' ')[0]} can't host you this time. Your other matches are still open.
+                            {b.hostName.split(' ')[0]} can't host this time. Other matches are still open.
                           </p>
                         ) : (
                         <ol className="mt-4 flex items-center" aria-label={`Status: ${BOOKING_STEPS[at]?.label}`}>
@@ -238,14 +232,14 @@ export default function Dashboard() {
                                 >
                                   {i <= at && <Icon name="check" size={13} />}
                                 </span>
-                                <span className={`whitespace-nowrap text-xs ${i === at ? 'font-bold' : 'text-[#4A5A75]'}`}>{s.label}</span>
+                                <span className={`whitespace-nowrap text-sm ${i === at ? 'font-bold' : 'text-[#4A5A75]'}`}>{s.label}</span>
                               </span>
                               {i < BOOKING_STEPS.length - 1 && <span aria-hidden="true" className={`mx-2 mb-5 h-0.5 flex-1 rounded ${i < at ? 'bg-[#1E2B44]' : 'bg-[#E4EAF1]'}`} />}
                             </li>
                           ))}
                         </ol>
                         )}
-                        {b.status === 'accepted' && <p className="mt-3 text-sm font-semibold text-[#2E6B45]">{b.hostName.split(' ')[0]} accepted your request. Message them to sort out the next steps.</p>}
+                        {b.status === 'booked' && <p className="mt-3 text-sm font-semibold text-[#2E6B45]">Booked with {b.hostName.split(' ')[0]}. Message them to sort out the next steps.</p>}
                         {b.status === 'requested' && <p className="mt-3 text-sm text-[#4A5A75]">Waiting on {b.hostName.split(' ')[0]} to reply.</p>}
                       </li>
                     )
@@ -270,7 +264,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <h2 className={`${serif} text-2xl font-medium`}>Meet interns near you</h2>
-                  <p className="text-[15px] text-[#4A5A75]">People with your interests in your city this summer.</p>
+                  <p className="text-[15px] text-[#4A5A75]">People with shared interests in the same city this summer.</p>
                 </div>
               </div>
               <Link href="/internMatches" className={btnLight}>
@@ -291,14 +285,13 @@ export default function Dashboard() {
                 </span>
                 <div>
                   <h2 className={`${serif} text-2xl font-medium text-[#2F4161]`}>Meet interns near you</h2>
-                  <p className="text-[15px] text-[#4A5A75]">Unlocks after the quiz, once we know your city and interests.</p>
+                  <p className="text-[15px] text-[#4A5A75]">Unlocks after the quiz, once we know the city and interests.</p>
                 </div>
               </div>
               <span className="rounded-full bg-[#E4EAF1] px-4 py-2 text-sm font-semibold text-[#2F4161]">Locked</span>
             </section>
           )}
         </div>
-        <p className="mt-12 text-center text-[13px] text-[#4A5A75]">&copy; 2026 Subtle Technologies, Inc. All rights reserved.</p>
       </section>
     </>
   )

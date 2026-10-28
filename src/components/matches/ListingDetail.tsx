@@ -18,7 +18,7 @@ const subtitleFor = (l: Listing) =>
 const whyFor = (l: Listing) =>
   l.whyScore ?? [
     `${l.commuteMode === 'walk' ? 'Walk' : 'Commute'} to the office · ${l.commuteMinutes} minutes`,
-    `Dates match your summer · ${l.availableFrom}`,
+    `Dates match the summer · ${l.availableFrom}`,
     l.tags.length ? l.tags.join(' · ') : l.roomType,
   ]
 const featuresFor = (l: Listing) => l.features ?? Array.from(new Set([l.homeType, l.roomType, ...l.tags, ...l.amenities]))
@@ -79,7 +79,6 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
               <Link href="/matches" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-[#4A5A75] hover:text-[#1E2B44]">
                 <Icon name="arrowL" size={16} /> All matches
               </Link>
-              <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">Listing details</p>
               <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">{listing.title}</h1>
               <p className="mt-2 text-[17px] text-[#4A5A75]">{subtitleFor(listing)}</p>
             </div>
@@ -119,7 +118,7 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
                     className="animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] rounded-[22px] border border-white bg-white/75 p-4"
                     style={{ animationDelay: `${150 + i * 70}ms` }}
                   >
-                    <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-[#4A5A75]">
+                    <span className="flex items-center gap-2 text-[15px] font-semibold text-[#4A5A75]">
                       <Icon name={f.icon} size={15} /> {f.label}
                     </span>
                     <p className="mt-1.5 text-[15px] font-semibold leading-snug">{f.value}</p>
@@ -131,8 +130,8 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
             {/* why, the place, about, actions */}
             <div className="flex flex-col gap-5">
               <section aria-labelledby="why-title" className="rounded-[28px] border border-white bg-white/75 p-6">
-                <h2 id="why-title" className="text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">
-                  Why this score
+                <h2 id="why-title" className="font-[family-name:var(--font-serif)] text-2xl font-medium">
+                  Why This Score
                 </h2>
                 <ul className="mt-4 space-y-3">
                   {whyFor(listing).map((reason) => (
@@ -151,8 +150,8 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
               </section>
 
               <section aria-labelledby="place-title" className="rounded-[28px] border border-white bg-white/75 p-6">
-                <h2 id="place-title" className="text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">
-                  The place
+                <h2 id="place-title" className="font-[family-name:var(--font-serif)] text-2xl font-medium">
+                  The Place
                 </h2>
                 <ul className="mt-4 flex flex-wrap gap-2 text-[13px] font-medium">
                   {featuresFor(listing).map((f) => (

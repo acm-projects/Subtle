@@ -32,9 +32,77 @@ html { scrollbar-gutter: stable; }
   [class*='journeyHop'] { animation: none !important; }
 }
 
-/* subtle. is all lowercase: every word on the site renders lowercase,
-   including labels that used to be ALL CAPS. What people type in fields stays as typed. */
-body, button, [role='button'], optgroup, option { text-transform: lowercase; }
-.uppercase, .capitalize { text-transform: lowercase; }
-input, textarea, select, [contenteditable='true'] { text-transform: none; }
 @keyframes journeyHop { 0% { transform: translateY(0); } 30% { transform: translateY(-14%); } 60% { transform: translateY(0) scale(1.05, 0.94); } 80% { transform: translateY(0) scale(0.98, 1.02); } 100% { transform: none; } }
+
+/* labels that used to be ALL CAPS read as normal words now */
+.uppercase { text-transform: none; letter-spacing: normal; }
+
+/* no tiny text: anything smaller than 14px is bumped up to 14px */
+.text-xs, .text-\[9px\], .text-\[10px\], .text-\[11px\], .text-\[12px\], .text-\[13px\] { font-size: 0.875rem; line-height: 1.35; }
+
+/* ---------- dark mode ----------
+   Turned on by the sun/moon button (ThemeToggle), which adds .dark to <html>.
+   The pages use fixed hex colors, so this layer swaps them for dark ones.
+   Unlayered CSS beats Tailwind's utilities, so these win without touching each page. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html.dark { color-scheme: dark; }
+.dark body { background: #111A2B; color: #EEF2F7; }
+.dark main,
+.dark .sb-auth,
+.dark [class*='bg-[radial'] {
+  background: radial-gradient(ellipse 60% 40% at 15% 10%, rgba(64, 92, 140, 0.35), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 90% 90%, rgba(163, 95, 51, 0.18), transparent 70%),
+    linear-gradient(180deg, #111A2B 0%, #172238 55%, #1E1C24 100%) !important;
+}
+
+/* text */
+.dark .text-\[\#1E2B44\], .dark .text-\[\#1e2b44\], .dark .text-\[\#1f2a44\], .dark .text-\[\#1F2A44\] { color: #EEF2F7; }
+.dark .text-\[\#2F4161\], .dark .text-\[\#3d4a6b\], .dark .text-\[\#3D4A6B\], .dark .text-\[\#245F90\] { color: #D3DCE8; }
+.dark .text-\[\#4A5A75\], .dark .text-\[\#4a5878\], .dark .text-\[\#4A5878\], .dark .text-\[\#3C6285\], .dark .text-\[\#5F6E84\], .dark .text-\[\#6B7691\] { color: #B3C0D2; }
+.dark .text-\[\#2E6B45\], .dark .text-\[\#2f6b3f\], .dark .text-\[\#1F5C3A\] { color: #93D6AB; }
+.dark .text-\[\#A35F33\], .dark .text-\[\#8A3A2A\], .dark .text-\[\#8A4B26\], .dark .text-\[\#9B2C1F\], .dark .text-\[\#C27A4A\] { color: #F2AE84; }
+
+/* glass and white surfaces */
+.dark .bg-white\/40, .dark .bg-white\/50, .dark .bg-white\/60, .dark .bg-white\/65, .dark .bg-white\/70,
+.dark .bg-white\/75, .dark .bg-white\/80, .dark .bg-white\/85, .dark .bg-white\/90 { background-color: rgba(28, 39, 60, 0.72); }
+.dark .bg-white { background-color: #1C273C; }
+.dark .hover\:bg-white:hover, .dark .hover\:bg-\[\#F7F9FB\]:hover, .dark .hover\:bg-\[\#f2f5fb\]:hover, .dark .hover\:bg-\[\#FBF3EA\]:hover { background-color: #26344F; }
+.dark .border-white, .dark .border-white\/25 { border-color: rgba(255, 255, 255, 0.09); }
+.dark .border-\[\#D5DFEA\], .dark .border-\[\#cfd8ea\], .dark .border-\[\#C9DBEA\], .dark .border-\[\#E4EAF1\], .dark .border-\[\#EADFD0\],
+.dark .border-\[\#E9C4A6\], .dark .border-\[\#E8C3B0\], .dark .border-\[\#1E2B44\] { border-color: #34445F; }
+
+/* pale fills */
+.dark .bg-\[\#EEF3F8\], .dark .bg-\[\#E4EAF1\], .dark .bg-\[\#F7F9FB\], .dark .bg-\[\#e8edf7\], .dark .bg-\[\#E3ECF5\], .dark .bg-\[\#DCEBF6\],
+.dark .bg-\[\#e6eff7\], .dark .bg-\[\#D8E2EB\], .dark .bg-\[\#d9e1f0\] { background-color: #26344F; }
+.dark .bg-\[\#C9DBEA\], .dark .bg-\[\#B9D6F0\] { background-color: #3B5277; }
+.dark .bg-\[\#FBF3EA\], .dark .bg-\[\#F3E3D2\], .dark .bg-\[\#FBEDE4\], .dark .bg-\[\#FBEAE6\] { background-color: #3A2E28; }
+.dark .bg-\[\#E3F1E8\], .dark .bg-\[\#E6F3EA\] { background-color: #1F3A2C; }
+
+/* navy buttons and chips flip to light so they still stand out */
+.dark .bg-\[\#1E2B44\], .dark .bg-\[\#1f2a44\], .dark .bg-\[\#1E2B44\]\/80 { background-color: #E6ECF4; color: #15203A; }
+.dark .bg-\[\#1E2B44\].text-white, .dark .bg-\[\#1E2B44\] .text-white, .dark .bg-\[\#1f2a44\].text-white, .dark .bg-\[\#1E2B44\]\/80.text-white { color: #15203A; }
+.dark .hover\:bg-\[\#2F4161\]:hover, .dark .hover\:bg-\[\#2b3a5e\]:hover, .dark .hover\:bg-\[\#1E2B44\]:hover { background-color: #FFFFFF; color: #15203A; }
+.dark .hover\:bg-\[\#1E2B44\]\/\[0\.06\]:hover { background-color: rgba(255, 255, 255, 0.08); }
+.dark .bg-\[\#2F4161\] { background-color: #8FA6C4; color: #15203A; }
+.dark .bg-\[\#1E2B44\]\/40 { background-color: rgba(10, 16, 28, 0.5); }
+.dark .accent-\[\#1E2B44\] { accent-color: #C9DBEA; }
+.dark .placeholder\:text-\[\#8A97AB\]::placeholder, .dark .placeholder\:text-\[\#6b7691\]::placeholder, .dark .placeholder\:text-\[\#5F6E84\]::placeholder { color: #8391A8; }
+.dark .ring-\[\#C9DBEA\] { --tw-ring-color: #3B5277; }
+
+/* login page */
+.dark .sb-card { background: rgba(28, 39, 60, 0.82); border-color: rgba(255, 255, 255, 0.09); }
+.dark .sb-auth, .dark .sb-label, .dark .sb-headline h1, .dark .sb-input input, .dark .sb-logo { color: #EEF2F7; }
+.dark .sb-headline p, .dark .sb-hint, .dark .sb-input svg, .dark .sb-eye { color: #B3C0D2; }
+.dark .sb-headline em { color: #C9DBEA; }
+.dark .sb-input { background: #1C273C; border-color: #34445F; }
+.dark .sb-badge { background: #26344F; color: #D3DCE8; }
+.dark .sb-submit { background: #E6ECF4; color: #15203A; }
+.dark .sb-check, .dark .sb-or, .dark .sb-footer a { color: #B3C0D2; }
+.dark .sb-check a, .dark .sb-linkbtn { color: #EEF2F7; }
+.dark .sb-strength span { background: #34445F; }
+.dark .sb-strength span.sb-on { background: #C9DBEA; }
+.dark .sb-google { background: rgba(28, 39, 60, 0.72); color: #EEF2F7; }
+.dark .sb-google:hover { background: #26344F; }
+.dark .sb-or::before, .dark .sb-or::after { background: rgba(255, 255, 255, 0.12); }
+html.dark { background: #111A2B; }

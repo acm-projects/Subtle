@@ -17,7 +17,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${serif.variable} ${body.variable}`}>
+    <html lang="en" className={`${serif.variable} ${body.variable}`} suppressHydrationWarning>
+      <head>
+        {/* apply the saved light/dark choice before the first paint (light is the default) */}
+        <script dangerouslySetInnerHTML={{ __html: "try{if(localStorage.getItem('subtle-theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}" }} />
+      </head>
       <body className="font-[family-name:var(--font-body)] antialiased">{children}</body>
     </html>
   )

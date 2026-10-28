@@ -66,6 +66,19 @@ export function useDashboardData(): DashboardData {
         // quiz answers in this browser only count if this account took the quiz
         const email = auth.user?.email?.toLowerCase()
         if (email && localStorage.getItem('subtle-quiz-owner') !== email) quiz = EMPTY
+        // no name on the account: try the saved profile row, then the email
+        if (!firstName && email) {
+          try {
+            const res = await fetch(`/api/users?email=${encodeURIComponent(email)}`)
+            const row = res.ok ? await res.json() : null
+            const fromRow = ((row?.first_name ?? '') as string).trim()
+            if (fromRow && fromRow !== 'Intern') firstName = fromRow
+          } catch {}
+        }
+        if (!firstName && email) {
+          const handle = email.split('@')[0].split(/[._\-+0-9]/)[0]
+          if (handle) firstName = handle.charAt(0).toUpperCase() + handle.slice(1)
+        }
       } catch {}
 
       const quizStatus = quizStatusOf(quiz)

@@ -5,14 +5,13 @@ import { useEffect, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import HouseMascot from '../HouseMascot'
 import Icon from '../quiz/icons'
-import { getMyListings, type Listing } from '../../lib/listings'
+import { deleteListing, getMyListings, type Listing } from '../../lib/listings'
 
 type Booking = { id: string; guestName: string; guestEmail: string; moveIn: string; moveOut: string; note: string; status: 'pending' | 'accepted' | 'declined'; createdAt: string }
 type Thread = { id: string; listingId: string; messages: { from: 'me' | 'them'; body: string; sentAt: string }[] }
 type Activity = { views: number; bookings: Booking[]; threads: Thread[] }
 
 const glass = 'rounded-[32px] border border-white bg-white/65 shadow-[0_30px_70px_-40px_rgba(30,43,68,0.38)] backdrop-blur-xl'
-const eyebrow = 'text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]'
 const serif = 'font-[family-name:var(--font-serif)]'
 const btnDark = 'inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#1E2B44] px-6 text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]'
 const btnLight = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#D5DFEA] bg-white/80 px-5 text-sm font-semibold transition hover:-translate-y-0.5 hover:bg-white'
@@ -51,7 +50,7 @@ async function loadActivity(id: string, threads: Thread[]): Promise<Activity> {
 function Stat({ icon, value, label }: { icon: string; value: number; label: string }) {
   return (
     <div className="rounded-[22px] border border-white bg-white/80 p-4">
-      <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-[#4A5A75]">
+      <span className="flex items-center gap-2 text-[15px] font-semibold text-[#4A5A75]">
         <Icon name={icon} size={14} /> {label}
       </span>
       <p className={`${serif} mt-1 text-4xl font-medium tabular-nums`}>{value}</p>
@@ -66,6 +65,23 @@ export default function RenterDashboard() {
   const [activity, setActivity] = useState<Record<string, Activity>>({})
   const [copied, setCopied] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<string | null>(null)
+  const [removeError, setRemoveError] = useState<string | null>(null)
+
+  // take a listing down for good (its photos are removed too)
+  const remove = async (l: Listing) => {
+    if (!window.confirm(`Remove "${l.title || 'this listing'}"? Interns won't be able to find or book it anymore.`)) return
+    setRemoving(l.id)
+    setRemoveError(null)
+    try {
+      await deleteListing(l.id)
+      setListings((all) => all.filter((x) => x.id !== l.id))
+    } catch (e) {
+      console.warn("Couldn't remove listing:", e)
+      setRemoveError(l.id)
+    }
+    setRemoving(null)
+  }
 
   // accept or decline a booking request; the intern sees the result on their dashboard
   // TODO(backend): PATCH /api/bookings keeps this in server memory until bookings move to Supabase
@@ -137,9 +153,8 @@ export default function RenterDashboard() {
         <div className="mx-auto w-full max-w-[1240px]">
           <header className="flex animate-[fadeIn_.5s_ease-out] flex-wrap items-end justify-between gap-6 md:pl-10">
             <div>
-              <p className={eyebrow}>For hosts</p>
-              <h1 className={`${serif} mt-2 text-5xl font-medium tracking-[-0.02em] md:text-6xl`}>your listings.</h1>
-              <p className="mt-2 text-[17px] text-[#4A5A75]">See who&apos;s looking at your place and who wants to talk.</p>
+              <h1 className={`${serif} text-5xl font-medium tracking-[-0.02em] md:text-6xl`}>Listings</h1>
+              <p className="mt-2 text-[17px] text-[#4A5A75]">See who&apos;s looking at each place and who wants to talk.</p>
             </div>
             <Link href="/post" className={btnLight}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -161,15 +176,15 @@ export default function RenterDashboard() {
           ) : listings.length === 0 ? (
             <div className={`${glass} mt-10 grid items-center gap-8 p-8 md:grid-cols-[1fr_auto] md:p-12`}>
               <div>
-                <h2 className={`${serif} text-4xl font-medium`}>{needsLogin ? 'Log in to see your listings' : 'Nothing posted yet'}</h2>
+                <h2 className={`${serif} text-4xl font-medium`}>{needsLogin ? 'Log in to see listings' : 'Nothing posted yet'}</h2>
                 <p className="mt-3 max-w-md text-[16px] text-[#4A5A75]">
                   {needsLogin
-                    ? 'Your listings, views and requests show up here once you’re logged in.'
-                    : 'Post your place and you’ll see views, booking requests and messages from interns right here.'}
+                    ? 'Listings, views and requests show up here once you’re logged in.'
+                    : 'Post a place and you’ll see views, booking requests and messages from interns right here.'}
                 </p>
                 <div className="mt-6">
                   <Link href={needsLogin ? '/login?mode=login' : '/post'} className={btnDark}>
-                    {needsLogin ? 'Log in' : 'Post your place'} <Icon name="arrowR" size={16} />
+                    {needsLogin ? 'Log in' : 'Post a place'} <Icon name="arrowR" size={16} />
                   </Link>
                 </div>
               </div>
@@ -201,10 +216,10 @@ export default function RenterDashboard() {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-bold ${l.is_active ? 'bg-[#E3F1E8] text-[#2E6B45]' : 'bg-[#EEF3F8] text-[#4A5A75]'}`}>
+                          <span className={`inline-block rounded-full px-3 py-1 text-sm font-bold ${l.is_active ? 'bg-[#E3F1E8] text-[#2E6B45]' : 'bg-[#EEF3F8] text-[#4A5A75]'}`}>
                             {l.is_active ? 'Live' : 'Paused'}
                           </span>
-                          <h2 className={`${serif} mt-2 truncate text-3xl font-medium`}>{l.title || 'Your place'}</h2>
+                          <h2 className={`${serif} mt-2 truncate text-3xl font-medium`}>{l.title || 'Untitled place'}</h2>
                           <p className="mt-1 text-[15px] text-[#4A5A75]">
                             {l.monthly_rent ? `$${l.monthly_rent.toLocaleString()} / month · ` : ''}
                             {shortDate(l.start_date)} – {shortDate(l.end_date)}
@@ -216,7 +231,16 @@ export default function RenterDashboard() {
                             <button type="button" onClick={() => copyLink(l.id)} className={btnLight}>
                               {copied === l.id ? 'Link copied' : 'Copy link'}
                             </button>
+                            <button
+                              type="button"
+                              disabled={removing === l.id}
+                              onClick={() => remove(l)}
+                              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#E8C3B0] bg-white/80 px-5 text-sm font-semibold text-[#8A3A2A] transition hover:-translate-y-0.5 hover:bg-[#FBEDE4] disabled:opacity-50"
+                            >
+                              {removing === l.id ? 'Removing…' : 'Remove listing'}
+                            </button>
                           </div>
+                          {removeError === l.id && <p className="mt-2 text-sm font-semibold text-[#8A3A2A]">Couldn&apos;t remove this listing. Try again.</p>}
                         </div>
                       </div>
 
@@ -230,10 +254,10 @@ export default function RenterDashboard() {
 
                     {/* who wants to talk */}
                     <div className="mt-6 border-t border-[#E4EAF1] pt-5">
-                      <p className={eyebrow}>Who wants to connect {people > 0 ? `· ${people}` : ''}</p>
+                      <h3 className={`${serif} text-2xl font-medium`}>Who Wants to Connect {people > 0 ? `· ${people}` : ''}</h3>
                       {people === 0 ? (
                         <p className="mt-3 text-[15px] text-[#4A5A75]">
-                          No one has reached out yet. Share your link to get it in front of more interns.
+                          No one has reached out yet. Share the link to get it in front of more interns.
                         </p>
                       ) : (
                         <ul className="mt-3 grid gap-3 md:grid-cols-2">
@@ -246,9 +270,9 @@ export default function RenterDashboard() {
                                 <div className="flex items-baseline justify-between gap-2">
                                   <p className="truncate font-semibold">
                                     {b.guestName || 'An intern'}
-                                    {b.status === 'pending' && <span className="ml-2 rounded-full bg-[#1E2B44] px-2 py-0.5 align-middle text-[10px] font-bold text-white">new</span>}
+                                    {b.status === 'pending' && <span className="ml-2 rounded-full bg-[#1E2B44] px-2.5 py-0.5 align-middle text-sm font-bold text-white">New</span>}
                                   </p>
-                                  <span className="shrink-0 text-xs text-[#4A5A75]">{ago(b.createdAt)}</span>
+                                  <span className="shrink-0 text-sm text-[#4A5A75]">{ago(b.createdAt)}</span>
                                 </div>
                                 <p className="text-sm text-[#4A5A75]">
                                   Wants to book · {b.moveIn || 'Flexible'} – {b.moveOut || 'Flexible'}
@@ -276,18 +300,18 @@ export default function RenterDashboard() {
                                 ) : (
                                   <div className="mt-3 flex flex-wrap items-center gap-2">
                                     <span
-                                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+                                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold ${
                                         b.status === 'accepted' ? 'bg-[#E3F1E8] text-[#2E6B45]' : 'bg-[#FBEDE4] text-[#8A4B26]'
                                       }`}
                                     >
                                       {b.status === 'accepted' && <Icon name="check" size={12} />}
-                                      {b.status === 'accepted' ? 'Accepted' : 'Declined'}
+                                      {b.status === 'accepted' ? 'Booked' : 'Declined'}
                                     </span>
                                     <button
                                       type="button"
                                       disabled={busy === b.id}
                                       onClick={() => decide(l.id, b.id, 'pending')}
-                                      className="text-xs font-semibold text-[#4A5A75] underline underline-offset-2 hover:text-[#1E2B44]"
+                                      className="text-sm font-semibold text-[#4A5A75] underline underline-offset-2 hover:text-[#1E2B44]"
                                     >
                                       Undo
                                     </button>
@@ -307,7 +331,7 @@ export default function RenterDashboard() {
                                   <div className="min-w-0 flex-1">
                                     <div className="flex items-baseline justify-between gap-2">
                                       <p className="truncate font-semibold">Message from an intern</p>
-                                      {last && <span className="shrink-0 text-xs text-[#4A5A75]">{ago(last.sentAt)}</span>}
+                                      {last && <span className="shrink-0 text-sm text-[#4A5A75]">{ago(last.sentAt)}</span>}
                                     </div>
                                     <p className="line-clamp-2 text-sm text-[#4A5A75]">{last?.body}</p>
                                   </div>
@@ -324,7 +348,6 @@ export default function RenterDashboard() {
             </div>
           )}
         </div>
-        <p className="mt-12 text-center text-[13px] text-[#4A5A75]">&copy; 2026 Subtle Technologies, Inc. All rights reserved.</p>
       </section>
     </>
   )
