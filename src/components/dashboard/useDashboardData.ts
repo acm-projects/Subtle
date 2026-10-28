@@ -61,12 +61,19 @@ export function useDashboardData(): DashboardData {
       try {
         const { data: auth } = await supabase.auth.getUser()
         const meta = auth.user?.user_metadata ?? {}
-        const fromAccount = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
-        if (fromAccount) firstName = fromAccount
+        const savedHere = firstName
+        firstName = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
         // quiz answers in this browser only count if this account took the quiz
         const email = auth.user?.email?.toLowerCase()
         if (email && localStorage.getItem('subtle-quiz-owner') !== email) quiz = EMPTY
-        // no name on the account: try the saved profile row, then the email
+        // no name on the account: use the first name saved on their profile (what they entered at sign-up)
+        if (!firstName && auth.user) {
+          try {
+            const { data: prof } = await supabase.from('profiles').select('first_name').eq('id', auth.user.id).single()
+            const fromProfile = ((prof?.first_name ?? '') as string).trim()
+            if (fromProfile) firstName = fromProfile
+          } catch {}
+        }
         if (!firstName && email) {
           try {
             const res = await fetch(`/api/users?email=${encodeURIComponent(email)}`)
@@ -75,10 +82,10 @@ export function useDashboardData(): DashboardData {
             if (fromRow && fromRow !== 'Intern') firstName = fromRow
           } catch {}
         }
-        if (!firstName && email) {
-          const handle = email.split('@')[0].split(/[._\-+0-9]/)[0]
-          if (handle) firstName = handle.charAt(0).toUpperCase() + handle.slice(1)
-        }
+        if (!firstName) firstName = ((meta.given_name ?? '') as string).trim()
+        if (!firstName && !savedHere.includes('@')) firstName = savedHere
+        // only the first word, in case a full name was saved
+        firstName = firstName.split(/\s+/)[0] ?? ''
       } catch {}
 
       const quizStatus = quizStatusOf(quiz)

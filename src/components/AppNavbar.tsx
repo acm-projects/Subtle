@@ -17,6 +17,7 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
   const [confirming, setConfirming] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [initials, setInitials] = useState('')
   const stayRef = useRef<HTMLButtonElement>(null)
 
   // load the signed-in user's profile picture; refresh when they change it on the profile page
@@ -25,14 +26,22 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
     const load = async () => {
       const { data: auth } = await supabase.auth.getUser()
       if (!auth.user) return
-      const { data } = await supabase.from('profiles').select('avatar_url').eq('id', auth.user.id).single()
-      if (active) setAvatarUrl(data?.avatar_url ?? null)
+      const { data } = await supabase.from('profiles').select('avatar_url, first_name, last_name').eq('id', auth.user.id).single()
+      if (!active) return
+      setAvatarUrl(data?.avatar_url ?? null)
+      // first + last initial: the profile row first, then what they entered at sign-up (or Google's name)
+      const meta = auth.user.user_metadata ?? {}
+      const first = String(data?.first_name || meta.first_name || meta.firstName || meta.given_name || '').trim()
+      const last = String(data?.last_name || meta.last_name || meta.lastName || meta.family_name || '').trim()
+      setInitials(`${first.charAt(0)}${last.charAt(0)}`.toUpperCase())
     }
     load()
     window.addEventListener('avatar-updated', load)
+    window.addEventListener('profile-updated', load)
     return () => {
       active = false
       window.removeEventListener('avatar-updated', load)
+      window.removeEventListener('profile-updated', load)
     }
   }, [pathname])
 
@@ -124,7 +133,7 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
                   viewingProfile ? 'bg-white text-[#1E2B44]' : 'bg-[#1E2B44] text-white'
                 }`}
               >
-                {firstName?.[0]?.toUpperCase() ?? (
+                {initials || firstName?.[0]?.toUpperCase() || (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="8" r="4" />
                     <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />

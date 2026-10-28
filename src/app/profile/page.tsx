@@ -196,6 +196,7 @@ export default function ProfilePage() {
       setSavingDetails(false);
       return flash("Couldn't save the name. Try again.", "err");
     }
+    window.dispatchEvent(new Event("profile-updated"));
     if (nextEmail !== savedEmail) {
       const { error: mailErr } = await supabase.auth.updateUser({ email: nextEmail });
       if (mailErr) {

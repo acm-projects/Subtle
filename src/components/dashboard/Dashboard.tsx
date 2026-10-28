@@ -33,7 +33,7 @@ export default function Dashboard() {
   const d = useDashboardData()
   const [hello, setHello] = useState('Welcome back')
   useEffect(() => setHello(greeting()), [])
-  const name = d.firstName || 'friend'
+  const name = d.firstName
   const rowRef = useRef<HTMLOListElement>(null)
   const scrollRow = (dir: number) => rowRef.current?.scrollBy({ left: dir * 340, behavior: 'smooth' })
 
@@ -44,7 +44,7 @@ export default function Dashboard() {
         <div className="mx-auto w-full max-w-[1240px]">
           <header className="animate-[fadeIn_.5s_ease-out] pl-2 md:pl-10">
             <h1 className={`${serif} text-5xl font-medium tracking-[-0.02em] md:text-6xl`}>
-              {hello}, {name}.
+              {name ? `${hello}, ${name}.` : `${hello}.`}
             </h1>
           </header>
 
@@ -113,12 +113,12 @@ export default function Dashboard() {
               <div className="grid items-center gap-10 py-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
                 <div>
                   <h2 className={`${serif} text-4xl font-medium leading-tight`}>
-                    {d.quizStatus === 'started' ? `Pick up where you left off, ${name}.` : 'Don’t see anything yet? No worries.'}
+                    {d.quizStatus === 'started' ? name ? `Pick up where you left off, ${name}.` : 'Pick up where you left off.' : 'Don’t see anything yet? No worries.'}
                   </h2>
                   <p className="mt-3 max-w-md text-[16px] leading-relaxed text-[#4A5A75]">
                     {d.quizStatus === 'started'
                       ? 'Answers are saved. Finish the last few questions and the best matches show up right here.'
-                      : `Take the quick housing quiz, ${name}, and the best matches will show up right here, ranked by Subtle score.`}
+                      : 'Take the quick housing quiz and the best matches will show up right here, ranked by Subtle score.'}
                   </p>
                   <ul className="mt-5 flex flex-wrap gap-2" aria-label="What the quiz asks">
                     {QUIZ_TOPICS.map((t) => (
