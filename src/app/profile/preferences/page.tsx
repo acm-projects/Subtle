@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabase'
 import AppNavbar from "../../../components/AppNavbar";
 // Adjust this folder name if your questionnaire lives somewhere else.
 import { Field } from '../../../components/quiz/parts'
+import { userRowToQuizAnswers } from '../../../lib/quiz-sync'
 
 
 import {
@@ -125,6 +126,23 @@ export default function PreferencesPage() {
         const raw = localStorage.getItem('subtle-quiz-v1')
         if (raw && (!owner || owner === mail)) loaded = { ...EMPTY, ...JSON.parse(raw) }
       } catch {}
+
+      // If not in local storage or incomplete, fetch directly from Supabase users_table
+      try {
+        const res = await fetch(`/api/users?email=${encodeURIComponent(mail)}`, { cache: 'no-store' })
+        if (res.ok) {
+          const dbUser = await res.json()
+          if (dbUser && (dbUser.company_name || dbUser.office_address || dbUser.monthly_budget)) {
+            const fromDb = userRowToQuizAnswers(dbUser)
+            loaded = { ...loaded, ...fromDb }
+            try {
+              localStorage.setItem('subtle-quiz-v1', JSON.stringify(loaded))
+              localStorage.setItem('subtle-quiz-owner', mail)
+            } catch {}
+          }
+        }
+      } catch {}
+
       setA(loaded)
       setSaved(loaded)
       setLoading(false)
