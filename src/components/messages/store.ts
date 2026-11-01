@@ -1,4 +1,7 @@
-// Messages data store backed by /api/messages with localStorage sync so Postman and the UI stay in sync.
+import { supabase } from '../../lib/supabase'
+import { apiFetch } from '../../lib/apiFetch'
+
+// ---------- Types the UI uses ----------
 
 export type Message = {
   id: string
@@ -13,161 +16,114 @@ export type Conversation = {
   listingTitle: string
   listingScore?: number
   hostName: string
+  kind: 'listing' | 'intern'
   messages: Message[]
   unread?: boolean
-  sample?: boolean // true for the made-up starter conversations
+  sample?: boolean
 }
 
-const KEY = 'subtle-messages-v1'
-const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString()
+// ---------- Shapes the API returns ----------
 
-function sampleConversations(): Conversation[] {
-  return [
-    {
-      id: 'c-soma-loft',
-      listingId: 'soma-loft',
-      listingTitle: 'SoMa loft',
-      listingScore: 96,
-      hostName: 'Maya',
-      unread: true,
-      sample: true,
-      messages: [
-        { id: uid(), from: 'me', body: "Hi Maya, I'm interning at Stripe this summer and I'm interested in the SoMa loft.", sentAt: ago(60 * 26) },
-        { id: uid(), from: 'them', body: 'Hi! Thanks for reaching out. The room is open from June 1. Want to set up a video tour?', sentAt: ago(60 * 25) },
-        { id: uid(), from: 'me', body: 'That would be great. Does Thursday evening work?', sentAt: ago(60 * 3) },
-        { id: uid(), from: 'them', body: 'Thursday at 6 works. I will send a link here.', sentAt: ago(12) },
-      ],
-    },
-    {
-      id: 'c-hayes-valley-studio',
-      listingId: 'hayes-valley-studio',
-      listingTitle: 'Hayes Valley studio',
-      listingScore: 87,
-      hostName: 'Daniel',
-      sample: true,
-      messages: [
-        { id: uid(), from: 'me', body: 'Hi Daniel, is the studio still available for the summer?', sentAt: ago(60 * 50) },
-        { id: uid(), from: 'them', body: 'It is! Utilities are included. Let me know if you have questions.', sentAt: ago(60 * 48) },
-      ],
-    },
-    {
-      id: 'c-mission-apartment',
-      listingId: 'mission-apartment',
-      listingTitle: 'Mission apartment',
-      listingScore: 73,
-      hostName: 'Priya',
-      sample: true,
-      messages: [{ id: uid(), from: 'me', body: 'Hi Priya, are the other two roommates interns too?', sentAt: ago(60 * 24 * 4) }],
-    },
-  ]
+type ApiMessage = {
+  id: string
+  conversation_id: string
+  sender_id: string
+  body: string
+  created_at: string
 }
 
-function readLocal(): Conversation[] {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  const seeded = sampleConversations()
-  writeLocal(seeded)
-  return seeded
+type ApiConversation = {
+  conversation_id: string
+  listing_id: string | null
+  kind: 'listing' | 'intern'
+  last_read_at: string
+  other_user_id: string | null
+  last_message: { body: string; created_at: string; sender_id: string } | null
+  other_user_name?: string
+  listing_title?: string
 }
 
-function writeLocal(list: Conversation[]) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(list))
-  } catch {}
+// ---------- Helpers ----------
+
+async function myUserId() {
+  const { data: { user } } = await supabase.auth.getUser()
+  return user?.id ?? null
 }
+
+const toMessage = (m: ApiMessage, me: string | null): Message => ({
+  id: m.id,
+  from: m.sender_id === me ? 'me' : 'them',
+  body: m.body,
+  sentAt: m.created_at,
+})
 
 const lastAt = (c: Conversation) => c.messages[c.messages.length - 1]?.sentAt ?? ''
-const newestFirst = (list: Conversation[]) => [...list].sort((a, b) => lastAt(b).localeCompare(lastAt(a)))
+const newestFirst = (list: Conversation[]) =>
+  [...list].sort((a, b) => Date.parse(lastAt(b)) - Date.parse(lastAt(a)))
 
-// Fetch conversations from /api/messages and merge with any local threads
+// ---------- Backend calls ----------
+
 export async function loadConversations(): Promise<Conversation[]> {
-  try {
-    const res = await fetch('/api/messages', { cache: 'no-store' })
-    if (res.ok) {
-      const data = await res.json()
-      if (Array.isArray(data.conversations)) {
-        writeLocal(data.conversations)
-        return newestFirst(data.conversations)
+  const me = await myUserId()
+  const res = await apiFetch('/api/conversations')
+  if (!res.ok) return []
+  const items: ApiConversation[] = await res.json()
+
+  // One extra request per conversation for now; fine at this size
+  const list = await Promise.all(
+    items.map(async (c): Promise<Conversation> => {
+      const mres = await apiFetch(`/api/conversations/${c.conversation_id}/messages`)
+      const raw: ApiMessage[] = mres.ok ? await mres.json() : []
+      const last = c.last_message
+
+      return {
+        id: c.conversation_id,
+        listingId: c.listing_id ?? '',
+        listingTitle: c.listing_title ?? 'Conversation', // TODO: real title
+        hostName: c.other_user_name ?? 'Host',
+        kind: c.kind,
+        messages: raw.map((m) => toMessage(m, me)),
+        unread:
+          !!last &&
+          last.sender_id !== me &&
+          Date.parse(last.created_at) > Date.parse(c.last_read_at),
       }
-    }
-  } catch {}
-  return newestFirst(readLocal())
+    }),
+  )
+  return newestFirst(list)
 }
 
-// Send message via POST /api/messages
 export async function sendMessage(conversationId: string, body: string): Promise<Message> {
-  try {
-    const res = await fetch('/api/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversationId, body }),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      if (data.message) {
-        writeLocal(readLocal().map((c) => (c.id === conversationId ? { ...c, messages: [...c.messages, data.message] } : c)))
-        return data.message as Message
-      }
-    }
-  } catch {}
-
-  const msg: Message = { id: uid(), from: 'me', body, sentAt: new Date().toISOString() }
-  writeLocal(readLocal().map((c) => (c.id === conversationId ? { ...c, messages: [...c.messages, msg] } : c)))
-  return msg
+  const me = await myUserId()
+  const res = await apiFetch(`/api/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ body }),
+  })
+  if (!res.ok) throw new Error('Could not send message')
+  return toMessage(await res.json(), me)
 }
 
-// Mark conversation read via PATCH /api/messages
 export async function markRead(conversationId: string) {
-  writeLocal(readLocal().map((c) => (c.id === conversationId ? { ...c, unread: false } : c)))
-  try {
-    await fetch('/api/messages', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversationId, unread: false }),
-    })
-  } catch {}
+  await apiFetch(`/api/conversations/${conversationId}/read`, { method: 'POST' })
 }
 
-// Used by ContactHost and InternMatches: starts or appends to a conversation via POST /api/messages
+// Used by ContactHost (with a listing id) and InternMatches (no listing id)
 export async function startConversation(
-  listing: { id: string; title: string; score?: number; hostName: string },
+  listing: { id?: string; title?: string; score?: number; hostName?: string; hostUserId: string },
   body: string,
 ): Promise<string> {
-  try {
-    const res = await fetch('/api/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        listingId: listing.id,
-        listingTitle: listing.title,
-        listingScore: listing.score,
-        hostName: listing.hostName,
-        body,
-      }),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      if (data.conversationId) {
-        await loadConversations()
-        return data.conversationId as string
-      }
-    }
-  } catch {}
+  const res = await apiFetch('/api/conversations', {
+    method: 'POST',
+    body: JSON.stringify({ otherUserId: listing.hostUserId, listingId: listing.id }),
+  })
+  if (!res.ok) throw new Error('Could not start conversation')
+  const { id } = await res.json()
 
-  const list = readLocal()
-  const existing = list.find((c) => c.listingId === listing.id)
-  const msg: Message = { id: uid(), from: 'me', body, sentAt: new Date().toISOString() }
-  if (existing) {
-    writeLocal(list.map((c) => (c.id === existing.id ? { ...c, messages: [...c.messages, msg] } : c)))
-    return existing.id
-  }
-  const id = `c-${listing.id}-${uid()}`
-  writeLocal([{ id, listingId: listing.id, listingTitle: listing.title, listingScore: listing.score, hostName: listing.hostName, messages: [msg] }, ...list])
+  await sendMessage(id, body)
   return id
 }
+
+// ---------- Display helpers (unchanged) ----------
 
 // Time labels without years: "3:42 PM", "Yesterday", "Mon", "Oct 12"
 export function shortTime(iso: string) {
