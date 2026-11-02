@@ -219,6 +219,21 @@ export default function ProfilePage() {
     };
   }, [uid, profile, loadConnections]);
 
+  // update the connection lists the moment a request is sent, accepted or removed, in either direction.
+  // Needs the realtime part of 02-connections.sql. The 20-second refresh above stays as a backup.
+  useEffect(() => {
+    if (!uid) return;
+    const refresh = () => void loadConnections(uid, profile?.interests ?? []);
+    const channel = supabase
+      .channel(`connections-${uid}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "connections", filter: `requester_id=eq.${uid}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "connections", filter: `addressee_id=eq.${uid}` }, refresh)
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [uid, profile, loadConnections]);
+
   /* ----- details ----- */
 
   async function saveDetails(e: React.FormEvent) {
@@ -390,7 +405,7 @@ export default function ProfilePage() {
     return <main className="min-h-screen bg-gradient-to-b from-[#c3d5ee] to-[#f6e6d2] p-10 text-[#1f2a44]">Loading…</main>;
   }
 
-  const fullName = `${first} ${last}`.trim() || "your profile.";
+  const fullName = `${first} ${last}`.trim() ||  "Profile Settings";
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#c3d5ee] via-[#e6ebf4] to-[#f6e6d2] px-3 pb-16 pt-32 text-[#1f2a44] md:px-4">
@@ -413,7 +428,7 @@ export default function ProfilePage() {
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="flex min-w-0 flex-col gap-6">
             {/* Details + photo */}
-            <Card title="your details.">
+            <Card title="Account Details">
               <form onSubmit={saveDetails} className="mt-6 flex flex-col gap-5">
                 <div className="flex flex-wrap items-center gap-5">
                   <div className="relative h-[88px] w-[88px] shrink-0">
@@ -472,7 +487,7 @@ export default function ProfilePage() {
             </Card>
 
             {/* Password */}
-            <Card title="password.">
+            <Card title="Set Password">
               <form onSubmit={changePassword} className="mt-6 flex flex-col gap-5">
                 <div>
                   <label htmlFor="pw0" className={labelCls}>Current password</label>
@@ -511,7 +526,7 @@ export default function ProfilePage() {
           {/* Right column: connections, then preferences */}
           <div className="flex min-w-0 flex-col gap-6">
           <aside className="rounded-[28px] bg-white/70 p-6 shadow-[0_10px_40px_rgba(31,42,68,0.08)] backdrop-blur">
-            <h2 className="font-[family-name:var(--font-serif)] text-[28px] font-medium">connections.</h2>
+            <h2 className="font-[family-name:var(--font-serif)] text-[28px] font-medium">Connections</h2>
             <p className="mb-4 mt-1 text-xs text-[#4a5878]">
               {connected.length} connected · {requests.length} {requests.length === 1 ? "request" : "requests"} waiting · {sent.length} sent
             </p>
@@ -591,7 +606,7 @@ export default function ProfilePage() {
           </aside>
 
             {/* Preferences entry point */}
-            <Card title="my preferences.">
+            <Card title="Preferences">
               <p className="mt-2.5 text-[13px] text-[#3d4a6b]">
                 Review your questionnaire answers and update them any time. Changes apply to your next set of matches.
               </p>

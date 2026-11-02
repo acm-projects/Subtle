@@ -277,9 +277,9 @@ export default function Messages() {
           {/* same heading treatment as "your listings." on the renter dashboard */}
           <header className="flex animate-[fadeIn_.5s_ease-out] flex-wrap items-end justify-between gap-4 md:pl-10">
             <div>
-              <p className="text-xs font-bold tracking-[0.14em] text-[#4A5A75]">for hosts</p>
-              <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">messages.</h1>
-              <p className="mt-2 text-[17px] text-[#4A5A75]">pick up where you left off with hosts and interns.</p>
+              
+              <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">Messages</h1>
+              <p className="mt-2 text-[17px] text-[#4A5A75]">Pick up where you left off with hosts and interns.</p>
             </div>
             {unreadCount > 0 && <span className="mb-2 rounded-full bg-[#1E2B44] px-3 py-1 text-xs font-bold text-white">{unreadCount} new</span>}
           </header>
