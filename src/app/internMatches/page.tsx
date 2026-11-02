@@ -4,10 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import AppNavbar from '../../components/AppNavbar'
 import { supabase } from '../../lib/supabase'
 
-//Backend: replace these 
-const MY_INTERESTS = ['Hiking', 'Cooking', 'Film', 'Photography', 'Basketball', 'Live music']
-
-// angle and radius from older versions of the API are no longer used: dots are placed by the layout below.
 type Intern = {
   id: string
   name: string
@@ -18,28 +14,35 @@ type Intern = {
   match?: number // 0-100. Only set for interns who matched with the user.
 }
 
-const INTERNS: Intern[] = [
-  //backend Replace with user data
-  { id: 'aisha', name: 'Aisha Rahman', initials: 'AR', role: 'Product design intern', school: 'UCLA', interests: ['Hiking', 'Cooking', 'Film', 'Photography', 'Pottery'], match: 96 },
-  { id: 'leo', name: 'Leo Martinez', initials: 'LM', role: 'Software intern', school: 'USC', interests: ['Basketball', 'Live music', 'Cooking', 'Film', 'Gaming'], match: 92 },
-  { id: 'priya', name: 'Priya Shah', initials: 'PS', role: 'Data intern', school: 'Stanford', interests: ['Hiking', 'Photography', 'Live music', 'Chess'], match: 89 },
-  { id: 'marcus', name: 'Marcus Tran', initials: 'MT', role: 'Marketing intern', school: 'UC Berkeley', interests: ['Cooking', 'Hiking', 'Basketball', 'Soccer'], match: 86 },
-  { id: 'sofia', name: 'Sofia Lopez', initials: 'SL', role: 'Finance intern', school: 'NYU', interests: ['Film', 'Live music', 'Yoga', 'Travel'], match: 82 },
-  { id: 'daniel', name: 'Daniel Kim', initials: 'DK', role: 'Research intern', school: 'Michigan', interests: ['Photography', 'Basketball', 'Reading', 'Chess'], match: 78 },
-  // also in the city, not matched
-  { id: 'emma', name: 'Emma Walsh', initials: 'EW', role: 'Design intern', school: 'Brown', interests: ['Painting', 'Yoga', 'Thrifting'] },
-  { id: 'jon', name: 'Jon Park', initials: 'JP', role: 'Software intern', school: 'UCSD', interests: ['Gaming', 'Anime', 'Running'] },
-  { id: 'nia', name: 'Nia Brooks', initials: 'NB', role: 'Policy intern', school: 'Howard', interests: ['Debate', 'Dance', 'Reading'] },
-  { id: 'omar', name: 'Omar Haddad', initials: 'OH', role: 'Software intern', school: 'UT Austin', interests: ['Soccer', 'Coding', 'Coffee'] },
-  { id: 'chloe', name: 'Chloe Evans', initials: 'CE', role: 'Media intern', school: 'Northwestern', interests: ['Writing', 'Theatre', 'Baking'] },
-  { id: 'ravi', name: 'Ravi Patel', initials: 'RP', role: 'Data intern', school: 'Georgia Tech', interests: ['Cricket', 'Chess', 'Travel'] },
-  { id: 'zoe', name: 'Zoe Chen', initials: 'ZC', role: 'Product intern', school: 'Columbia', interests: ['Surfing', 'Pottery', 'Fashion'] },
-  { id: 'sam', name: 'Sam Okafor', initials: 'SO', role: 'Finance intern', school: 'Duke', interests: ['Golf', 'Podcasts', 'Cars'] },
-  { id: 'lily', name: 'Lily Nguyen', initials: 'LN', role: 'Design intern', school: 'RISD', interests: ['Illustration', 'Anime', 'Baking'] },
-  { id: 'ben', name: 'Ben Carter', initials: 'BC', role: 'Software intern', school: 'MIT', interests: ['Robotics', 'Climbing', 'Gaming'] },
-  { id: 'maya', name: 'Maya Singh', initials: 'MS', role: 'Policy intern', school: 'Yale', interests: ['Volunteering', 'Reading', 'Yoga'] },
-  { id: 'theo', name: 'Theo Grant', initials: 'TG', role: 'Data intern', school: 'Rice', interests: ['Running', 'Board games', 'Coffee'] },
-]
+// Ids of the old built-in demo interns. If the API still sends any of them, they are dropped here.
+const SAMPLE_IDS = new Set([
+  'aisha', 'leo', 'priya', 'marcus', 'sofia', 'daniel', 'emma', 'jon', 'nia',
+  'omar', 'chloe', 'ravi', 'zoe', 'sam', 'lily', 'ben', 'maya', 'theo',
+])
+
+// Keeps only the fields this page uses and drops duplicate ids, so odd API data can't break the layout.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const cleanInterns = (raw: any[]): Intern[] => {
+  const seen = new Set<string>()
+  return raw.flatMap((r, n) => {
+    const id = String(r.id ?? `${r.name}-${n}`)
+    if (seen.has(id) || SAMPLE_IDS.has(id)) return []
+    seen.add(id)
+    const name = String(r.name ?? 'Intern')
+    const m = r.match == null ? NaN : Number(r.match)
+    return [
+      {
+        id,
+        name,
+        initials: String(r.initials ?? name.split(' ').map((w: string) => w[0]).join('').slice(0, 2)),
+        role: String(r.role ?? 'Intern'),
+        school: String(r.school ?? ''),
+        interests: Array.isArray(r.interests) ? r.interests.map(String) : [],
+        match: Number.isNaN(m) ? undefined : m,
+      },
+    ]
+  })
+}
 
 // sample meetup ideas by interest (replace with real events later)
 const MEETUP_IDEAS: Record<string, string> = {
@@ -52,38 +55,46 @@ const MEETUP_IDEAS: Record<string, string> = {
 }
 
 const serif = 'font-[family-name:var(--font-serif)]'
-const label = 'text-[11px] font-semibold uppercase tracking-[0.14em] text-[#4A5A75]'
+const label = 'text-[13px] font-semibold text-[#4A5A75]'
 const card = 'rounded-[28px] border border-white bg-white/80 p-6 shadow-[0_20px_50px_-30px_rgba(30,43,68,0.35)]'
 const pill = 'rounded-full border border-[#D5DFEA] bg-white px-3 py-1 text-xs font-medium text-[#1E2B44]'
 const pillShared = 'rounded-full border border-[#86abcc] bg-[#86abcc] px-3 py-1 text-xs font-medium text-white'
 const btnDark = 'rounded-full bg-[#1E2B44] text-sm font-semibold text-white transition hover:bg-[#2F4161] disabled:cursor-default disabled:bg-[#9CB5CE]'
 const btnLight = 'rounded-full border border-[#D5DFEA] bg-white text-sm font-semibold text-[#1E2B44] transition hover:bg-[#F7F9FB] disabled:cursor-default disabled:text-[#4A5A75]'
 
-// Score colors: navy for the best matches, then blue, then brown as the score drops.
-// All keep white text above 4.5:1 contrast.
-function scoreColor(score: number) {
-  if (score >= 90) return '#739dc2'
-  if (score >= 80) return '#a0c8ec'
-  if (score >= 70) return '#B9D6F0' 
-  return 'rgb(221, 167, 131)'
+// Match color: light to dark through #d5dfea, #c7d9ed and #a9c2de, spread across the top matches
+// (the weakest of them is the lightest, the strongest is the darkest). All three keep dark text readable.
+const GRADIENT = [
+  [213, 223, 234], // #d5dfea
+  [199, 217, 237], // #c7d9ed
+  [169, 194, 222], // #a9c2de
+]
+function scoreStyle(score: number, low: number, high: number) {
+  const t = high > low ? Math.min(1, Math.max(0, (score - low) / (high - low))) : 1
+  const seg = t * (GRADIENT.length - 1)
+  const i = Math.min(GRADIENT.length - 2, Math.floor(seg))
+  const f = seg - i
+  const [r, g, b] = GRADIENT[i].map((c, k) => Math.round(c + (GRADIENT[i + 1][k] - c) * f))
+  return { backgroundColor: `rgb(${r}, ${g}, ${b})`, color: '#1E2B44' }
 }
 
 const joinNames = (list: string[]) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0] ?? '')
 
-// Title Case for names, roles, interests and headings; short words like "at" and "in" stay lowercase.
-const SMALL_WORDS = new Set(['a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'in', 'of', 'on', 'or', 'the', 'to', 'vs'])
-const titleCase = (s: string) =>
+// First letter capital, the rest as written: "live music" becomes "Live music".
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+// Names start every word with a capital letter, even if they were typed in lowercase.
+const nameCase = (s: string) =>
   s
-    .split(' ')
-    .map((w, i) => (i > 0 && SMALL_WORDS.has(w.toLowerCase()) ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ')
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
 /* ---------- map layout ----------
-   Only the 10 best matches get big circles. They fan out in a spiral around "You": each one is a new
-   angle (golden angle apart) and the distance grows with rank, so they spread in every direction.
-   Everyone else is a small dot scattered farther out. Positions are random but the same on every visit.
+   The 10 best matches sit on a rectangle around "You": a row across the top, a row across the bottom and
+   a column on each side, ranked clockwise from the top middle. Everyone else is a small, pale dot scattered
+   in the space outside that rectangle. Positions are the same on every visit.
    Units: the map is 16:11, so it is 100 wide and 68.75 tall in the same units. */
 
 const MAP_H = 68.75
@@ -92,17 +103,16 @@ const CY = MAP_H / 2
 const R_YOU = 6 // the "You" circle
 const R_BIG = 4.2 // a top-10 match (big circle)
 const R_SMALL = 1.6 // everyone else (small dot)
-const EDGE = 6 // keep dots this far from the map edge
-const GAP_BIG = 4.5 // clear space wanted around a big circle
+const RECT_W = 30 // the rectangle reaches this far left and right of "You"
+const RECT_H = 17 // ...and this far up and down
 const GAP_SMALL = 3 // clear space wanted around a small dot
-const TRIES = 160
+const TRIES = 200
 const MAX_BIG = 10
-const GOLDEN = 2.399963 // about 137.5 degrees, spreads items evenly around a circle
 
 // the legend (bottom left) and the hint chip (top right) sit on top of the map, so keep dots out of them
 const KEEP_OUT = [
-  { x0: 0, y0: MAP_H - 10, x1: 40, y1: MAP_H },
-  { x0: 60, y0: 0, x1: 100, y1: 9 },
+  { x0: 0, y0: MAP_H - 8, x1: 52, y1: MAP_H },
+  { x0: 58, y0: 0, x1: 100, y1: 8 },
 ]
 
 const hitsRect = (x: number, y: number, r: number, b: (typeof KEEP_OUT)[number]) => {
@@ -137,6 +147,39 @@ const bigIdsOf = (list: Intern[]) =>
       .map((i) => i.id),
   )
 
+// n spots around the rectangle, in rank order: rank 1 at the top middle, then clockwise
+function rectangleSpots(n: number) {
+  if (n === 0) return []
+  const top = CY - RECT_H
+  const bottom = CY + RECT_H
+  // a row of evenly spaced points, with the first and last on the rectangle's corners
+  const row = (count: number, y: number) =>
+    Array.from({ length: count }, (_, i) => ({ x: count === 1 ? CX : CX - RECT_W + (2 * RECT_W * i) / (count - 1), y }))
+  // a column of points between the corners
+  const col = (count: number, x: number) =>
+    Array.from({ length: count }, (_, j) => ({ x, y: top + (2 * RECT_H * (j + 1)) / (count + 1) }))
+
+  let ring: { x: number; y: number }[]
+  let startAt: number
+  if (n < 4) {
+    // too few for a full rectangle: one row above "You"
+    ring = row(n, top)
+    startAt = Math.floor((n - 1) / 2)
+  } else {
+    const nTop = Math.max(2, Math.round((n / 2) * (RECT_W / (RECT_W + RECT_H))))
+    const nSide = Math.floor((n - 2 * nTop) / 2)
+    const nBottom = n - nTop - 2 * nSide
+    ring = [
+      ...row(nTop, top), // left to right
+      ...col(nSide, CX + RECT_W), // top to bottom
+      ...row(nBottom, bottom).reverse(), // right to left
+      ...col(nSide, CX - RECT_W).reverse(), // bottom to top
+    ]
+    startAt = Math.floor((nTop - 1) / 2)
+  }
+  return Array.from({ length: n }, (_, k) => ring[(startAt + k) % n])
+}
+
 function layoutInterns(list: Intern[]): Record<string, { x: number; y: number }> {
   const rand = mulberry32(hashString(list.map((i) => i.id).join('|')))
   const big = bigIdsOf(list)
@@ -145,65 +188,43 @@ function layoutInterns(list: Intern[]): Record<string, { x: number; y: number }>
 
   const placed: { x: number; y: number; r: number }[] = []
   const out: Record<string, { x: number; y: number }> = {}
-
-  // free space between a circle at (x, y) and "You" plus everything placed so far
-  const clearAt = (x: number, y: number, r: number) => {
-    let c = Math.hypot(x - CX, y - CY) - (R_YOU + r)
-    for (const p of placed) c = Math.min(c, Math.hypot(x - p.x, y - p.y) - (p.r + r))
-    return c
-  }
-  const at = (angle: number, t: number) => ({
-    x: CX + Math.cos(angle) * t * (50 - EDGE),
-    y: CY + Math.sin(angle) * t * (MAP_H / 2 - EDGE),
-  })
   const save = (id: string, x: number, y: number, r: number) => {
     placed.push({ x, y, r })
     out[id] = { x: round2(x), y: round2((y / MAP_H) * 100) } // y becomes a % of the height
   }
 
-  // big circles: a spiral around "You"
-  const startAngle = rand() * Math.PI * 2
-  bigOrder.forEach((intern, k) => {
-    const baseAngle = startAngle + k * GOLDEN
-    const baseT = 0.4 + 0.5 * (k / Math.max(1, bigOrder.length - 1))
-    let best = at(baseAngle, baseT)
-    let bestClear = -Infinity
-    for (let n = 0; n < TRIES; n++) {
-      const wiggle = 0.3 + (n / TRIES) * 3 // search wider the longer it takes
-      const p = at(baseAngle + (rand() - 0.5) * 0.35 * wiggle, Math.min(0.95, Math.max(0.3, baseT + (rand() - 0.5) * 0.16 * wiggle)))
-      if (KEEP_OUT.some((b) => hitsRect(p.x, p.y, R_BIG + 1, b))) continue
-      const c = clearAt(p.x, p.y, R_BIG)
-      if (c >= GAP_BIG) {
-        best = p
-        bestClear = c
-        break
-      }
-      if (c > bestClear) {
-        bestClear = c
-        best = p
-      }
-    }
-    save(intern.id, best.x, best.y, R_BIG)
-  })
+  // big circles: the rectangle, best match first
+  const spots = rectangleSpots(bigOrder.length)
+  bigOrder.forEach((intern, k) => save(intern.id, spots[k].x, spots[k].y, R_BIG))
 
-  // small dots: scattered at random, farther out
+  // free space between a small dot at (x, y) and "You" plus everything placed so far
+  const clearAt = (x: number, y: number) => {
+    let c = Math.hypot(x - CX, y - CY) - (R_YOU + R_SMALL)
+    for (const p of placed) c = Math.min(c, Math.hypot(x - p.x, y - p.y) - (p.r + R_SMALL))
+    return c
+  }
+  // the area the rectangle and its circles use up; small dots stay outside it
+  const insideRing = (x: number, y: number) => Math.abs(x - CX) < RECT_W + R_BIG + 3 && Math.abs(y - CY) < RECT_H + R_BIG + 3
+
+  // small dots: scattered at random in the space around the rectangle, never on top of anything
   for (const intern of rest) {
-    let best = at(rand() * Math.PI * 2, 0.8)
+    let best: { x: number; y: number } | null = null
     let bestClear = -Infinity
     for (let n = 0; n < TRIES; n++) {
-      const p = at(rand() * Math.PI * 2, 0.3 + rand() * 0.7)
-      if (KEEP_OUT.some((b) => hitsRect(p.x, p.y, R_SMALL + 1, b))) continue
-      const c = clearAt(p.x, p.y, R_SMALL)
+      const x = 3 + rand() * 94
+      const y = 3 + rand() * (MAP_H - 6)
+      if (insideRing(x, y) || KEEP_OUT.some((b) => hitsRect(x, y, R_SMALL + 1, b))) continue
+      const c = clearAt(x, y)
       if (c >= GAP_SMALL) {
-        best = p
-        bestClear = c
+        best = { x, y }
         break
       }
       if (c > bestClear) {
         bestClear = c
-        best = p
+        best = { x, y }
       }
     }
+    if (!best) best = { x: 3 + rand() * 94, y: 3 } // only if the outer area is completely full
     save(intern.id, best.x, best.y, R_SMALL)
   }
   return out
@@ -215,10 +236,12 @@ type RequestState = 'none' | 'sent' | 'connected'
 function Tooltip({
   intern,
   state,
+  badge,
   onConnect,
 }: {
   intern: Placed
   state: RequestState
+  badge: React.CSSProperties
   onConnect: (id: string) => void
 }) {
   const matched = intern.match !== undefined
@@ -226,15 +249,16 @@ function Tooltip({
     <div className="w-[260px] rounded-[22px] border border-white bg-white p-4 text-left text-[#1E2B44] shadow-[0_30px_60px_-24px_rgba(30,43,68,0.5)]">
       <div className="flex items-center gap-3">
         <span
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold text-white"
-          style={{ backgroundColor: matched ? scoreColor(intern.match ?? 0) : '#9CB5CE' }}
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold"
+          style={matched ? badge : { backgroundColor: '#E4ECF4', color: '#1E2B44' }}
         >
           {matched ? intern.match : intern.initials}
         </span>
         <div className="min-w-0">
           <div className={`${serif} text-[18px] font-medium leading-tight`}>{intern.name}</div>
-          <div className="text-xs text-[#4A5A75]">
-            {titleCase(intern.role)} · {intern.school}
+          <div className="text-xs text-[#829fcf]">
+            {cap(intern.role)}
+            {intern.school ? ` · ${intern.school}` : ''}
           </div>
         </div>
       </div>
@@ -242,17 +266,17 @@ function Tooltip({
       <div className="mt-3 flex flex-wrap gap-1.5">
         {intern.interests.map((i) => (
           <span key={i} className={matched && intern.shared.includes(i) ? pillShared : pill}>
-            {titleCase(i)}
+            {cap(i)}
           </span>
         ))}
       </div>
 
-      <p className="mt-3 text-xs leading-snug text-[#4A5A75]">
-        {matched ? `Subtle score ${intern.match}. You both like ${joinNames(intern.shared.map(titleCase))}.` : 'Not matched yet.'}
+      <p className="mt-3 text-xs leading-snug text-[#829fcf]">
+        {matched ? `Subtle score ${intern.match}. You both like ${joinNames(intern.shared.map(cap))}.` : 'Not matched yet.'}
       </p>
 
       <button type="button" disabled={state !== 'none'} onClick={() => onConnect(intern.id)} className={`mt-3.5 w-full py-2.5 ${state === 'none' ? btnDark : btnLight}`}>
-        {state === 'connected' ? 'Connected' : state === 'sent' ? 'Request Sent' : `Connect with ${intern.name.split(' ')[0]}`}
+        {state === 'connected' ? 'Connected' : state === 'sent' ? 'Request sent' : `Connect with ${intern.name.split(' ')[0]}`}
       </button>
     </div>
   )
@@ -266,8 +290,9 @@ export default function MatchesPage() {
   const [toast, setToast] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null)
   const [firstName, setFirstName] = useState('')
   const [matchesOnly, setMatchesOnly] = useState(false)
-  const [myInterests, setMyInterests] = useState<string[]>(MY_INTERESTS)
-  const [internList, setInternList] = useState<Intern[]>(INTERNS)
+  const [myInterests, setMyInterests] = useState<string[]>([])
+  const [internList, setInternList] = useState<Intern[]>([]) // only real data from /api/intern-matches
+  const [loaded, setLoaded] = useState(false)
 
   const flash = (text: string, tone: 'ok' | 'err' = 'ok') => {
     setToast({ tone, text })
@@ -305,16 +330,13 @@ export default function MatchesPage() {
         const res = await fetch(`/api/intern-matches${query}`)
         if (res.ok) {
           const json = await res.json()
-          if (Array.isArray(json.myInterests) && json.myInterests.length > 0) {
-            setMyInterests(json.myInterests)
-          }
-          if (Array.isArray(json.interns) && json.interns.length > 0) {
-            setInternList(json.interns)
-          }
+          if (Array.isArray(json.myInterests)) setMyInterests(json.myInterests.map(String))
+          if (Array.isArray(json.interns)) setInternList(cleanInterns(json.interns))
         }
       } catch {
-        // Fallback to static INTERNS on network error
+        // network error: the page just shows no matches
       }
+      setLoaded(true)
     })
   }, [])
 
@@ -327,6 +349,8 @@ export default function MatchesPage() {
     () =>
       internList.map((i) => ({
         ...i,
+        name: nameCase(i.name), // every name shown on the page starts with capitals
+        initials: i.initials.toUpperCase(),
         ...(positions[i.id] ?? { x: 50, y: 50 }),
         shared: i.interests.filter((x) => myInterests.includes(x)),
         big: bigIds.has(i.id),
@@ -336,6 +360,12 @@ export default function MatchesPage() {
   const matches = interns.filter((i) => i.match !== undefined).sort((a, b) => (b.match ?? 0) - (a.match ?? 0))
   const topMatches = matches.filter((m) => m.big)
   const visible = matchesOnly ? topMatches : interns
+
+  // the gradient runs from the weakest to the strongest of the top matches
+  const scores = topMatches.map((m) => m.match ?? 0)
+  const low = scores.length ? Math.min(...scores) : 0
+  const high = scores.length ? Math.max(...scores) : 100
+  const styleFor = (score: number) => scoreStyle(score, low, high)
 
   const stateOf = (id: string): RequestState => (connectedIds.has(id) ? 'connected' : requested.has(id) ? 'sent' : 'none')
 
@@ -350,27 +380,27 @@ export default function MatchesPage() {
   // meetup ideas for the interests you share with your matches
   const meetups = useMemo(
     () =>
-      MY_INTERESTS.filter((x) => MEETUP_IDEAS[x])
+      myInterests
+        .filter((x) => MEETUP_IDEAS[x])
         .map((interest) => ({ interest, idea: MEETUP_IDEAS[interest], people: matches.filter((m) => m.shared.includes(interest)) }))
         .filter((m) => m.people.length > 0)
         .sort((a, b) => b.people.length - a.people.length)
         .slice(0, 4),
-    [matches],
+    [matches, myInterests],
   )
 
-  // send a connection request to this intern; they accept or decline it from their profile
+  // send a connection request to this intern. It is saved in the connections table, so it shows up in
+  // "Sent" on your profile, and in "Requests" on theirs, where they can accept or decline it.
   const connect = async (id: string) => {
     const intern = interns.find((x) => x.id === id)
     if (!intern || stateOf(id) !== 'none') return
     const first = intern.name.split(' ')[0]
 
     if (!userId) return flash('Log in to send connection requests.', 'err')
+    if (intern.id === userId) return
 
     // mark it right away so a double-click can't send two requests
     setRequested((prev) => new Set(prev).add(id))
-
-    // sample interns have no account to send to, so only the button changes
-    if (!UUID.test(intern.id)) return flash(`Connection request sent to ${first}.`)
 
     const { error } = await supabase.from('connections').insert({
       requester_id: userId,
@@ -393,53 +423,51 @@ export default function MatchesPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_92%_100%,rgba(246,214,180,0.85),transparent_42%),linear-gradient(180deg,#c3d8ec_0%,#dde8f3_38%,#f1eeea_72%,#f7e8d8_100%)] text-[#1E2B44]">
+    // [&_*]:!normal-case shows every piece of text exactly as it is written here, even if a global
+    // stylesheet lowercases everything
+    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_92%_100%,rgba(246,214,180,0.85),transparent_42%),linear-gradient(180deg,#c3d8ec_0%,#dde8f3_38%,#f1eeea_72%,#f7e8d8_100%)] text-[#1E2B44] [&_*]:!normal-case">
       <AppNavbar firstName={firstName} />
 
-      {/* pt-28 leaves room for the fixed navbar */}
-      <div className="relative mx-auto max-w-[1240px] px-3 pb-10 pt-28 md:px-4">
-        <div className="rounded-[40px] border border-white bg-white/65 p-6 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-9">
-          {/* header: the interests block sits on the right, label directly above its tags */}
-          <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
-            <div>
-              <h1 className={`${serif} text-[44px] font-medium leading-[1.02] tracking-[-0.02em] md:text-[56px]`}>Matches</h1>
-              <p className="mt-2 text-[15px] text-[#4A5A75]">Interns living in Los Angeles this summer who share your interests.</p>
-            </div>
+      {/* pt-32 leaves room for the fixed navbar */}
+      <div className="relative mx-auto flex max-w-[1240px] flex-col gap-7 px-3 pb-10 pt-32 md:px-4">
+        {/* heading sits above the white box, like the profile page */}
+        <header className="animate-[fadeIn_.5s_ease-out] md:pl-10">
+          <h1 className={`${serif} text-5xl font-medium tracking-[-0.02em] md:text-6xl`}>Matches</h1>
+          <p className="mt-2 text-[17px] text-[#4A5A75]">Interns living in Los Angeles this summer who share your interests.</p>
+        </header>
 
+        <div className="rounded-[40px] border border-white bg-white/65 p-6 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-9">
+          {/* interests on the left (label directly above its tags), filters on the right */}
+          <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
             <div className="max-w-[460px]">
-              <div className={`${label} mb-2`}>Your Interests</div>
+              <div className={`${label} mb-2`}>Your interests</div>
               <ul className="flex flex-wrap gap-1.5" aria-label="Your interests">
                 {myInterests.map((i) => (
                   <li key={i} className="rounded-full bg-[#DCEBF6] px-2.5 py-1 text-[11px] font-semibold text-[#245F90] ring-[1.5px] ring-inset ring-[#2E7DB5]">
-                    {titleCase(i)}
+                    {cap(i)}
                   </li>
                 ))}
               </ul>
             </div>
-          </header>
 
-          {/* filters */}
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setMatchesOnly(false)} aria-pressed={!matchesOnly} className={`px-4 py-2 ${!matchesOnly ? btnDark : btnLight}`}>
-                Everyone
-              </button>
-              <button type="button" onClick={() => setMatchesOnly(true)} aria-pressed={matchesOnly} className={`px-4 py-2 ${matchesOnly ? btnDark : btnLight}`}>
-                Matches Only
-              </button>
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setMatchesOnly(false)} aria-pressed={!matchesOnly} className={`px-4 py-2 ${!matchesOnly ? btnDark : btnLight}`}>
+                  Everyone
+                </button>
+                <button type="button" onClick={() => setMatchesOnly(true)} aria-pressed={matchesOnly} className={`px-4 py-2 ${matchesOnly ? btnDark : btnLight}`}>
+                  Matches only
+                </button>
+              </div>
+              <span className="text-xs text-[#4A5A75]">
+                {topMatches.length} of {matches.length} matches on the map
+              </span>
             </div>
-            <span className="text-xs text-[#4A5A75]">
-              {topMatches.length} of {matches.length} matches on the map · sample interns
-            </span>
           </div>
 
-          {/* map + side column */}
-          <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_320px]">
-            <div className="relative aspect-[16/11] min-h-[400px] overflow-hidden rounded-[28px] border border-white bg-[#F5F8FC] bg-[linear-gradient(#E3ECF5_1px,transparent_1px),linear-gradient(90deg,#E3ECF5_1px,transparent_1px)] bg-[length:48px_48px] shadow-[inset_0_0_0_1px_rgba(213,223,234,0.8)]">
-              {/* distance zones */}
-              <div className="pointer-events-none absolute inset-[14%] rounded-[28px] border border-dashed border-[#BFD0E2]" />
-              <div className="pointer-events-none absolute inset-[30%] rounded-[24px] border border-dashed border-[#BFD0E2]" />
-
+          {/* map + side column. minmax(0,1fr) lets the map shrink so the side cards never push past the white box */}
+          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="relative aspect-[16/11] min-h-[400px] min-w-0 overflow-hidden rounded-[28px] border border-white bg-[#F5F8FC] bg-[linear-gradient(#E3ECF5_1px,transparent_1px),linear-gradient(90deg,#E3ECF5_1px,transparent_1px)] bg-[length:48px_48px] shadow-[inset_0_0_0_1px_rgba(213,223,234,0.8)]">
               {/* lines from you to each of the top 10 matches */}
               <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 {topMatches.map((m) => (
@@ -449,79 +477,90 @@ export default function MatchesPage() {
                     y1="50"
                     x2={m.x}
                     y2={m.y}
-                    stroke="#B9D6F0"
+                    stroke="#A9C2DE"
                     strokeLinecap="round"
                     vectorEffect="non-scaling-stroke"
-                    strokeWidth={hoverId === m.id ? 3 : 1.2 + ((m.match ?? 0) / 100) * 1.2}
-                    strokeOpacity={hoverId === m.id ? 0.85 : 0.22}
+                    strokeWidth={hoverId === m.id ? 3 : 1.5}
+                    strokeOpacity={hoverId === m.id ? 0.85 : 0.35}
                     style={{ transition: 'stroke-opacity .2s, stroke-width .2s' }}
                   />
                 ))}
               </svg>
 
               {/* you */}
-              <div className="absolute left-1/2 top-1/2 z-20 grid h-[68px] w-[68px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-4 border-white bg-[#1E2B44] text-sm font-bold text-white shadow-[0_14px_30px_-8px_rgba(30,43,68,0.6)]">
+              <div className="absolute left-1/2 top-1/2 z-20 grid h-[68px] w-[68px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-4 border-white bg-[#1E2B44] text-sm font-bold text-white">
                 <span className="absolute inset-0 animate-ping rounded-full border-2 border-[#1E2B44]/60" />
                 <span className="absolute inset-0 animate-ping rounded-full border-2 border-[#1E2B44]/60" style={{ animationDelay: '1.4s' }} />
                 You
               </div>
 
-              {/* intern dots: big circles for the top 10, small dots for everyone else */}
-              {visible.map((i) => {
-                const matched = i.match !== undefined
-                const active = hoverId === i.id
-                const up = i.y > 52
-                const horizontal = i.x < 28 ? 'left-[-6px]' : i.x > 72 ? 'right-[-6px]' : 'left-1/2 -translate-x-1/2'
-                return (
-                  <div
-                    key={i.id}
-                    role="group"
-                    tabIndex={0}
-                    aria-label={`${i.name}, ${titleCase(i.role)}${matched ? `, Subtle score ${i.match}` : ''}`}
-                    onMouseEnter={() => setHoverId(i.id)}
-                    onMouseLeave={() => setHoverId(null)}
-                    onFocus={() => setHoverId(i.id)}
-                    onBlur={() => setHoverId(null)}
-                    className={`group absolute -translate-x-1/2 -translate-y-1/2 outline-none ${active ? 'z-30' : 'z-10'}`}
-                    style={{ left: `${i.x}%`, top: `${i.y}%` }}
-                  >
-                    <span
-                      className={`grid place-items-center rounded-full border-[3px] border-white font-bold text-white transition duration-200 group-hover:scale-125 group-focus:scale-125 ${
-                        i.big
-                          ? 'h-[52px] w-[52px] text-sm shadow-[0_10px_20px_-8px_rgba(30,43,68,0.6)]'
-                          : 'h-[16px] w-[16px] bg-[#9CB5CE] shadow-[0_4px_10px_rgba(30,43,68,0.2)] group-hover:bg-[#1E2B44]'
-                      } ${active ? 'scale-125' : ''}`}
-                      style={i.big ? { backgroundColor: scoreColor(i.match ?? 0) } : undefined}
-                    >
-                      {i.big ? i.initials : null}
-                    </span>
+              {!loaded && <p className="absolute inset-x-0 top-[calc(50%+56px)] text-center text-sm text-[#4A5A75]">Loading matches…</p>}
+              {loaded && internList.length === 0 && (
+                <p className="absolute inset-x-0 top-[calc(50%+56px)] text-center text-sm text-[#4A5A75]">No matches yet. Check back soon.</p>
+              )}
 
-                    {/* padding keeps the card attached to the dot so hover never drops */}
+              {/* intern dots: big circles for the top 10, small pale dots for everyone else */}
+              {loaded &&
+                visible.map((i) => {
+                  const matched = i.match !== undefined
+                  const active = hoverId === i.id
+                  const up = i.y > 52
+                  const horizontal = i.x < 28 ? 'left-[-6px]' : i.x > 72 ? 'right-[-6px]' : 'left-1/2 -translate-x-1/2'
+                  const badge = styleFor(i.match ?? 0)
+                  return (
                     <div
-                      className={`invisible absolute z-40 opacity-0 transition-opacity duration-200 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 ${horizontal} ${
-                        up ? 'bottom-full pb-3' : 'top-full pt-3'
-                      } ${active ? '!visible !opacity-100' : ''}`}
+                      key={i.id}
+                      role="group"
+                      tabIndex={0}
+                      aria-label={`${i.name}, ${cap(i.role)}${matched ? `, Subtle score ${i.match}` : ''}`}
+                      onMouseEnter={() => setHoverId(i.id)}
+                      onMouseLeave={() => setHoverId(null)}
+                      onFocus={() => setHoverId(i.id)}
+                      onBlur={() => setHoverId(null)}
+                      className={`group absolute -translate-x-1/2 -translate-y-1/2 outline-none ${active ? 'z-30' : 'z-10'}`}
+                      style={{ left: `${i.x}%`, top: `${i.y}%` }}
                     >
-                      <Tooltip intern={i} state={stateOf(i.id)} onConnect={connect} />
+                      {/* flat circles: no shadow */}
+                      <span
+                        className={`grid place-items-center rounded-full font-bold transition duration-200 group-hover:scale-125 group-focus:scale-125 ${
+                          i.big
+                            ? 'h-[52px] w-[52px] border-[3px] border-white text-sm ring-1 ring-[#BFD0E2]'
+                            : 'h-[16px] w-[16px] border-2 border-white bg-[#E4ECF4] ring-1 ring-[#CBD8E6] group-hover:!bg-[#A9C2DE]'
+                        } ${active ? 'scale-125' : ''}`}
+                        style={i.big ? badge : undefined}
+                      >
+                        {i.big ? i.initials : null}
+                      </span>
+
+                      {/* padding keeps the card attached to the dot so hover never drops */}
+                      <div
+                        className={`invisible absolute z-40 opacity-0 transition-opacity duration-200 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 ${horizontal} ${
+                          up ? 'bottom-full pb-3' : 'top-full pt-3'
+                        } ${active ? '!visible !opacity-100' : ''}`}
+                      >
+                        <Tooltip intern={i} state={stateOf(i.id)} badge={badge} onConnect={connect} />
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
 
               {/* legend */}
               <div className="absolute bottom-3.5 left-3.5 z-10 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-full border border-white bg-white/85 px-4 py-2 text-[11px] font-semibold shadow-sm backdrop-blur">
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#B9D6F0]" />You</span>
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#2F5D8C]" />Top 10 Matches</span>
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#9CB5CE]" />Also in LA</span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#1E2B44]" />You</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-6 rounded-full bg-gradient-to-r from-[#d5dfea] via-[#c7d9ed] to-[#a9c2de] ring-1 ring-[#BFD0E2]" />
+                  Top 10 (darker = stronger)
+                </span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#E4ECF4] ring-1 ring-[#CBD8E6]" />Also in LA</span>
               </div>
               <div className="absolute right-3.5 top-3.5 z-10 rounded-full border border-white bg-white/85 px-3.5 py-1.5 text-[11px] font-semibold shadow-sm backdrop-blur">Hover a dot to see who they are</div>
             </div>
 
             {/* side column */}
-            <div className="grid content-start gap-5">
+            <div className="grid min-w-0 content-start gap-5">
               <div className={card}>
                 <div className="mb-3 flex items-baseline justify-between">
-                  <h2 className={`${serif} text-2xl font-medium`}>Top Matches</h2>
+                  <h2 className={`${serif} text-2xl font-medium`}>Top matches</h2>
                   <span className={label}>Score</span>
                 </div>
                 {/* 5 rows (57px each) are visible; scroll for the rest */}
@@ -531,6 +570,7 @@ export default function MatchesPage() {
                   aria-label="All matches, scrollable"
                   className="max-h-[285px] overflow-y-auto overscroll-contain rounded-xl pr-1 outline-none focus-visible:ring-2 focus-visible:ring-[#1E2B44]/40"
                 >
+                  {loaded && matches.length === 0 && <p className="border-t border-[#E3ECF5] py-4 text-sm text-[#4A5A75]">No matches yet.</p>}
                   {matches.map((m) => {
                     const state = stateOf(m.id)
                     return (
@@ -540,7 +580,7 @@ export default function MatchesPage() {
                         onMouseLeave={() => setHoverId(null)}
                         className={`flex h-[57px] items-center gap-3 border-t border-[#E3ECF5] px-1 transition-colors ${hoverId === m.id ? 'bg-[#F4F7FB]' : ''}`}
                       >
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white" style={{ backgroundColor: scoreColor(m.match ?? 0) }}>
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold" style={styleFor(m.match ?? 0)}>
                           {m.match}
                         </span>
                         <div className="min-w-0 flex-1">
@@ -558,11 +598,11 @@ export default function MatchesPage() {
               </div>
 
               <div className={card}>
-                <div className={label}>Matched on Your Interests</div>
+                <div className={label}>Matched on your interests</div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {MY_INTERESTS.map((i) => (
+                  {myInterests.map((i) => (
                     <span key={i} className={pillShared}>
-                      {titleCase(i)}
+                      {cap(i)}
                     </span>
                   ))}
                 </div>
@@ -577,15 +617,15 @@ export default function MatchesPage() {
               <p className="mb-5 mt-1 text-sm text-[#4A5A75]">What interns in your city are into. Yours are in navy.</p>
               <div className="grid gap-3.5">
                 {popular.map(([interest, count]) => {
-                  const mine = MY_INTERESTS.includes(interest)
+                  const mine = myInterests.includes(interest)
                   return (
                     <div key={interest}>
                       <div className="mb-1 flex justify-between text-sm font-semibold">
-                        <span className={mine ? 'text-[#1E2B44]' : 'text-[#4A5A75]'}>{titleCase(interest)}</span>
+                        <span className={mine ? 'text-[#1E2B44]' : 'text-[#4A5A75]'}>{cap(interest)}</span>
                         <span className="text-xs font-medium text-[#4A5A75]">{count} interns</span>
                       </div>
                       <div className="h-2.5 overflow-hidden rounded-full bg-[#E3ECF5]">
-                        <div className={`h-full rounded-full ${mine ? 'bg-[#B9D6F0]' : 'bg-[#D8E2EB]'}`} style={{ width: `${(count / popularMax) * 100}%` }} />
+                        <div className={`h-full rounded-full ${mine ? 'bg-[#A9C2DE]' : 'bg-[#D8E2EB]'}`} style={{ width: `${(count / popularMax) * 100}%` }} />
                       </div>
                     </div>
                   )
@@ -594,15 +634,15 @@ export default function MatchesPage() {
             </div>
 
             <div className={card}>
-              <h2 className={`${serif} text-2xl font-medium`}>Ways to Meet Up</h2>
+              <h2 className={`${serif} text-2xl font-medium`}>Ways to meet up</h2>
               <p className="mb-5 mt-1 text-sm text-[#4A5A75]">Ideas based on what you share with your matches. Sample ideas.</p>
               <div className="grid gap-3">
                 {meetups.map((m) => (
                   // fixed first column so every idea title starts at the same x position
                   <div key={m.interest} className="grid grid-cols-[8.5rem_minmax(0,1fr)] items-center gap-4 rounded-2xl border border-[#EADFD0] bg-[#e6eff7] p-4">
-                    <span className={`${pillShared} block truncate text-center`}>{titleCase(m.interest)}</span>
+                    <span className={`${pillShared} block truncate text-center`}>{cap(m.interest)}</span>
                     <div className="min-w-0">
-                      <div className={`${serif} text-[17px] font-medium leading-snug`}>{titleCase(m.idea)}</div>
+                      <div className={`${serif} text-[17px] font-medium leading-snug`}>{m.idea}</div>
                       <div className="text-xs text-[#4A5A75]">
                         {joinNames(m.people.slice(0, 3).map((p) => p.name.split(' ')[0]))}
                         {m.people.length > 3 ? ` +${m.people.length - 3}` : ''} could join
@@ -615,7 +655,7 @@ export default function MatchesPage() {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-xs text-[#4A5A75]">© 2026 Subtle Technologies, Inc. All rights reserved.</p>
+        <p className="text-center text-xs text-[#4A5A75]">© 2026 Subtle Technologies, Inc. All rights reserved.</p>
       </div>
 
       <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">

@@ -203,6 +203,22 @@ export default function ProfilePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [confirmDelete, deleting]);
 
+  // refresh the connection lists whenever this tab is focused again, and every 20 seconds
+  useEffect(() => {
+    if (!uid) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void loadConnections(uid, profile?.interests ?? []);
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    const timer = window.setInterval(refresh, 20000);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      window.clearInterval(timer);
+    };
+  }, [uid, profile, loadConnections]);
+
   /* ----- details ----- */
 
   async function saveDetails(e: React.FormEvent) {
@@ -497,7 +513,7 @@ export default function ProfilePage() {
           <aside className="rounded-[28px] bg-white/70 p-6 shadow-[0_10px_40px_rgba(31,42,68,0.08)] backdrop-blur">
             <h2 className="font-[family-name:var(--font-serif)] text-[28px] font-medium">connections.</h2>
             <p className="mb-4 mt-1 text-xs text-[#4a5878]">
-              {connected.length} connected · {requests.length} {requests.length === 1 ? "request" : "requests"} waiting
+              {connected.length} connected · {requests.length} {requests.length === 1 ? "request" : "requests"} waiting · {sent.length} sent
             </p>
 
             <div role="tablist" className="mb-4 flex gap-1 rounded-full bg-[#e8edf7] p-1">
