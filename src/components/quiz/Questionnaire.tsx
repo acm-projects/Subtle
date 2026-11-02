@@ -7,6 +7,7 @@ import AppNavbar from '../AppNavbar'
 import Icon from './icons'
 import { Field, OptionRow, OptionTile } from './parts'
 import Journey from './Journey'
+import { userRowToQuizAnswers } from '../../lib/quiz-sync'
 import {
   ACCOMMODATIONS,
   BUDGETS,
@@ -38,32 +39,60 @@ export default function Questionnaire() {
 
   // read-only: greet by first name if the account has one, and restore saved answers
   useEffect(() => {
-    try {
-      const savedQuiz = localStorage.getItem('subtle-quiz-v1')
-      if (savedQuiz) {
-        setA((prev) => ({ ...prev, ...JSON.parse(savedQuiz) }))
-      }
-      const savedUser = localStorage.getItem('subtle-user-v1')
-      if (savedUser) {
-        const u = JSON.parse(savedUser)
-        if (u.firstName) setFirstName(u.firstName)
-        if (u.lastName) setLastName(u.lastName)
-        if (u.email) setUserEmail(u.email)
-      }
-    } catch {}
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       const meta = data.user?.user_metadata ?? {}
       const fn = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
       const ln = ((meta.last_name ?? meta.lastName ?? '') as string).trim()
       if (fn) setFirstName(fn)
       if (ln) setLastName(ln)
-      if (data.user?.email) {
-        setUserEmail(data.user.email)
-        // answers saved in this browser belong to whoever took the quiz; a different account starts fresh
+      
+      const mail = data.user?.email?.toLowerCase() ?? null
+      if (mail) {
+        setUserEmail(mail)
+
+        // Only restore cached quiz if it belongs to this logged-in account
         try {
-          if (localStorage.getItem('subtle-quiz-owner') !== data.user.email.toLowerCase()) {
-            setA(EMPTY)
-            setIndex(0)
+          const owner = (localStorage.getItem('subtle-quiz-owner') ?? '').toLowerCase()
+          const savedQuiz = localStorage.getItem('subtle-quiz-v1')
+          if (savedQuiz && owner === mail) {
+            setA((prev) => ({ ...prev, ...JSON.parse(savedQuiz) }))
+          }
+        } catch {}
+        
+        // Fetch saved quiz answers from Supabase users_table
+        try {
+          const res = await fetch(`/api/users?email=${encodeURIComponent(mail)}`, { cache: 'no-store' })
+          if (res.ok) {
+            const dbUser = await res.json()
+            if (dbUser && (dbUser.company_name || dbUser.office_address || dbUser.monthly_budget)) {
+              const loaded = userRowToQuizAnswers(dbUser)
+              setA((prev) => ({ ...prev, ...loaded }))
+              try {
+                localStorage.setItem('subtle-quiz-v1', JSON.stringify(loaded))
+                localStorage.setItem('subtle-quiz-owner', mail)
+              } catch {}
+            } else {
+              // New user with no responses in DB
+              const owner = (localStorage.getItem('subtle-quiz-owner') ?? '').toLowerCase()
+              if (owner !== mail) {
+                setA(EMPTY)
+              }
+            }
+          }
+        } catch {}
+      } else {
+        // Fallback for unauthenticated or local user
+        try {
+          const savedUser = localStorage.getItem('subtle-user-v1')
+          if (savedUser) {
+            const u = JSON.parse(savedUser)
+            if (u.firstName) setFirstName(u.firstName)
+            if (u.lastName) setLastName(u.lastName)
+            if (u.email) setUserEmail(u.email)
+          }
+          const savedQuiz = localStorage.getItem('subtle-quiz-v1')
+          if (savedQuiz) {
+            setA((prev) => ({ ...prev, ...JSON.parse(savedQuiz) }))
           }
         } catch {}
       }
