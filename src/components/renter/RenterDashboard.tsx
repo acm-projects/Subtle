@@ -228,6 +228,9 @@ export default function RenterDashboard() {
                             <Link href={`/matches/${l.id}`} className={btnLight}>
                               View listing
                             </Link>
+                            <Link href={`/my-listings/${l.id}/edit`} className={btnLight}>
+                              Edit place
+                            </Link>
                             <button type="button" onClick={() => copyLink(l.id)} className={btnLight}>
                               {copied === l.id ? 'Link copied' : 'Copy link'}
                             </button>

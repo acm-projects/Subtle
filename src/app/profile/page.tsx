@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AppNavbar from "../../components/AppNavbar";
+import { BUDGETS, COMMUTE_MODES, EMPTY, HOUSING_TYPES, label, MOVE_IN, type QuizAnswers } from "../../components/quiz/options";
 
 /* ---------- types & constants ---------- */
 
@@ -63,7 +64,7 @@ const btnDark =
   "h-11 rounded-full bg-[#1f2a44] px-5 text-sm font-semibold text-white transition hover:bg-[#2b3a5e] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#1f2a44] disabled:opacity-50";
 const smBtn = "!h-9 !px-4 !text-sm";
 
-function Card({ title, children }: { eyebrow?: string; title: string; children: React.ReactNode }) {
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-[28px] bg-white/70 p-7 shadow-[0_10px_40px_rgba(31,42,68,0.08)] backdrop-blur">
       <h2 className="font-[family-name:var(--font-serif)] text-[28px] font-medium">{title}</h2>
@@ -119,6 +120,15 @@ export default function ProfilePage() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [tab, setTab] = useState<Tab>("connected");
 
+  // saved questionnaire answers, used for the preference tags
+  const [answers, setAnswers] = useState<QuizAnswers>(EMPTY);
+
+  // log out and delete account
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteText, setDeleteText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
   const flash = useCallback((text: string, tone: "ok" | "err" = "ok") => {
     setToast({ tone, text });
     window.setTimeout(() => setToast(null), 4000);
@@ -167,17 +177,76 @@ export default function ProfilePage() {
       setEmail(user.email ?? "");
       setSavedEmail(user.email ?? "");
 
-      const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-      if (data) {
-        const p = data as Profile;
-        setProfile(p);
-        setFirst(p.first_name ?? "");
-        setLast(p.last_name ?? "");
-        await loadConnections(user.id, p.interests ?? []);
-      }
+try {
+        // answers saved in this browser only count if they belong to this account
+        const owner = localStorage.getItem("subtle-quiz-owner");
+        const raw = localStorage.getItem("subtle-quiz-v1");
+        if (raw && (!owner || owner === (user.email ?? "").toLowerCase())) setAnswers({ ...EMPTY, ...JSON.parse(raw) });
+      } catch {}
+
+      // 1. Check user_metadata for avatar_url, first_name, last_name
+      const meta = user.user_metadata ?? {};
+      const metaAvatar = (meta.avatar_url ?? meta.avatarUrl ?? null) as string | null;
+      let firstName = (meta.first_name ?? meta.firstName ?? "") as string;
+      let lastName = (meta.last_name ?? meta.lastName ?? "") as string;
+
+      // 2. Also check public.users_table
+      try {
+        const { data: userRows } = await supabase
+          .from("users_table")
+          .select("*")
+          .eq("student_email", user.email ?? "");
+        if (userRows && userRows.length > 0) {
+          const latest = userRows[userRows.length - 1];
+          if (!firstName && latest.first_name) firstName = latest.first_name;
+          if (!lastName && latest.last_name) lastName = latest.last_name;
+        }
+      } catch {}
+
+      // 3. Fallback to localStorage for avatar
+      let localAvatar = metaAvatar;
+      try {
+        const stored = localStorage.getItem(`subtle-avatar-${user.id}`);
+        if (stored) localAvatar = stored;
+      } catch {}
+
+      // 4. Fetch from public.profiles table
+      let p: Profile | null = null;
+      try {
+        const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+        if (data) {
+          p = data as Profile;
+          if (!firstName && p.first_name) firstName = p.first_name;
+          if (!lastName && p.last_name) lastName = p.last_name;
+          await loadConnections(user.id, p.interests ?? []);
+        }
+      } catch {}
+
+      const finalAvatar = localAvatar || p?.avatar_url || null;
+
+      setFirst(firstName);
+      setLast(lastName);
+      setProfile({
+        id: user.id,
+        first_name: firstName,
+        last_name: lastName,
+        avatar_url: finalAvatar,
+        interests: p?.interests ?? [],
+        preferences: p?.preferences ?? null,
+        budget_min: p?.budget_min ?? null,
+        budget_max: p?.budget_max ?? null,
+      });
+
       setLoading(false);
     })();
   }, [router, loadConnections]);
+
+  useEffect(() => {
+    if (!confirmDelete) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !deleting && setConfirmDelete(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirmDelete, deleting]);
 
   /* ----- details ----- */
 
@@ -185,29 +254,60 @@ export default function ProfilePage() {
     e.preventDefault();
     if (!uid) return;
     const nextEmail = email.trim().toLowerCase();
-    if (!nextEmail.endsWith(".edu")) return flash("Use a .edu email address.", "err");
 
     setSavingDetails(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ first_name: first.trim(), last_name: last.trim() })
-      .eq("id", uid);
-    if (error) {
-      setSavingDetails(false);
-      return flash("Couldn't save the name. Try again.", "err");
-    }
-    window.dispatchEvent(new Event("profile-updated"));
-    if (nextEmail !== savedEmail) {
-      const { error: mailErr } = await supabase.auth.updateUser({ email: nextEmail });
-      if (mailErr) {
+
+    try {
+      // Update Supabase Auth user_metadata
+      const { error: metaErr } = await supabase.auth.updateUser({
+        data: {
+          first_name: first.trim(),
+          last_name: last.trim(),
+          firstName: first.trim(),
+          lastName: last.trim(),
+        },
+      });
+      if (metaErr) {
         setSavingDetails(false);
-        return flash(mailErr.message, "err");
+        return flash(metaErr.message, "err");
       }
-      flash("Check the new inbox to confirm the email change.");
-    } else {
-      flash("Details saved.");
+
+      // Update public.users_table
+      await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          student_email: email,
+          first_name: first.trim(),
+          last_name: last.trim(),
+        }),
+      });
+
+      // Update localStorage
+      try {
+        localStorage.setItem(
+          "subtle-user-v1",
+          JSON.stringify({ firstName: first.trim(), lastName: last.trim(), email })
+        );
+      } catch {}
+
+      window.dispatchEvent(new Event("profile-updated"));
+
+      if (nextEmail !== savedEmail) {
+        const { error: mailErr } = await supabase.auth.updateUser({ email: nextEmail });
+        if (mailErr) {
+          setSavingDetails(false);
+          return flash(mailErr.message, "err");
+        }
+        flash("Check the new inbox to confirm the email change.");
+      } else {
+        flash("Details saved.");
+      }
+    } catch {
+      flash("Couldn't save details.", "err");
+    } finally {
+      setSavingDetails(false);
     }
-    setSavingDetails(false);
   }
 
   function resetDetails() {
@@ -222,28 +322,63 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !uid) return;
-    if (!["image/jpeg", "image/png"].includes(file.type)) return flash("Choose a JPG or PNG.", "err");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return flash("Choose a JPG, PNG, or WEBP.", "err");
     if (file.size > MAX_AVATAR_BYTES) return flash("Photos must be under 5 MB.", "err");
 
     setUploading(true);
-    const ext = file.type === "image/png" ? "png" : "jpg";
-    const path = `${uid}/avatar-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
-    if (error) {
+
+    try {
+      // 1. Convert image to optimized data URL so it displays instantly and persists across sessions
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = reader.result as string;
+
+        // Try uploading to Supabase Storage if bucket exists
+        let finalUrl = dataUrl;
+        try {
+          const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+          const path = `${uid}/avatar-${Date.now()}.${ext}`;
+          const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+          if (!uploadErr) {
+            const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+            if (data?.publicUrl) finalUrl = data.publicUrl;
+          }
+        } catch {}
+
+        // Save to Supabase auth user_metadata
+        await supabase.auth.updateUser({
+          data: { avatar_url: finalUrl },
+        });
+
+        // Save to localStorage for instant client access and persistence
+        try {
+          localStorage.setItem(`subtle-avatar-${uid}`, finalUrl);
+        } catch {}
+
+        setProfile((p) => (p ? { ...p, avatar_url: finalUrl } : p));
+        setUploading(false);
+        window.dispatchEvent(new Event("avatar-updated"));
+        flash("Profile picture updated.");
+      };
+      reader.onerror = () => {
+        setUploading(false);
+        flash("Could not read image file.", "err");
+      };
+      reader.readAsDataURL(file);
+    } catch {
       setUploading(false);
-      return flash("Upload failed. Try again.", "err");
+      flash("Upload failed. Try again.", "err");
     }
-    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-    await supabase.from("profiles").update({ avatar_url: data.publicUrl }).eq("id", uid);
-    setProfile((p) => (p ? { ...p, avatar_url: data.publicUrl } : p));
-    setUploading(false);
-    window.dispatchEvent(new Event("avatar-updated"));
-    flash("Profile picture updated.");
   }
 
   async function removePhoto() {
     if (!uid) return;
-    await supabase.from("profiles").update({ avatar_url: null }).eq("id", uid);
+    await supabase.auth.updateUser({
+      data: { avatar_url: null },
+    });
+    try {
+      localStorage.removeItem(`subtle-avatar-${uid}`);
+    } catch {}
     setProfile((p) => (p ? { ...p, avatar_url: null } : p));
     window.dispatchEvent(new Event("avatar-updated"));
     flash("Profile picture removed.");
@@ -294,6 +429,52 @@ export default function ProfilePage() {
     await respond(c, false);
   }
 
+  /* ----- log out & delete account ----- */
+
+  async function logOut() {
+    setLoggingOut(true);
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
+  }
+
+  async function deleteAccount() {
+    setDeleting(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const res = await fetch("/api/account", {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+    } catch {
+      setDeleting(false);
+      return flash("Couldn't delete the account. Try again.", "err");
+    }
+    try {
+      localStorage.removeItem("subtle-quiz-v1");
+      localStorage.removeItem("subtle-quiz-owner");
+      localStorage.removeItem("subtle-user-v1");
+    } catch {}
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
+  }
+
+  /* ----- preference tags (the main answers only) ----- */
+
+  const mins = answers.maxCommute >= 60 ? "60+" : String(answers.maxCommute);
+  const budget = BUDGETS.find((b) => b.id === answers.budget);
+  const prefTags = [
+    budget && `Budget ${budget.range ?? budget.title}`,
+    answers.housingType && label(HOUSING_TYPES, answers.housingType),
+    answers.roommates === "yes" ? "With roommates" : answers.roommates === "no" ? "Living alone" : null,
+    answers.car && (answers.car === "car" ? "Has a car" : answers.car === "either" ? "Car or transit" : "No car"),
+    answers.commuteMode && `${label(COMMUTE_MODES, answers.commuteMode)}, up to ${mins} min`,
+    answers.moveIn && (answers.moveIn === "flexible" ? "Flexible move-in" : `${label(MOVE_IN, answers.moveIn)} move-in`),
+  ].filter(Boolean) as string[];
+
   const connected = connections.filter((c) => c.status === "accepted");
   const requests = connections.filter((c) => c.status === "pending" && c.incoming);
   const sent = connections.filter((c) => c.status === "pending" && !c.incoming);
@@ -328,7 +509,7 @@ export default function ProfilePage() {
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="flex min-w-0 flex-col gap-6">
             {/* Details + photo */}
-            <Card eyebrow="Account" title="Details">
+            <Card title="Details">
               <form onSubmit={saveDetails} className="mt-6 flex flex-col gap-5">
                 <div className="flex flex-wrap items-center gap-5">
                   <div className="relative h-[88px] w-[88px] shrink-0">
@@ -387,7 +568,7 @@ export default function ProfilePage() {
             </Card>
 
             {/* Password */}
-            <Card eyebrow="Security" title="Password">
+            <Card title="Password">
               <form onSubmit={changePassword} className="mt-6 flex flex-col gap-5">
                 <div>
                   <label htmlFor="pw0" className={labelCls}>Current password</label>
@@ -506,7 +687,7 @@ export default function ProfilePage() {
           </aside>
 
             {/* Preferences entry point */}
-            <Card eyebrow="Questionnaire" title="Preferences">
+            <Card title="Preferences">
               <p className="mt-2.5 text-[15px] text-[#3d4a6b]">
                 Review questionnaire answers and update them any time. Changes apply to the next set of matches.
               </p>
@@ -515,10 +696,85 @@ export default function ProfilePage() {
                   Edit Preferences
                 </button>
               </div>
+              <div className="mt-5 border-t border-[#e4eaf1] pt-4">
+                {prefTags.length > 0 ? (
+                  <ul className="flex flex-wrap gap-2" aria-label="Main preferences">
+                    {prefTags.map((t) => (
+                      <li key={t} className="rounded-full border border-[#cfd8ea] bg-white px-3 py-1.5 text-xs font-medium text-[#1f2a44]">
+                        {t}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-[#4a5878]">No saved answers on this device yet.</p>
+                )}
+              </div>
             </Card>
           </div>
         </div>
+
+        {/* account actions */}
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+          <button type="button" onClick={logOut} disabled={loggingOut} className={btnCls}>
+            {loggingOut ? "Logging out…" : "Log out"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteText("");
+              setConfirmDelete(true);
+            }}
+            className="h-11 rounded-full border border-[#e3b5a8] bg-white px-5 text-[13px] font-semibold text-[#8a3a2a] transition hover:bg-[#fbeee9] focus-visible:ring-2 focus-visible:ring-[#8a3a2a]"
+          >
+            Delete account
+          </button>
+        </div>
       </div>
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close"
+            disabled={deleting}
+            onClick={() => setConfirmDelete(false)}
+            className="absolute inset-0 bg-[#1f2a44]/30 backdrop-blur-sm"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-title"
+            className="relative w-full max-w-sm rounded-[28px] border border-white bg-white/95 p-7 text-center text-[#1f2a44] shadow-[0_40px_90px_-40px_rgba(30,43,68,0.6)]"
+          >
+            <h2 id="delete-title" className="font-[family-name:var(--font-serif)] text-3xl font-medium">Delete account?</h2>
+            <p className="mt-2 text-[15px] text-[#4a5878]">
+              This permanently removes the profile, photo and connections. It can&apos;t be undone.
+            </p>
+            <label htmlFor="delete-confirm" className={`${labelCls} mt-5 text-left`}>Type DELETE to confirm</label>
+            <input
+              id="delete-confirm"
+              autoFocus
+              autoComplete="off"
+              className={inputCls}
+              value={deleteText}
+              onChange={(e) => setDeleteText(e.target.value)}
+            />
+            <div className="mt-5 flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={deleteAccount}
+                disabled={deleteText.trim().toUpperCase() !== "DELETE" || deleting}
+                className="h-12 rounded-full bg-[#8a3a2a] px-6 text-[15px] font-semibold text-white transition hover:bg-[#6f2e21] disabled:opacity-40"
+              >
+                {deleting ? "Deleting…" : "Delete my account"}
+              </button>
+              <button type="button" onClick={() => setConfirmDelete(false)} disabled={deleting} className="h-12 rounded-full border border-[#cfd8ea] bg-white px-6 text-[15px] font-semibold transition hover:bg-[#f2f5fb] disabled:opacity-50">
+                Keep my account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-6 flex justify-center px-4">
         {toast && (

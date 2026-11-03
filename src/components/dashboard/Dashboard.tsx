@@ -250,7 +250,32 @@ export default function Dashboard() {
           </div>
 
           )}
-
+          {/* post a listing: always visible, since hosting doesn't depend on the quiz */}
+<section
+  aria-label="Post a listing"
+  className={`${glass} mt-6 flex animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.05)_both] flex-wrap items-center justify-between gap-6 p-7 [animation-delay:200ms] md:px-10`}
+>
+  <div className="flex items-center gap-5">
+    <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#1E2B44] text-white">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+    </span>
+    <div>
+      
+      <h2 className={`${serif} mt-1 text-2xl font-medium`}>Have a spare room this summer?</h2>
+      <p className="text-[15px] text-[#4A5A75]">Post a listing and find a verified intern who fits.</p>
+    </div>
+  </div>
+  <div className="flex flex-wrap items-center gap-3">
+    <Link href="/my-listings" className={btnLight}>
+      My Listings
+    </Link>
+    <Link href="/post" className={btnDark}>
+      Post a listing <Icon name="arrowR" size={16} />
+    </Link>
+  </div>
+</section>
           {/* intern community: locked until the quiz tells us their city and interests */}
           {d.quizStatus === 'done' ? (
             <section className={`${glass} mt-6 flex animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.05)_both] flex-wrap items-center justify-between gap-6 p-7 [animation-delay:240ms] md:px-10`}>

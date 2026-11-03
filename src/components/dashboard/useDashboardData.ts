@@ -6,6 +6,7 @@ import { getListing as getDbListing, getListings } from '../../lib/listings'
 import { loadMyBookings, loadSaved, type Booking } from '../matches/activity'
 import { dbListingToMatchListing, SAMPLE_LISTINGS, type Listing } from '../matches/listings'
 import { EMPTY, type QuizAnswers } from '../quiz/options'
+import { userRowToQuizAnswers } from '../../lib/quiz-sync'
 
 export type QuizStatus = 'none' | 'started' | 'done'
 
@@ -20,11 +21,12 @@ export type DashboardData = {
 }
 
 // The quiz counts as done once the core questions are answered.
-// TODO(backend): read this from the user's row in users_table instead of this browser.
 function quizStatusOf(q: QuizAnswers): QuizStatus {
+  // If company and address are filled, or budget and housingType, the user has completed their onboarding
+  if ((q.company.trim() || q.address.trim()) && (q.budget || q.housingType || q.moveIn)) return 'done'
   const core = [q.company.trim(), q.address.trim(), q.budget, q.housingType, q.moveIn]
   const answered = core.filter(Boolean).length
-  if (answered === core.length) return 'done'
+  if (answered >= 3) return 'done'
   return answered > 0 || q.commuteMode ? 'started' : 'none'
 }
 
@@ -51,37 +53,57 @@ export function useDashboardData(): DashboardData {
     const load = async () => {
       let firstName = ''
       let quiz: QuizAnswers = EMPTY
-      try {
-        const savedUser = localStorage.getItem('subtle-user-v1')
-        if (savedUser) firstName = (JSON.parse(savedUser).firstName ?? '').trim()
-        const savedQuiz = localStorage.getItem('subtle-quiz-v1')
-        if (savedQuiz) quiz = { ...EMPTY, ...JSON.parse(savedQuiz) }
-      } catch {}
 
       try {
         const { data: auth } = await supabase.auth.getUser()
         const meta = auth.user?.user_metadata ?? {}
-        const savedHere = firstName
-        firstName = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
-        // quiz answers in this browser only count if this account took the quiz
         const email = auth.user?.email?.toLowerCase()
-        if (email && localStorage.getItem('subtle-quiz-owner') !== email) quiz = EMPTY
-        // no name on the account: use the first name saved on their profile (what they entered at sign-up)
+        let savedHere = ''
+
+        // 1. If we have local storage for this EXACT user account, start with it
+        try {
+          const savedUser = localStorage.getItem('subtle-user-v1')
+          if (savedUser) savedHere = (JSON.parse(savedUser).firstName ?? '').trim()
+
+          const quizOwner = (localStorage.getItem('subtle-quiz-owner') ?? '').toLowerCase()
+          const savedQuiz = localStorage.getItem('subtle-quiz-v1')
+          if (savedQuiz && (!email || quizOwner === email)) {
+            quiz = { ...EMPTY, ...JSON.parse(savedQuiz) }
+          }
+        } catch {}
+
+        // 2. Fetch ground truth from Supabase users_table
+        let rowFirst = ''
+        if (email) {
+          try {
+            const res = await fetch(`/api/users?email=${encodeURIComponent(email)}`, { cache: 'no-store' })
+            if (res.ok) {
+              const dbUser = await res.json()
+              rowFirst = String(dbUser?.first_name ?? '').trim()
+              if (dbUser && (dbUser.company_name || dbUser.office_address || dbUser.monthly_budget)) {
+                const fromDb = userRowToQuizAnswers(dbUser)
+                quiz = { ...quiz, ...fromDb }
+                try {
+                  localStorage.setItem('subtle-quiz-v1', JSON.stringify(quiz))
+                  localStorage.setItem('subtle-quiz-owner', email)
+                } catch {}
+              } else if (!localStorage.getItem('subtle-quiz-owner') || localStorage.getItem('subtle-quiz-owner')?.toLowerCase() !== email) {
+                // User has no row in Supabase and no personal quiz cached for this email
+                quiz = EMPTY
+              }
+            }
+          } catch {}
+        }
+
+        // 3. First name only: what they entered at sign-up, then their profile, then the users_table row
+        firstName = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
         if (!firstName && auth.user) {
           try {
             const { data: prof } = await supabase.from('profiles').select('first_name').eq('id', auth.user.id).single()
-            const fromProfile = ((prof?.first_name ?? '') as string).trim()
-            if (fromProfile) firstName = fromProfile
+            firstName = ((prof?.first_name ?? '') as string).trim()
           } catch {}
         }
-        if (!firstName && email) {
-          try {
-            const res = await fetch(`/api/users?email=${encodeURIComponent(email)}`)
-            const row = res.ok ? await res.json() : null
-            const fromRow = ((row?.first_name ?? '') as string).trim()
-            if (fromRow && fromRow !== 'Intern') firstName = fromRow
-          } catch {}
-        }
+        if (!firstName && rowFirst !== 'Intern') firstName = rowFirst
         if (!firstName) firstName = ((meta.given_name ?? '') as string).trim()
         if (!firstName && !savedHere.includes('@')) firstName = savedHere
         // only the first word, in case a full name was saved
