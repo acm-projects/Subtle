@@ -61,20 +61,82 @@ function mapCar(c: unknown): boolean | null {
   return null
 }
 
+// Postgres interest_types enum strictly allows only these 6 exact values:
+// 'Cooking' | 'Hiking' | 'Live Music' | 'Baking' | 'Nightlife' | 'Reading'
+const VALID_INTEREST_TYPES = new Set(['Cooking', 'Hiking', 'Live Music', 'Baking', 'Nightlife', 'Reading'])
+
 function mapInterests(arr: unknown): string[] | null {
   if (!Array.isArray(arr) || !arr.length) return null
   const map: Record<string, string> = {
+    // Cooking & Food
     cooking: 'Cooking',
-    fitness: 'Fitness',
-    music: 'Music',
-    outdoors: 'Outdoors',
+    food: 'Cooking',
+    culinary: 'Cooking',
+    'trying food spots': 'Cooking',
+    coffee: 'Cooking',
+
+    // Baking
+    baking: 'Baking',
+
+    // Hiking & Outdoors & Fitness
+    hiking: 'Hiking',
+    outdoors: 'Hiking',
+    nature: 'Hiking',
+    'outdoor trips': 'Hiking',
+    'exploring the city': 'Hiking',
+    fitness: 'Hiking',
+    gym: 'Hiking',
+    running: 'Hiking',
+    workout: 'Hiking',
+    yoga: 'Hiking',
+    basketball: 'Hiking',
+    soccer: 'Hiking',
+    'pickup sports': 'Hiking',
+    travel: 'Hiking',
+    photography: 'Hiking',
+
+    // Live Music
+    'live music': 'Live Music',
+    'livemusic': 'Live Music',
+    music: 'Live Music',
+    'concerts and shows': 'Live Music',
+
+    // Nightlife
     nightlife: 'Nightlife',
+    social: 'Nightlife',
+
+    // Reading & Quiet / Hobbies
     reading: 'Reading',
+    study: 'Reading',
+    gaming: 'Reading',
+    film: 'Reading',
+    art: 'Reading',
+    volunteering: 'Reading',
+    'quiet nights': 'Reading',
+    'game nights': 'Reading',
+    'co-working': 'Reading',
   }
-  const result = arr
-    .map((x) => (typeof x === 'string' ? map[x.toLowerCase()] ?? x : null))
-    .filter((x): x is string => Boolean(x))
-  return result.length ? result : null
+
+  const result = new Set<string>()
+  for (const item of arr) {
+    if (typeof item !== 'string') continue
+    const trimmed = item.trim()
+    const lower = trimmed.toLowerCase()
+
+    // 1. Direct match with valid enum values
+    if (VALID_INTEREST_TYPES.has(trimmed)) {
+      result.add(trimmed)
+      continue
+    }
+
+    // 2. Mapped equivalent to valid enum
+    if (map[lower] && VALID_INTEREST_TYPES.has(map[lower])) {
+      result.add(map[lower])
+    }
+  }
+
+  const list = Array.from(result)
+  return list.length ? list : null
 }
 
 function mapAccommodations(arr: unknown): string[] | null {
@@ -183,6 +245,11 @@ async function upsertUser(request: Request) {
   } else if (token) {
     const { data: authData } = await client.auth.getUser(token)
     if (authData?.user?.id) row.id = authData.user.id
+  }
+  if (body.password !== undefined) row.password = orNull(body.password)
+  if (body.phone !== undefined || body.phone_number !== undefined) {
+    const p = toInt(body.phone ?? body.phone_number)
+    if (p !== null) row.phone_number = p
   }
   if (body.city !== undefined) row.user_city = orNull(body.city)
   if (body.company !== undefined || body.company_name !== undefined) row.company_name = orNull(body.company ?? body.company_name)

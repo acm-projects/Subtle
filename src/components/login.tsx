@@ -55,11 +55,22 @@ export default function Login() {
     setIsError(false)
 
     if (isSignUp) {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) {
         setIsError(true)
         setMessage(error.message)
       } else {
+        try {
+          await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: data.user?.id ?? null,
+              email: email.trim(),
+              password: password,
+            }),
+          })
+        } catch {}
         setMessage('Success! Check your email for the confirmation link.')
       }
     } else {

@@ -109,6 +109,7 @@ function LoginForm() {
               firstName: firstName.trim(),
               lastName: lastName.trim(),
               email: email.trim(),
+              password: password,
               nameSharingConsent: true,
               nameSharingConsentAt: consentAt,
             }),
