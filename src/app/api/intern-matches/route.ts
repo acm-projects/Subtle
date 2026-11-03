@@ -206,7 +206,8 @@ export async function GET(request: Request) {
   })
 
   // 4. Combine and Rank by Match Score (descending)
-  const allInterns = [...dbInterns, ...seedInterns]
+  // Only include interns who have at least one shared interest with the user
+  const allInterns = [...dbInterns, ...seedInterns].filter((i) => (i.shared?.length ?? 0) > 0)
   allInterns.sort((a, b) => {
     const scoreA = a.match ?? 0
     const scoreB = b.match ?? 0
