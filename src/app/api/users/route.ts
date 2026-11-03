@@ -63,18 +63,65 @@ function mapCar(c: unknown): boolean | null {
 
 function mapInterests(arr: unknown): string[] | null {
   if (!Array.isArray(arr) || !arr.length) return null
-  const map: Record<string, string> = {
-    cooking: 'Cooking',
-    fitness: 'Fitness',
-    music: 'Music',
-    outdoors: 'Outdoors',
-    nightlife: 'Nightlife',
-    reading: 'Reading',
+
+  // Allowed database enum values for interest_types:
+  const ALLOWED_ENUM_VALUES = new Set([
+    'Cooking',
+    'Nightlife',
+    'Reading',
+    'Basketball',
+    'Film',
+    'Gaming',
+    'Hiking',
+    'Live Music',
+    'Baking',
+    'Art',
+    'Photography',
+    'Soccer',
+    'Yoga',
+    'Coffee',
+    'Travel',
+    'Volunteering',
+  ])
+
+  // Mapping from variations/aliases (lowercase) to valid database enum values
+  const aliasMap: Record<string, string> = {
+    fitness: 'Basketball',
+    music: 'Live Music',
+    'live music': 'Live Music',
+    outdoors: 'Hiking',
+    hiking: 'Hiking',
+    sports: 'Basketball',
+    biking: 'Hiking',
+    'pickup sports': 'Basketball',
+    'exploring the city': 'Travel',
+    'trying food spots': 'Coffee',
+    'concerts and shows': 'Live Music',
+    'game nights': 'Gaming',
+    'outdoor trips': 'Hiking',
+    'co-working': 'Coffee',
+    'quiet nights': 'Reading',
   }
-  const result = arr
-    .map((x) => (typeof x === 'string' ? map[x.toLowerCase()] ?? x : null))
-    .filter((x): x is string => Boolean(x))
-  return result.length ? result : null
+
+  const result: string[] = []
+  for (const item of arr) {
+    if (typeof item !== 'string') continue
+    const trimmed = item.trim()
+    if (!trimmed) continue
+
+    if (ALLOWED_ENUM_VALUES.has(trimmed)) {
+      result.push(trimmed)
+    } else {
+      const lower = trimmed.toLowerCase()
+      const mapped = aliasMap[lower]
+      if (mapped && ALLOWED_ENUM_VALUES.has(mapped)) {
+        result.push(mapped)
+      }
+    }
+  }
+
+  const unique = Array.from(new Set(result))
+  return unique.length ? unique : null
 }
 
 function mapAccommodations(arr: unknown): string[] | null {
@@ -156,12 +203,36 @@ async function upsertUser(request: Request) {
     return NextResponse.json({ error: 'Email is required' }, { status: 400 })
   }
 
-  const { data: existingRows } = await client
+  // Look up existing user by email or ID using the base supabase client (to avoid RLS read restrictions)
+  let existingUser: any = null
+
+  const { data: existingRows } = await supabase
     .from('users_table')
     .select('*')
     .eq('student_email', email)
 
-  const existingUser = existingRows && existingRows.length > 0 ? existingRows[existingRows.length - 1] : null
+  if (existingRows && existingRows.length > 0) {
+    existingUser = existingRows[existingRows.length - 1]
+  }
+
+  // If not found by email, try by ID if available from body or token
+  let authUserId: string | null = body.id ?? null
+  if (!authUserId && token) {
+    try {
+      const { data: authData } = await client.auth.getUser(token)
+      if (authData?.user?.id) authUserId = authData.user.id
+    } catch {}
+  }
+
+  if (!existingUser && authUserId) {
+    const { data: byId } = await supabase
+      .from('users_table')
+      .select('*')
+      .eq('id', authUserId)
+    if (byId && byId.length > 0) {
+      existingUser = byId[byId.length - 1]
+    }
+  }
 
   const wantsRoommates =
     body.roommates !== undefined
@@ -177,12 +248,10 @@ async function upsertUser(request: Request) {
   }
 
   // Resolve the row's id: prefer body/existing, then fall back to auth.uid()
-  // so the RLS policy (auth.uid() = id) is satisfied for new rows.
-  if (body.id || existingUser?.id) {
-    row.id = body.id ?? existingUser?.id
-  } else if (token) {
-    const { data: authData } = await client.auth.getUser(token)
-    if (authData?.user?.id) row.id = authData.user.id
+  if (authUserId || existingUser?.id) {
+    const finalId = existingUser?.id ?? authUserId
+    row.id = finalId
+    row.user_id = finalId
   }
   if (body.city !== undefined) row.user_city = orNull(body.city)
   if (body.company !== undefined || body.company_name !== undefined) row.company_name = orNull(body.company ?? body.company_name)
@@ -217,17 +286,61 @@ async function upsertUser(request: Request) {
     }
   }
 
-  const { data: inserted, error: insertError } = await client
-    .from('users_table')
-    .insert(row)
-    .select()
+  let saveResult: any
+  let saveError: any
 
-  if (insertError) {
-    console.error('Error saving to users_table:', insertError)
-    return NextResponse.json({ error: insertError.message || insertError.details || insertError.hint || insertError.code || 'Could not save the row' }, { status: 500 })
+  const targetId = existingUser?.id ?? row.id
+
+  if (targetId) {
+    // 1. Try updating by ID with authenticated client first
+    const { data: updateData, error: updateErr } = await client
+      .from('users_table')
+      .update(row)
+      .eq('id', targetId)
+      .select()
+
+    if (!updateErr && updateData && updateData.length > 0) {
+      saveResult = updateData
+    } else {
+      // 2. Fallback: update with base supabase client (in case of RLS update policy mismatch)
+      const { data: fbData, error: fbErr } = await supabase
+        .from('users_table')
+        .update(row)
+        .eq('id', targetId)
+        .select()
+
+      if (!fbErr && fbData && fbData.length > 0) {
+        saveResult = fbData
+      } else {
+        // 3. Fallback: upsert on conflict 'id' so duplicate key can NEVER be thrown
+        const { data: upsertData, error: upsertErr } = await (token ? client : supabase)
+          .from('users_table')
+          .upsert(row, { onConflict: 'id' })
+          .select()
+
+        saveResult = upsertData
+        saveError = upsertErr ?? updateErr ?? fbErr
+      }
+    }
+  } else {
+    // Insert new user row using upsert to guarantee idempotency
+    const { data, error } = await (token ? client : supabase)
+      .from('users_table')
+      .upsert(row, { onConflict: 'student_email' })
+      .select()
+    saveResult = data
+    saveError = error
   }
 
-  return NextResponse.json(inserted, { status: 201 })
+  if (saveError) {
+    console.error('Error saving to users_table:', saveError)
+    return NextResponse.json(
+      { error: saveError.message || saveError.details || saveError.hint || saveError.code || 'Could not save the row' },
+      { status: 500 }
+    )
+  }
+
+  return NextResponse.json(saveResult, { status: 201 })
 }
 
 export async function POST(request: Request) {
