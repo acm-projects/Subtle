@@ -58,16 +58,14 @@ export function useDashboardData(): DashboardData {
       try {
         const { data: auth } = await supabase.auth.getUser()
         const meta = auth.user?.user_metadata ?? {}
-        const fromAccount = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
-        if (fromAccount) firstName = fromAccount
-        
         const email = auth.user?.email?.toLowerCase()
+        let savedHere = ''
 
         // 1. If we have local storage for this EXACT user account, start with it
         try {
           const savedUser = localStorage.getItem('subtle-user-v1')
-          if (!firstName && savedUser) firstName = (JSON.parse(savedUser).firstName ?? '').trim()
-          
+          if (savedUser) savedHere = (JSON.parse(savedUser).firstName ?? '').trim()
+
           const quizOwner = (localStorage.getItem('subtle-quiz-owner') ?? '').toLowerCase()
           const savedQuiz = localStorage.getItem('subtle-quiz-v1')
           if (savedQuiz && (!email || quizOwner === email)) {
@@ -76,23 +74,41 @@ export function useDashboardData(): DashboardData {
         } catch {}
 
         // 2. Fetch ground truth from Supabase users_table
+        let rowFirst = ''
         if (email) {
-          const res = await fetch(`/api/users?email=${encodeURIComponent(email)}`, { cache: 'no-store' })
-          if (res.ok) {
-            const dbUser = await res.json()
-            if (dbUser && (dbUser.company_name || dbUser.office_address || dbUser.monthly_budget)) {
-              const fromDb = userRowToQuizAnswers(dbUser)
-              quiz = { ...quiz, ...fromDb }
-              try {
-                localStorage.setItem('subtle-quiz-v1', JSON.stringify(quiz))
-                localStorage.setItem('subtle-quiz-owner', email)
-              } catch {}
-            } else if (!localStorage.getItem('subtle-quiz-owner') || localStorage.getItem('subtle-quiz-owner')?.toLowerCase() !== email) {
-              // User has no row in Supabase and no personal quiz cached for this email
-              quiz = EMPTY
+          try {
+            const res = await fetch(`/api/users?email=${encodeURIComponent(email)}`, { cache: 'no-store' })
+            if (res.ok) {
+              const dbUser = await res.json()
+              rowFirst = String(dbUser?.first_name ?? '').trim()
+              if (dbUser && (dbUser.company_name || dbUser.office_address || dbUser.monthly_budget)) {
+                const fromDb = userRowToQuizAnswers(dbUser)
+                quiz = { ...quiz, ...fromDb }
+                try {
+                  localStorage.setItem('subtle-quiz-v1', JSON.stringify(quiz))
+                  localStorage.setItem('subtle-quiz-owner', email)
+                } catch {}
+              } else if (!localStorage.getItem('subtle-quiz-owner') || localStorage.getItem('subtle-quiz-owner')?.toLowerCase() !== email) {
+                // User has no row in Supabase and no personal quiz cached for this email
+                quiz = EMPTY
+              }
             }
-          }
+          } catch {}
         }
+
+        // 3. First name only: what they entered at sign-up, then their profile, then the users_table row
+        firstName = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
+        if (!firstName && auth.user) {
+          try {
+            const { data: prof } = await supabase.from('profiles').select('first_name').eq('id', auth.user.id).single()
+            firstName = ((prof?.first_name ?? '') as string).trim()
+          } catch {}
+        }
+        if (!firstName && rowFirst !== 'Intern') firstName = rowFirst
+        if (!firstName) firstName = ((meta.given_name ?? '') as string).trim()
+        if (!firstName && !savedHere.includes('@')) firstName = savedHere
+        // only the first word, in case a full name was saved
+        firstName = firstName.split(/\s+/)[0] ?? ''
       } catch {}
 
       const quizStatus = quizStatusOf(quiz)

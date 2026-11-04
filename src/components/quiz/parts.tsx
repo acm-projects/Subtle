@@ -73,7 +73,7 @@ export function OptionTile({
       </span>
       <span className={compact ? 'leading-tight' : 'mt-3 leading-snug'}>
         <strong className={`block font-semibold ${compact ? 'text-[15px]' : 'text-[17px]'}`}>{title}</strong>
-        <span className={`text-[#4A5A75] ${compact ? 'text-xs' : 'text-[13px]'}`}>{body}</span>
+        <span className={`text-[#4A5A75] text-sm`}>{body}</span>
       </span>
     </button>
   )
@@ -87,7 +87,6 @@ export function Field({
   onChange,
   placeholder,
   list,
-  required = true,
 }: {
   id: string
   label: string
@@ -96,15 +95,13 @@ export function Field({
   onChange: (v: string) => void
   placeholder: string
   list?: string // id of a <datalist> with suggestions
-  required?: boolean
 }) {
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between">
-        <label htmlFor={id} className="text-xs font-bold uppercase tracking-[0.1em]">
+        <label htmlFor={id} className="text-[15px] font-semibold">
           {label}
         </label>
-        {required && <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#A35F33]">Required</span>}
       </div>
       <div className="flex h-14 items-center gap-3 rounded-2xl border border-[#D5DFEA] bg-white px-4 transition focus-within:border-[#2F4161] focus-within:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]">
         <span className="text-[#4A5A75]">

@@ -16,7 +16,7 @@ const DRAFT_KEY = 'subtle-post-draft'
 const card = 'rounded-[32px] border border-white bg-white/65 p-6 shadow-[0_30px_70px_-40px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-8'
 const input =
   'min-h-12 w-full rounded-2xl border border-[#D5DFEA] bg-white px-4 text-[15px] outline-none transition placeholder:text-[#5F6E84] focus:border-[#2F4161] focus:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]'
-const label = 'mb-1.5 block text-xs font-bold uppercase tracking-[0.1em]'
+const label = 'mb-1.5 block text-[15px] font-semibold'
 
 function Chips({ name, options, selected, onToggle, multi }: { name: string; options: string[]; selected: string[]; onToggle: (o: string) => void; multi?: boolean }) {
   return (
@@ -119,7 +119,7 @@ export default function PostListing() {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(listing))
       } catch {}
-      setBackendError('You must be logged in to post a listing. Your draft has been saved.')
+      setBackendError('You must be logged in to post a listing. The draft has been saved.')
       requestAnimationFrame(() => document.getElementById('post-errors')?.focus())
       return
     }
@@ -159,7 +159,7 @@ export default function PostListing() {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err: any) {
       console.error('Failed to post listing:', err)
-      setBackendError(err.message || 'Something went wrong while posting your place.')
+      setBackendError(err.message || 'Something went wrong while posting the place.')
       setStatus('idle')
       requestAnimationFrame(() => document.getElementById('post-errors')?.focus())
     }
@@ -186,7 +186,6 @@ export default function PostListing() {
               </div>
             </div>
             <div className="absolute bottom-0 right-[10%] h-[40%] w-[24%] rounded-t-lg bg-[#E4EAF1]" />
-            <p className="absolute inset-x-0 bottom-3 text-center text-xs font-semibold text-[#1E2B44]">Your cover photo shows here</p>
           </div>
         )}
         <span className="absolute right-3 top-3 rounded-full bg-[#1E2B44] px-3 py-1 text-xs font-bold text-white">New</span>
@@ -194,7 +193,7 @@ export default function PostListing() {
       <div className="p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate font-[family-name:var(--font-serif)] text-2xl font-medium">{listing.title.trim() || 'Your place'}</p>
+            <p className="truncate font-[family-name:var(--font-serif)] text-2xl font-medium">{listing.title.trim() || 'Untitled place'}</p>
             <p className="text-sm text-[#4A5A75]">{subtitle}</p>
           </div>
           <p className="shrink-0 font-[family-name:var(--font-serif)] text-2xl">
@@ -222,15 +221,15 @@ export default function PostListing() {
         <section className="flex min-h-screen items-center justify-center px-4 pb-16 pt-28">
           <div className={`${card} w-full max-w-2xl animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] text-center`} role="status">
             <HouseMascot label="Subtle's house mascot waving" className="mx-auto h-36 w-36" />
-            <h1 className="mt-5 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Your place is posted.</h1>
-            <p className="mt-3 text-[17px] text-[#4A5A75]">Your listing has been saved to Subtle! Interns whose preferences match your home will see it.</p>
+            <h1 className="mt-5 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Posted!</h1>
+            <p className="mt-3 text-[17px] text-[#4A5A75]">The listing is saved to Subtle. Interns whose preferences match will see it.</p>
             <div className="mx-auto mt-6 max-w-sm text-left">{preview}</div>
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               <Link href="/home" className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white font-semibold transition hover:-translate-y-0.5">
                 Back to home
               </Link>
               <Link href="/my-listings" className="flex min-h-12 items-center justify-center rounded-full bg-[#1E2B44] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
-                See your listing
+                See Listings
               </Link>
             </div>
             <div className="mt-4">
@@ -263,21 +262,20 @@ export default function PostListing() {
         <div className="mx-auto w-full max-w-[1240px]">
           <header className="animate-[fadeIn_.5s_ease-out]">
             <div className="md:pl-10">
-              <p className="text-xs font-bold tracking-[0.14em] text-[#4A5A75]">for sub-leasers</p>
-              <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">post your place.</h1>
-              <p className="mt-2 text-[17px] text-[#4A5A75]">find a subletter who actually fits.</p>
+              <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">Post a Listing</h1>
+              <p className="mt-2 text-[17px] text-[#4A5A75]">Find a subletter who actually fits.</p>
             </div>
 
             {!user && !checkingAuth && (
               <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-white bg-white/70 px-5 py-3 text-sm shadow-sm backdrop-blur-md">
                 <span className="text-[#4A5A75]">
-                  You are browsing as a guest. Your work is saved as a draft, but you&apos;ll need to log in to publish.
+                  Browsing as a guest. Work is saved as a draft, but you&apos;ll need to log in to publish.
                 </span>
                 <div className="flex gap-2">
-                  <Link href="/login?mode=login" className="rounded-full bg-[#1E2B44] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#2F4161]">
+                  <Link href="/login?mode=login" className="rounded-full bg-[#1E2B44] px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-[#2F4161]">
                     Log in
                   </Link>
-                  <Link href="/login?mode=signup" className="rounded-full border border-[#D5DFEA] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#1E2B44] hover:border-[#1E2B44]">
+                  <Link href="/login?mode=signup" className="rounded-full border border-[#D5DFEA] bg-white px-3.5 py-1.5 text-sm font-semibold text-[#1E2B44] hover:border-[#1E2B44]">
                     Sign up
                   </Link>
                 </div>
@@ -296,7 +294,7 @@ export default function PostListing() {
               className="flex flex-col gap-6"
             >
               <section aria-labelledby="basics" className={`${card} animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both]`}>
-                <h2 id="basics" className="font-[family-name:var(--font-serif)] text-3xl font-medium">The basics</h2>
+                <h2 id="basics" className="font-[family-name:var(--font-serif)] text-3xl font-medium">The Basics</h2>
                 <label htmlFor="post-title" className={`${label} mt-5`}>
                   Title
                 </label>
@@ -306,12 +304,11 @@ export default function PostListing() {
               </section>
 
               <section aria-labelledby="where" className={`${card} animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] [animation-delay:80ms]`}>
-                <h2 id="where" className="font-[family-name:var(--font-serif)] text-3xl font-medium">Where and when</h2>
+                <h2 id="where" className="font-[family-name:var(--font-serif)] text-3xl font-medium">Where and When</h2>
                 <label htmlFor="post-address" className={`${label} mt-5`}>
                   Address
                 </label>
                 <input id="post-address" className={input} value={listing.address} onChange={(e) => set('address', e.target.value)} placeholder="123 Sunset Blvd, Los Angeles, CA" autoComplete="street-address" />
-                <p className="mt-1.5 text-xs text-[#4A5A75]">Only the neighborhood is shown until you accept a request.</p>
                 <div className="mt-5 grid gap-4 sm:grid-cols-3">
                   <div>
                     <label htmlFor="post-rent" className={label}>
@@ -345,7 +342,7 @@ export default function PostListing() {
               </section>
 
               <section aria-labelledby="home" className={`${card} animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] [animation-delay:160ms]`}>
-                <h2 id="home" className="font-[family-name:var(--font-serif)] text-3xl font-medium">The home</h2>
+                <h2 id="home" className="font-[family-name:var(--font-serif)] text-3xl font-medium">The Home</h2>
                 <p className={`${label} mt-5`}>Home type</p>
                 <Chips name="Home type" options={HOME_TYPES} selected={[listing.homeType]} onToggle={(o) => set('homeType', o)} />
                 <p className={`${label} mt-5`}>Private or shared</p>
@@ -363,7 +360,7 @@ export default function PostListing() {
               <section aria-labelledby="about" className={`${card} animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] [animation-delay:240ms]`}>
                 <h2 id="about" className="font-[family-name:var(--font-serif)] text-3xl font-medium">About</h2>
                 <label htmlFor="post-about" className="sr-only">
-                  About your place
+                  About the place
                 </label>
                 <textarea
                   id="post-about"
@@ -374,7 +371,6 @@ export default function PostListing() {
                   placeholder="Describe the room, the vibe, and who you are looking for."
                   className="mt-5 w-full resize-none rounded-2xl border border-[#D5DFEA] bg-white p-4 text-[15px] leading-relaxed outline-none placeholder:text-[#5F6E84] focus:border-[#2F4161] focus:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]"
                 />
-                <p className="mt-1 text-right text-xs text-[#4A5A75]">{listing.about.length} / 800</p>
               </section>
 
               {tried && (missing.length > 0 || backendError) && (
@@ -387,10 +383,10 @@ export default function PostListing() {
                       <p className="font-semibold text-[#9B2C1F]">{backendError}</p>
                       {!user && (
                         <div className="mt-3 flex flex-wrap gap-2">
-                          <Link href="/login?mode=login" className="inline-flex items-center rounded-full bg-[#1E2B44] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2F4161]">
-                            Log in to subtle.
+                          <Link href="/login?mode=login" className="inline-flex items-center rounded-full bg-[#1E2B44] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2F4161]">
+                            Log in
                           </Link>
-                          <Link href="/login?mode=signup" className="inline-flex items-center rounded-full border border-[#1E2B44] bg-white px-4 py-2 text-xs font-semibold text-[#1E2B44] transition hover:bg-[#FBF3EA]">
+                          <Link href="/login?mode=signup" className="inline-flex items-center rounded-full border border-[#1E2B44] bg-white px-4 py-2 text-sm font-semibold text-[#1E2B44] transition hover:bg-[#FBF3EA]">
                             Sign up with .edu
                           </Link>
                         </div>
@@ -416,13 +412,11 @@ export default function PostListing() {
 
             {/* live preview */}
             <aside aria-label="Live preview" className="lg:sticky lg:top-28">
-              <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">Live preview</p>
+              <h2 className="mb-4 font-[family-name:var(--font-serif)] text-3xl font-medium">Preview</h2>
               {preview}
-              <p className="mt-3 text-sm text-[#4A5A75]">This is how interns will see your place in their matches.</p>
             </aside>
           </div>
         </div>
-        <p className="mt-12 text-center text-[13px] text-[#4A5A75]">&copy; 2026 Subtle Technologies, Inc. All rights reserved.</p>
       </section>
 
       {toast && (

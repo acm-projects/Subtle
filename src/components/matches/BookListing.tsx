@@ -10,7 +10,7 @@ import { addBookingRequest } from './activity'
 import HouseMascot from '../HouseMascot'
 import { supabase } from '../../lib/supabase'
 
-const STEPS = ['Choose your dates', 'Review the total', 'Send a request']
+const STEPS = ['Choose dates', 'Review the total', 'Send a request']
 
 /*
   Backend hook-up points:
@@ -93,8 +93,7 @@ export default function BookListing({ listing: loadedListing, context = SAMPLE_C
         </div>
       ) : (
         <>
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">How to book</p>
-          <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Book the {listing.title}</h1>
+          <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Book the {listing.title}</h1>
           <p className="mt-2 text-[17px] text-[#4A5A75]">
             {listing.score} Subtle score · ${listing.price.toLocaleString()} / month · {commute}
           </p>

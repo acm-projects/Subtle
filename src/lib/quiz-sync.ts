@@ -84,6 +84,9 @@ export function userRowToQuizAnswers(row: Record<string, any> | null | undefined
     accommodations,
     car,
     moveIn,
+    // the calendar saves an exact day (YYYY-MM-DD); older rows only have a month
+    moveInDate: /^\d{4}-\d{2}-\d{2}/.test(mDate) ? mDate.slice(0, 10) : '',
+    moveOutDate: '', // TODO(backend): no move-out column in users_table yet
     transitImportance: typeof row.public_transit_importance === 'number' ? row.public_transit_importance : 1,
     interests: rawInterests,
     hangouts: [],
