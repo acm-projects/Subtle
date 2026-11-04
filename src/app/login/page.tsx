@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Navbar from '../../components/Navbar'
@@ -27,6 +27,10 @@ function passwordStrength(pw: string): number {
 
 const CONSENT_ERROR = 'Please agree to share your name with other users to create an account.'
 
+// The redirect to Google wipes the page's state, so the tick is carried across in localStorage.
+// This key must match the one in app/auth/callback/page.tsx.
+const CONSENT_KEY = 'subtle-google-consent'
+
 function LoginForm() {
   const [firstName, setFirstName] = useState<string>('')
   const [lastName, setLastName] = useState<string>('')
@@ -48,6 +52,18 @@ function LoginForm() {
   // Signing up requires the checkbox. Logging in never does.
   const needsConsent = isSignUpMode && !agreed
   const submitBlocked = loading || needsConsent
+
+  // the Google callback page sends people back here with ?notice=edu or ?notice=consent
+  const notice = searchParams.get('notice')
+  useEffect(() => {
+    if (notice === 'edu') {
+      setIsError(true)
+      setMessage('Subtle is for students. Please use your .edu email.')
+    } else if (notice === 'consent') {
+      setIsError(true)
+      setMessage('Please tick the box to agree to share your name, then try Google again.')
+    }
+  }, [notice])
 
   const switchMode = (next: 'signup' | 'login') => {
     setMessage('')
@@ -153,14 +169,39 @@ function LoginForm() {
     handleAuth(isSignUpMode)
   }
 
-  const handleGoogle = () => {
+  // Runs only when the Google button is clicked. After Google, the person lands on /auth/callback.
+  const handleGoogle = async () => {
     if (needsConsent) {
       setIsError(true)
       setMessage(CONSENT_ERROR)
       return
     }
-    // TODO: supabase.auth.signInWithOAuth({ provider: 'google' })
-    // Google sign-ups skip the name fields, so record the consent for them after they return.
+
+    // carry the tick across the redirect (the callback page reads and clears it)
+    try {
+      if (isSignUpMode && agreed) localStorage.setItem(CONSENT_KEY, '1')
+      else localStorage.removeItem(CONSENT_KEY)
+    } catch {}
+
+    setLoading(true)
+    setMessage('')
+    setIsError(false)
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // your own page, NOT the supabase.co address (that one only goes in Google Cloud)
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: 'select_account' },
+      },
+    })
+
+    // on success the browser leaves for Google, so only an error needs handling here
+    if (error) {
+      setLoading(false)
+      setIsError(true)
+      setMessage(error.message)
+    }
   }
 
   return (
@@ -308,7 +349,7 @@ function LoginForm() {
 
           <div className="sb-or" aria-hidden="true"><span>or</span></div>
 
-          <button type="button" className="sb-google" onClick={handleGoogle} disabled={needsConsent}>
+          <button type="button" className="sb-google" onClick={handleGoogle} disabled={needsConsent || loading}>
             <span className="sb-google-g">
               <svg viewBox="0 0 48 48" width="16" height="16" aria-hidden="true">
                 <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" />
