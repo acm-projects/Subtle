@@ -8,6 +8,7 @@ export type Listing = {
   commuteMinutes: number
   commuteMode: 'walk' | 'transit' | 'bike' | 'drive'
   commuteSource?: 'google' | 'estimate' // where commuteMinutes came from (see /api/matches)
+  safety?: import('../../lib/safety').SafetyInfo // reported incidents nearby (SF only, see lib/safety.ts)
   homeType: 'Apartment' | 'House' | 'Studio'
   roomType: 'Private room' | 'Shared room' | 'Entire place'
   tags: string[]

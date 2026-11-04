@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { dbListingToMatchListing, type Listing as MatchListing, type MatchContext, SAMPLE_CONTEXT, SAMPLE_LISTINGS } from '../../../components/matches/listings'
 import { type CommuteMode, estimateCommuteMinutes, geocodeAddress, haversineDistanceKm, pickOptimalCommuteMode } from '../../../lib/geocoding'
 import { googleCommuteMinutes, hasGoogleMapsKey } from '../../../lib/google-maps'
+import { safetyFit, safetyForMany, safetyReason, type SafetyInfo } from '../../../lib/safety'
 import { getListings } from '../../../lib/listings'
 import { runPythonVectorMatcher } from '../../../lib/python-matcher'
 import { supabase } from '../../../lib/supabase'
@@ -136,6 +137,27 @@ export async function GET(request: Request) {
     }))
   }
 
+  // 5. Safety: nudge each score by real reported incidents near the listing (San Francisco only;
+  //    anywhere else there is no data, so the score is left as is).
+  const safetyById = new Map<string, SafetyInfo>()
+  const safetyList = await safetyForMany(
+    combined.map((l) => (l.latitude != null && l.longitude != null ? { lat: l.latitude, lon: l.longitude } : null)),
+  )
+  combined.forEach((l, i) => {
+    const info = safetyList[i]
+    if (info) safetyById.set(l.id, info)
+  })
+  scored = scored.map((l) => {
+    const info = safetyById.get(l.id)
+    if (!info) return l
+    return {
+      ...l,
+      score: Math.max(58, Math.min(99, Math.round(l.score * safetyFit(info)))),
+      safety: info,
+      whyScore: [...(l.whyScore ?? []), safetyReason(info)],
+    }
+  })
+
   scored.sort((a, b) => {
     if (sort === 'price') return a.price - b.price
     if (sort === 'commute') return a.commuteMinutes - b.commuteMinutes
@@ -149,6 +171,7 @@ export async function GET(request: Request) {
     geocodedWorkplace: workplaceCoords,
     // how many commute times came from Google Maps vs. the distance estimate
     commuteSources: { google: googleCount, estimate: combined.length - googleCount },
+    safetyCoverage: { withData: safetyById.size, without: combined.length - safetyById.size },
     total: scored.length,
     matches: scored,
     mlAnalytics,
