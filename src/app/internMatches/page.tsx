@@ -355,12 +355,18 @@ export default function MatchesPage() {
 
   const interns: Placed[] = useMemo(
     () =>
-      internList.map((i) => ({
-        ...i,
-        ...(positions[i.id] ?? { x: 50, y: 50 }),
-        shared: i.interests.filter((x) => myInterests.some((m) => m.toLowerCase() === x.toLowerCase())),
-        big: bigIds.has(i.id),
-      })),
+      internList
+        .map((i) => {
+          const shared = i.interests.filter((x) => myInterests.some((m) => m.toLowerCase() === x.toLowerCase()))
+          return {
+            ...i,
+            ...(positions[i.id] ?? { x: 50, y: 50 }),
+            shared,
+            big: bigIds.has(i.id),
+          }
+        })
+        // Only show people who share at least 1 interest with you
+        .filter((i) => i.shared.length > 0),
     [internList, myInterests, positions, bigIds],
   )
   const matches = interns.filter((i) => i.match !== undefined).sort((a, b) => (b.match ?? 0) - (a.match ?? 0))
