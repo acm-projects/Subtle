@@ -75,14 +75,19 @@ const pillShared = 'rounded-full border border-[#86abcc] bg-[#86abcc] px-3 py-1 
 const btnDark = 'rounded-full bg-[#1E2B44] text-sm font-semibold text-white transition hover:bg-[#2F4161] disabled:cursor-default disabled:bg-[#9CB5CE]'
 const btnLight = 'rounded-full border border-[#D5DFEA] bg-white text-sm font-semibold text-[#1E2B44] transition hover:bg-[#F7F9FB] disabled:cursor-default disabled:text-[#4A5A75]'
 
-// Score colors: navy for the best matches, then blue, then brown as the score drops.
-// All keep white text above 4.5:1 contrast.
+// Score colors: the stronger the match, the darker the blue.
+// Text on each shade passes 4.5:1 contrast (white on the two dark ones, navy on the two light ones).
+const SCORE_SHADES = [
+  { min: 90, bg: '#22507F', text: '#FFFFFF' },
+  { min: 80, bg: '#3D6D9F', text: '#FFFFFF' },
+  { min: 70, bg: '#8EB2D6', text: '#15203A' },
+  { min: 0, bg: '#C9DBEA', text: '#15203A' },
+]
+const shadeFor = (score: number) => SCORE_SHADES.find((s) => score >= s.min) ?? SCORE_SHADES[SCORE_SHADES.length - 1]
 function scoreColor(score: number) {
-  if (score >= 90) return '#739dc2'
-  if (score >= 80) return '#a0c8ec'
-  if (score >= 70) return '#B9D6F0' 
-  return 'rgb(221, 167, 131)'
+  return shadeFor(score).bg
 }
+const scoreStyle = (score: number) => ({ backgroundColor: shadeFor(score).bg, color: shadeFor(score).text })
 
 const joinNames = (list: string[]) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0] ?? '')
 
@@ -243,7 +248,7 @@ function Tooltip({
       <div className="flex items-center gap-3">
         <span
           className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold text-white"
-          style={{ backgroundColor: matched ? scoreColor(intern.match ?? 0) : '#9CB5CE' }}
+          style={matched ? scoreStyle(intern.match ?? 0) : { backgroundColor: '#9CB5CE' }}
         >
           {matched ? intern.match : intern.initials}
         </span>
@@ -485,11 +490,11 @@ export default function MatchesPage() {
                     y1="50"
                     x2={m.x}
                     y2={m.y}
-                    stroke="#B9D6F0"
+                    stroke={scoreColor(m.match ?? 0)}
                     strokeLinecap="round"
                     vectorEffect="non-scaling-stroke"
                     strokeWidth={hoverId === m.id ? 3 : 1.2 + ((m.match ?? 0) / 100) * 1.2}
-                    strokeOpacity={hoverId === m.id ? 0.85 : 0.22}
+                    strokeOpacity={hoverId === m.id ? 0.9 : 0.25 + ((m.match ?? 0) / 100) * 0.3}
                     style={{ transition: 'stroke-opacity .2s, stroke-width .2s' }}
                   />
                 ))}
@@ -527,7 +532,7 @@ export default function MatchesPage() {
                           ? 'h-[52px] w-[52px] text-sm shadow-[0_10px_20px_-8px_rgba(30,43,68,0.6)]'
                           : 'h-[16px] w-[16px] bg-[#9CB5CE] shadow-[0_4px_10px_rgba(30,43,68,0.2)] group-hover:bg-[#1E2B44]'
                       } ${active ? 'scale-125' : ''}`}
-                      style={i.big ? { backgroundColor: scoreColor(i.match ?? 0) } : undefined}
+                      style={i.big ? scoreStyle(i.match ?? 0) : undefined}
                     >
                       {i.big ? i.initials : null}
                     </span>
@@ -546,8 +551,16 @@ export default function MatchesPage() {
 
               {/* legend */}
               <div className="absolute bottom-3.5 left-3.5 z-10 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-full border border-white bg-white/85 px-4 py-2 text-[11px] font-semibold shadow-sm backdrop-blur">
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#B9D6F0]" />You</span>
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#2F5D8C]" />Top 10 Matches</span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#1E2B44]" />You</span>
+                <span className="flex items-center gap-1.5">
+                  Stronger
+                  <span className="flex">
+                    {SCORE_SHADES.map((sh) => (
+                      <span key={sh.bg} className="h-3 w-3 rounded-full border border-white" style={{ backgroundColor: sh.bg }} />
+                    ))}
+                  </span>
+                  Weaker
+                </span>
                 <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#9CB5CE]" />Also in LA</span>
               </div>
               <div className="absolute right-3.5 top-3.5 z-10 rounded-full border border-white bg-white/85 px-3.5 py-1.5 text-[11px] font-semibold shadow-sm backdrop-blur">Hover a dot to see who they are</div>
@@ -576,7 +589,7 @@ export default function MatchesPage() {
                         onMouseLeave={() => setHoverId(null)}
                         className={`flex h-[57px] items-center gap-3 border-t border-[#E3ECF5] px-1 transition-colors ${hoverId === m.id ? 'bg-[#F4F7FB]' : ''}`}
                       >
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white" style={{ backgroundColor: scoreColor(m.match ?? 0) }}>
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white" style={scoreStyle(m.match ?? 0)}>
                           {m.match}
                         </span>
                         <div className="min-w-0 flex-1">
