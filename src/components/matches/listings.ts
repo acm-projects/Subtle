@@ -22,6 +22,9 @@ export type Listing = {
   hostEmail?: string // shown on the contact page
   hostVerified?: boolean // verified .edu sub-leaser
   hostReplyTime?: string // e.g. "Replies within a day"
+  address?: string
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export type MatchContext = {
@@ -177,6 +180,9 @@ export function dbListingToMatchListing(db: any): Listing {
     subtitle: `${roomType} in a ${homeType.toLowerCase()}`,
     features: [homeType, roomType, ...(db.amenities || [])],
     imageUrl: coverImage,
+    address: db.address || undefined,
+    latitude: db.latitude || null,
+    longitude: db.longitude || null,
   }
 }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { dbListingToMatchListing, type Listing as MatchListing, type MatchContext, SAMPLE_CONTEXT, SAMPLE_LISTINGS } from '../../../components/matches/listings'
+import { estimateCommuteMinutes, geocodeAddress, haversineDistanceKm, pickOptimalCommuteMode } from '../../../lib/geocoding'
 import { getListings } from '../../../lib/listings'
 import { runPythonVectorMatcher } from '../../../lib/python-matcher'
 import { supabase } from '../../../lib/supabase'
@@ -29,11 +30,17 @@ export async function GET(request: Request) {
     }
   }
 
+  const officeAddress = userProfile?.office_address || SAMPLE_CONTEXT.office
+  const preferredMode = userProfile?.user_transportation || 'Public Transit'
+
   const context: MatchContext = {
     company: userProfile?.company_name || SAMPLE_CONTEXT.company,
-    office: userProfile?.office_address || SAMPLE_CONTEXT.office,
-    city: userProfile?.user_city || (userProfile?.office_address ? userProfile.office_address.split(',').slice(-2).join(', ').trim() : SAMPLE_CONTEXT.city),
+    office: officeAddress,
+    city: userProfile?.user_city || (officeAddress ? officeAddress.split(',').slice(-2).join(', ').trim() : SAMPLE_CONTEXT.city),
   }
+
+  // 1. Geocode the user's workplace address with Nominatim
+  const workplaceCoords = await geocodeAddress(officeAddress)
 
   let dbMatched: MatchListing[] = []
   try {
@@ -45,9 +52,40 @@ export async function GET(request: Request) {
     console.error('Error loading DB listings in /api/matches:', err)
   }
 
-  const combined = includeSamples ? [...dbMatched, ...SAMPLE_LISTINGS] : dbMatched
+  const rawCombined = includeSamples ? [...dbMatched, ...SAMPLE_LISTINGS] : dbMatched
 
-  // 1. Primary: Run Python Machine Learning & Vector Matching Engine (ml/vector_matcher.py)
+  // 2. Geocode listings and compute approximate commute duration based on real coordinates
+  const combined: MatchListing[] = await Promise.all(
+    rawCombined.map(async (l) => {
+      // If we don't have workplace coords, preserve listing defaults
+      if (!workplaceCoords) return l
+
+      // Determine listing coordinates: check explicit lat/lon, or geocode address/neighborhood
+      let listingCoords = l.latitude && l.longitude ? { lat: l.latitude, lon: l.longitude } : null
+      if (!listingCoords) {
+        const query = l.address || `${l.neighborhood}, ${context.city}`
+        listingCoords = await geocodeAddress(query)
+      }
+
+      if (listingCoords) {
+        const distKm = haversineDistanceKm(listingCoords, workplaceCoords)
+        const optimalMode = pickOptimalCommuteMode(distKm, preferredMode)
+        const commuteMinutes = estimateCommuteMinutes(distKm, optimalMode)
+
+        return {
+          ...l,
+          commuteMinutes,
+          commuteMode: optimalMode,
+          latitude: listingCoords.lat,
+          longitude: listingCoords.lon,
+        }
+      }
+
+      return l
+    }),
+  )
+
+  // 3. Primary: Run Python Machine Learning & Vector Matching Engine (ml/vector_matcher.py)
   let scored: MatchListing[] = []
   let mlAnalytics: any[] = []
   let engine = 'python'
@@ -57,7 +95,7 @@ export async function GET(request: Request) {
     scored = pythonResult.scored
     mlAnalytics = pythonResult.mlAnalytics
   } else {
-    // 2. High-performance fallback: In-process JS Vector Matching Engine
+    // 4. High-performance fallback: In-process JS Vector Matching Engine
     engine = 'typescript-fallback'
     const fallbackResults = combined.map((l) => computeSubtleScore(l, userProfile))
     scored = fallbackResults.map((r) => r.listing)
@@ -81,9 +119,9 @@ export async function GET(request: Request) {
     context,
     userProfile,
     engine,
+    geocodedWorkplace: workplaceCoords,
     total: scored.length,
     matches: scored,
     mlAnalytics,
   })
 }
-
