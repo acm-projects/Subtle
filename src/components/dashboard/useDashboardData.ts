@@ -7,6 +7,7 @@ import { loadMyBookings, loadSaved, type Booking } from '../matches/activity'
 import { dbListingToMatchListing, SAMPLE_LISTINGS, type Listing } from '../matches/listings'
 import { EMPTY, type QuizAnswers } from '../quiz/options'
 import { userRowToQuizAnswers } from '../../lib/quiz-sync'
+import { fetchScoredMatches, withScore } from '../matches/useScored'
 
 export type QuizStatus = 'none' | 'started' | 'done'
 
@@ -96,8 +97,14 @@ export function useDashboardData(): DashboardData {
 
       const quizStatus = quizStatusOf(quiz)
 
+      // scores come from /api/matches so they match the Matches page (commute + safety included)
+      const scored = await fetchScoredMatches()
+      const scoredById = new Map(scored.map((l) => [l.id, l]))
+
       let topMatches: Listing[] = []
-      if (quizStatus === 'done') {
+      if (quizStatus === 'done' && scored.length) {
+        topMatches = [...scored].sort((a, b) => b.score - a.score).slice(0, 12)
+      } else if (quizStatus === 'done') {
         let real: Listing[] = []
         try {
           const { listings } = await getListings({ pageSize: 20 })
@@ -110,12 +117,12 @@ export function useDashboardData(): DashboardData {
       for (const id of loadSaved().slice(0, 4)) {
         const sample = SAMPLE_LISTINGS.find((l) => l.id === id)
         if (sample) {
-          savedHomes.push(sample)
+          savedHomes.push(withScore(sample, scoredById.get(sample.id)))
           continue
         }
         try {
           const db = await getDbListing(id)
-          if (db) savedHomes.push(dbListingToMatchListing(db))
+          if (db) savedHomes.push(withScore(dbListingToMatchListing(db), scoredById.get(db.id)))
         } catch {}
       }
       let myEmail: string | null = null

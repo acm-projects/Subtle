@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useScoredListing } from './useScored'
 import { useEffect, useRef, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { SAMPLE_CONTEXT, type Listing, type MatchContext } from './listings'
@@ -28,7 +29,9 @@ const featuresFor = (l: Listing) => l.features ?? Array.from(new Set([l.homeType
   - listing / context props: pass the real listing (fetched by id) and the user's quiz context
   - toggleSaved: persist; Book and Contact are their own pages (/matches/[id]/book and /contact)
 */
-export default function ListingDetail({ listing, context: initialContext = SAMPLE_CONTEXT }: { listing: Listing; context?: MatchContext }) {
+export default function ListingDetail({ listing: loadedListing, context: initialContext = SAMPLE_CONTEXT }: { listing: Listing; context?: MatchContext }) {
+  // same score, commute and safety as the Matches page and dashboard
+  const listing = useScoredListing(loadedListing)
   const [saved, setSaved] = useState(false)
   const [context, setContext] = useState<MatchContext>(initialContext)
 
