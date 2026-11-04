@@ -25,6 +25,7 @@ export type Listing = {
   hostVerified?: boolean // verified .edu sub-leaser
   hostReplyTime?: string // e.g. "Replies within a day"
   address?: string
+  city?: string // the listing's own city (listing_table.city); used to place it on the map
   latitude?: number | null
   longitude?: number | null
 }
@@ -183,6 +184,7 @@ export function dbListingToMatchListing(db: any): Listing {
     features: [homeType, roomType, ...(db.amenities || [])],
     imageUrl: coverImage,
     address: db.address || undefined,
+    city: db.city || undefined,
     latitude: db.latitude || null,
     longitude: db.longitude || null,
   }

@@ -7,7 +7,7 @@ import { loadMyBookings, loadSaved, type Booking } from '../matches/activity'
 import { dbListingToMatchListing, SAMPLE_LISTINGS, type Listing } from '../matches/listings'
 import { EMPTY, type QuizAnswers } from '../quiz/options'
 import { userRowToQuizAnswers } from '../../lib/quiz-sync'
-import { fetchScoredMatches, withScore } from '../matches/useScored'
+import { fetchMatchesPayload, fetchScoredMatches, withScore } from '../matches/useScored'
 
 export type QuizStatus = 'none' | 'started' | 'done'
 
@@ -17,6 +17,7 @@ export type DashboardData = {
   quiz: QuizAnswers
   quizStatus: QuizStatus
   topMatches: Listing[]
+  nearCity: string // the city /api/matches searched around, for the "No listings near ..." message
   savedHomes: Listing[]
   bookings: Booking[]
 }
@@ -35,7 +36,7 @@ function quizStatusOf(q: QuizAnswers): QuizStatus {
   Everything the dashboard shows, in one place for backend:
   - name: Supabase user metadata, then the copy the login page saves
   - quiz: answers the questionnaire saves in this browser
-  - topMatches: real listings from Supabase plus sample listings, ranked purely by Subtle score
+  - topMatches: /api/matches listings near the user's workplace, ranked by Subtle score
   - savedHomes / bookings: matches/activity.ts
 */
 export function useDashboardData(): DashboardData {
@@ -45,6 +46,7 @@ export function useDashboardData(): DashboardData {
     quiz: EMPTY,
     quizStatus: 'none',
     topMatches: [],
+    nearCity: '',
     savedHomes: [],
     bookings: [],
   })
@@ -115,11 +117,15 @@ export function useDashboardData(): DashboardData {
 
       // scores come from /api/matches so they match the Matches page (commute + safety included)
       const scored = await fetchScoredMatches()
-      const scoredById = new Map(scored.map((l) => [l.id, l]))
+      const scoredById = new Map((scored ?? []).map((l) => [l.id, l]))
 
+      // Homes near their workplace, best score first. Empty means nothing is posted near them yet
+      // (the dashboard shows that); only if /api/matches is down do we fall back to unscored listings.
       let topMatches: Listing[] = []
-      if (quizStatus === 'done' && scored.length) {
+      let nearCity = ''
+      if (quizStatus === 'done' && scored) {
         topMatches = [...scored].sort((a, b) => b.score - a.score).slice(0, 12)
+        nearCity = (await fetchMatchesPayload())?.context.city ?? ''
       } else if (quizStatus === 'done') {
         let real: Listing[] = []
         try {
@@ -149,7 +155,7 @@ export function useDashboardData(): DashboardData {
       } catch {}
       const bookings = await loadMyBookings(myEmail)
 
-      if (alive) setData({ loading: false, firstName, quiz, quizStatus, topMatches, savedHomes, bookings })
+      if (alive) setData({ loading: false, firstName, quiz, quizStatus, topMatches, nearCity, savedHomes, bookings })
     }
     load()
     // refresh when you come back to the tab (and every 20s), so new requests and host replies show up

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { fetchMatchesPayload } from './useScored'
 import AppNavbar from '../AppNavbar'
 import { SAMPLE_CONTEXT, SAMPLE_LISTINGS, type Listing, type MatchContext } from './listings'
 import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from './parts'
@@ -28,56 +28,32 @@ export default function Matches({
   listings?: Listing[]
   context?: MatchContext
 }) {
-  const [listings, setListings] = useState<Listing[]>(initialListings)
+  // The server passes every listing as a fallback; we only show it if /api/matches can't be reached.
+  // Otherwise we show exactly what the API returns: homes near the user's workplace (maybe none).
+  const [listings, setListings] = useState<Listing[]>([])
+  const [status, setStatus] = useState<'loading' | 'ready' | 'offline'>('loading')
   const [sort, setSort] = useState<Sort>('score')
   const [savedOnly, setSavedOnly] = useState(false)
   const [saved, setSaved] = useState<string[]>([])
   const [context, setContext] = useState<MatchContext>(initialContext)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('subtle-quiz-v1')
-      if (raw) {
-        const q = JSON.parse(raw)
-        if (q.company || q.address) {
-          const addr = (q.address as string | undefined)?.trim() || initialContext.office
-          const parts = addr.split(',').map((s) => s.trim()).filter(Boolean)
-          const city = parts.length >= 2 ? parts.slice(-2).join(', ') : initialContext.city
-          setContext({
-            company: (q.company as string | undefined)?.trim() || initialContext.company,
-            office: addr,
-            city,
-          })
-        }
+    let alive = true
+    fetchMatchesPayload().then((payload) => {
+      if (!alive) return
+      if (payload) {
+        setListings(payload.matches)
+        if (payload.context) setContext(payload.context)
+        setStatus('ready')
+      } else {
+        setListings(initialListings)
+        setStatus('offline')
       }
-    } catch {}
-
-    // Fetch personalized scored matches from /api/matches using logged-in email
-    ;(async () => {
-      try {
-        let email = ''
-        const { data } = await supabase.auth.getUser()
-        if (data.user?.email) {
-          email = data.user.email
-        } else {
-          const savedUser = localStorage.getItem('subtle-user-v1')
-          if (savedUser) email = JSON.parse(savedUser)?.email ?? ''
-        }
-
-        const url = email ? `/api/matches?email=${encodeURIComponent(email)}` : '/api/matches'
-        const res = await fetch(url, { cache: 'no-store' })
-        if (res.ok) {
-          const payload = await res.json()
-          if (Array.isArray(payload.matches) && payload.matches.length > 0) {
-            setListings(payload.matches)
-          }
-          if (payload.context && payload.userProfile?.company_name) {
-            setContext(payload.context)
-          }
-        }
-      } catch {}
-    })()
-  }, [initialContext])
+    })
+    return () => {
+      alive = false
+    }
+  }, [initialListings])
 
   const shown = useMemo(() => {
     const list = savedOnly ? listings.filter((l) => saved.includes(l.id)) : [...listings]
@@ -141,7 +117,7 @@ export default function Matches({
             </div>
             <div className="flex items-center gap-3 text-sm">
               <span className="text-[#4A5A75]">
-                {shown.length} {shown.length === 1 ? 'home' : 'homes'} · verified &amp; sample listings
+                {status === 'loading' ? 'Finding homes near you…' : `${shown.length} ${shown.length === 1 ? 'home' : 'homes'} · verified & sample listings`}
               </span>
               <button
                 type="button"
@@ -229,14 +205,36 @@ export default function Matches({
             })}
           </ul>
 
-          {shown.length === 0 && (
+          {status === 'loading' && (
+            <ul className="mt-6 space-y-5" aria-hidden="true">
+              {[0, 1].map((k) => (
+                <li key={k} className="h-56 animate-pulse rounded-[28px] bg-[#E4EAF1]" />
+              ))}
+            </ul>
+          )}
+
+          {status !== 'loading' && shown.length === 0 && (
             <div className="mt-6 rounded-[28px] border border-dashed border-[#C9DBEA] p-10 text-center">
               <HouseMascot label="Subtle's house mascot" speed={0.7} className="mx-auto mb-3 h-28 w-28" />
-              <p className="font-[family-name:var(--font-serif)] text-3xl">No saved homes yet.</p>
-              <p className="mt-2 text-[#4A5A75]">Tap the heart on any home to keep it here.</p>
-              <button type="button" onClick={() => setSavedOnly(false)} className="mt-5 rounded-full bg-[#1E2B44] px-6 py-3 font-semibold text-white">
-                Show all matches
-              </button>
+              {savedOnly && listings.length > 0 ? (
+                <>
+                  <p className="font-[family-name:var(--font-serif)] text-3xl">No saved homes yet.</p>
+                  <p className="mt-2 text-[#4A5A75]">Tap the heart on any home to keep it here.</p>
+                  <button type="button" onClick={() => setSavedOnly(false)} className="mt-5 rounded-full bg-[#1E2B44] px-6 py-3 font-semibold text-white">
+                    Show all matches
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="font-[family-name:var(--font-serif)] text-3xl">No listings near {context.city} yet.</p>
+                  <p className="mx-auto mt-2 max-w-md text-[#4A5A75]">
+                    We only show homes within about 40 miles of {context.office || 'where you work'}. New sublets show up here as soon as they&apos;re posted.
+                  </p>
+                  <Link href="/questionnaire" className="mt-5 inline-flex rounded-full bg-[#1E2B44] px-6 py-3 font-semibold text-white">
+                    Check my work address
+                  </Link>
+                </>
+              )}
             </div>
           )}
         </div>

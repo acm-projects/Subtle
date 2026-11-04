@@ -38,6 +38,27 @@ const KNOWN_PLACES: Record<string, Coordinates> = {
  * Includes local known place resolution and caching.
  */
 export async function geocodeAddress(address: string): Promise<Coordinates | null> {
+  // Nominatim often can't find an address with a unit number ("Unit 205", "Apt 3B") or a typo in
+  // the street, so try the full address, then without the unit, then just "City, ST 12345".
+  const full = (address || '').trim()
+  if (!full) return null
+  const candidates = [full]
+  const noUnit = full
+    .replace(/[,\s]*\b(unit|apt|apartment|suite|ste|room|rm|fl|floor)\b\.?\s*#?\s*[\w-]+/gi, '')
+    .replace(/[,\s]*#\s*[\w-]+/g, '')
+    .replace(/\s+,/g, ',')
+    .trim()
+  if (noUnit && noUnit !== full) candidates.push(noUnit)
+  const parts = full.split(',').map((s) => s.trim()).filter(Boolean)
+  if (parts.length >= 3) candidates.push(parts.slice(-2).join(', '))
+  for (const q of candidates) {
+    const hit = await geocodeOnce(q)
+    if (hit) return hit
+  }
+  return null
+}
+
+async function geocodeOnce(address: string): Promise<Coordinates | null> {
   const clean = (address || '').trim()
   if (!clean) return null
 
@@ -48,7 +69,9 @@ export async function geocodeAddress(address: string): Promise<Coordinates | nul
 
   // Check known shortcut / neighborhood table
   for (const [name, coords] of Object.entries(KNOWN_PLACES)) {
-    if (key.includes(name) || name.includes(key)) {
+    // exact name, or the name followed by a city ("SoMa, San Francisco"); a looser match sent
+    // places like "Mission Bend, Houston" to San Francisco's Mission District
+    if (key === name || key.startsWith(`${name},`)) {
       GEO_CACHE.set(key, coords)
       return coords
     }

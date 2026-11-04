@@ -15,6 +15,24 @@ import { computeSubtleScore } from '../../../lib/vector-matching'
  *   - sort: 'score' | 'price' | 'commute' (default 'score')
  *   - includeSamples: 'true' | 'false' (default 'true')
  */
+// ~40 miles: about as far as an intern would commute every day
+const NEARBY_KM = 65
+
+/**
+ * "Houston, TX" from an office address like "315 Capitol St Unit 205, Houston, TX 77002".
+ * The office address wins over users_table.user_city, which the quiz doesn't update.
+ */
+function cityLabel(userCity?: string | null, office?: string | null): string {
+  const parts = (office ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  if (parts.length >= 2) {
+    const last = parts[parts.length - 1]
+    const state = last.match(/^([A-Za-z]{2})(?:\s+\d{5}(?:-\d{4})?)?$/)
+    if (state) return `${parts[parts.length - 2]}, ${state[1].toUpperCase()}`
+    return parts.slice(-2).join(', ').replace(/\s*\d{5}(-\d{4})?$/, '')
+  }
+  return userCity?.trim() ?? ''
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const email = searchParams.get('email')
@@ -33,12 +51,13 @@ export async function GET(request: Request) {
   }
 
   const officeAddress = userProfile?.office_address || SAMPLE_CONTEXT.office
+
   const preferredMode = userProfile?.user_transportation || 'Public Transit'
 
   const context: MatchContext = {
     company: userProfile?.company_name || SAMPLE_CONTEXT.company,
     office: officeAddress,
-    city: userProfile?.user_city || (officeAddress ? officeAddress.split(',').slice(-2).join(', ').trim() : SAMPLE_CONTEXT.city),
+    city: cityLabel(userProfile?.user_city, userProfile?.office_address) || SAMPLE_CONTEXT.city,
   }
 
   // 1. Geocode the user's workplace address with Nominatim
@@ -54,19 +73,30 @@ export async function GET(request: Request) {
     console.error('Error loading DB listings in /api/matches:', err)
   }
 
-  const rawCombined = includeSamples ? [...dbMatched, ...SAMPLE_LISTINGS] : dbMatched
+  // sample listings are all in San Francisco
+  const samples = SAMPLE_LISTINGS.map((l) => ({ ...l, city: SAMPLE_CONTEXT.city }))
+  const rawCombined = includeSamples ? [...dbMatched, ...samples] : dbMatched
 
   // 2. Geocode listings and compute approximate commute duration based on real coordinates
-  const combined: MatchListing[] = await Promise.all(
+  const located: { listing: MatchListing; distKm: number | null }[] = await Promise.all(
     rawCombined.map(async (l) => {
       // If we don't have workplace coords, preserve listing defaults
-      if (!workplaceCoords) return l
+      if (!workplaceCoords) return { listing: l, distKm: null }
 
-      // Determine listing coordinates: check explicit lat/lon, or geocode address/neighborhood
+      // Listing coordinates: explicit lat/lon, else its address, else its neighborhood + its own city.
+      // Never the user's city: a listing with no location of its own would look "nearby" everywhere.
       let listingCoords = l.latitude && l.longitude ? { lat: l.latitude, lon: l.longitude } : null
       if (!listingCoords) {
-        const query = l.address || `${l.neighborhood}, ${context.city}`
-        listingCoords = await geocodeAddress(query)
+        const address = l.address?.trim()
+        const city = l.city?.trim()
+        const query = address
+          ? city && !address.toLowerCase().includes(city.toLowerCase())
+            ? `${address}, ${city}`
+            : address
+          : city
+          ? `${l.neighborhood}, ${city}`
+          : ''
+        listingCoords = query ? await geocodeAddress(query) : null
       }
 
       if (listingCoords) {
@@ -75,18 +105,28 @@ export async function GET(request: Request) {
         const commuteMinutes = estimateCommuteMinutes(distKm, optimalMode)
 
         return {
-          ...l,
-          commuteMinutes,
-          commuteMode: optimalMode,
-          commuteSource: 'estimate' as const,
-          latitude: listingCoords.lat,
-          longitude: listingCoords.lon,
+          listing: {
+            ...l,
+            commuteMinutes,
+            commuteMode: optimalMode,
+            commuteSource: 'estimate' as const,
+            latitude: listingCoords.lat,
+            longitude: listingCoords.lon,
+          },
+          distKm,
         }
       }
 
-      return l
+      return { listing: l, distKm: null }
     }),
   )
+
+  // 2a. Only homes within NEARBY_KM of the workplace. A listing we couldn't place on the map is left out,
+  //     since we can't tell if it's near. If the workplace itself couldn't be found, nothing is filtered.
+  const combined: MatchListing[] = workplaceCoords
+    ? located.filter((x) => x.distKm != null && x.distKm <= NEARBY_KM).map((x) => x.listing)
+    : located.map((x) => x.listing)
+  const filteredOut = rawCombined.length - combined.length
 
   // 2b. Replace the estimate with real Google Maps travel times wherever Google has a route.
   //     Listings are grouped by travel mode so each mode is one request (in batches).
@@ -171,6 +211,10 @@ export async function GET(request: Request) {
     geocodedWorkplace: workplaceCoords,
     // how many commute times came from Google Maps vs. the distance estimate
     commuteSources: { google: googleCount, estimate: combined.length - googleCount },
+    // homes within ~40 miles of the workplace, and how many were left out for being too far or unplaceable
+    nearby: combined.length,
+    filteredOut,
+    radiusKm: workplaceCoords ? NEARBY_KM : null,
     safetyCoverage: { withData: safetyById.size, without: combined.length - safetyById.size },
     total: scored.length,
     matches: scored,

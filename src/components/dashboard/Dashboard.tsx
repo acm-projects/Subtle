@@ -64,50 +64,64 @@ export default function Dashboard() {
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <h2 className={`${serif} text-4xl font-medium`}>Best Matches</h2>
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => scrollRow(-1)} aria-label="Scroll matches left" className="flex h-12 w-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white/80 transition hover:bg-white">
-                      <Icon name="arrowL" size={18} />
-                    </button>
-                    <button type="button" onClick={() => scrollRow(1)} aria-label="Scroll matches right" className="flex h-12 w-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white/80 transition hover:bg-white">
-                      <Icon name="arrowR" size={18} />
-                    </button>
+                    {d.topMatches.length > 0 && (
+                      <>
+                        <button type="button" onClick={() => scrollRow(-1)} aria-label="Scroll matches left" className="flex h-12 w-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white/80 transition hover:bg-white">
+                          <Icon name="arrowL" size={18} />
+                        </button>
+                        <button type="button" onClick={() => scrollRow(1)} aria-label="Scroll matches right" className="flex h-12 w-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white/80 transition hover:bg-white">
+                          <Icon name="arrowR" size={18} />
+                        </button>
+                      </>
+                    )}
                     <Link href="/matches" className={btnLight}>
                       See all matches
                     </Link>
                   </div>
                 </div>
-                <ol
-                  ref={rowRef}
-                  aria-label="Best matches, scroll sideways for more"
-                  tabIndex={0}
-                  className="-mx-2 mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-px-2 px-2 pb-4 outline-none [scrollbar-color:#C9DBEA_transparent] [scrollbar-width:thin] focus-visible:ring-4 focus-visible:ring-[#A9C7E8]/60"
-                >
-                  {d.topMatches.map((l, i) => (
-                    <li key={l.id} className="w-[min(320px,80vw)] shrink-0 snap-start animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both]" style={{ animationDelay: `${120 + Math.min(i, 4) * 70}ms` }}>
-                      <Link
-                        href={`/matches/${l.id}`}
-                        aria-label={`Number ${i + 1}: ${l.title}, Subtle score ${l.score}`}
-                        className="group block rounded-[26px] border border-white bg-white/80 p-2.5 transition hover:-translate-y-1 hover:shadow-[0_24px_50px_-30px_rgba(30,43,68,0.5)]"
-                      >
-                        <div className="relative">
-                          <ListingPhoto listing={l} seed={i} className="h-52" />
-                          <span className="absolute right-2.5 top-2.5 rounded-full bg-[#1E2B44] px-3 py-1 text-sm font-bold text-white">#{i + 1}</span>
-                        </div>
-                        <div className="flex items-start gap-3 px-1.5 pb-1.5 pt-4">
-                          <ScoreBadge score={l.score} size={44} />
-                          <div className="min-w-0">
-                            <p className={`${serif} truncate text-xl font-medium`}>{l.title}</p>
-                            <p className="text-sm">
-                              <strong>${l.price.toLocaleString()}</strong> / month
-                            </p>
-                            <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-[#4A5A75]">
-                              <Icon name={commuteIcon(l)} size={14} /> {commuteText(l)}
-                            </p>
+                {d.topMatches.length === 0 ? (
+                  <div className="mt-8 rounded-[26px] border border-dashed border-[#C9DBEA] p-8 text-center">
+                    <p className={`${serif} text-3xl`}>{d.nearCity ? `No listings near ${d.nearCity} yet.` : 'No listings near you yet.'}</p>
+                    <p className="mx-auto mt-2 max-w-md text-[#4A5A75]">We only show homes within about 40 miles of where you work. New sublets show up here as soon as they're posted.</p>
+                    <Link href="/questionnaire" className={`${btnLight} mt-5`}>
+                      Check my work address
+                    </Link>
+                  </div>
+                ) : (
+                  <ol
+                    ref={rowRef}
+                    aria-label="Best matches, scroll sideways for more"
+                    tabIndex={0}
+                    className="-mx-2 mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-px-2 px-2 pb-4 outline-none [scrollbar-color:#C9DBEA_transparent] [scrollbar-width:thin] focus-visible:ring-4 focus-visible:ring-[#A9C7E8]/60"
+                  >
+                    {d.topMatches.map((l, i) => (
+                      <li key={l.id} className="w-[min(320px,80vw)] shrink-0 snap-start animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both]" style={{ animationDelay: `${120 + Math.min(i, 4) * 70}ms` }}>
+                        <Link
+                          href={`/matches/${l.id}`}
+                          aria-label={`Number ${i + 1}: ${l.title}, Subtle score ${l.score}`}
+                          className="group block rounded-[26px] border border-white bg-white/80 p-2.5 transition hover:-translate-y-1 hover:shadow-[0_24px_50px_-30px_rgba(30,43,68,0.5)]"
+                        >
+                          <div className="relative">
+                            <ListingPhoto listing={l} seed={i} className="h-52" />
+                            <span className="absolute right-2.5 top-2.5 rounded-full bg-[#1E2B44] px-3 py-1 text-sm font-bold text-white">#{i + 1}</span>
                           </div>
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
-                </ol>
+                          <div className="flex items-start gap-3 px-1.5 pb-1.5 pt-4">
+                            <ScoreBadge score={l.score} size={44} />
+                            <div className="min-w-0">
+                              <p className={`${serif} truncate text-xl font-medium`}>{l.title}</p>
+                              <p className="text-sm">
+                                <strong>${l.price.toLocaleString()}</strong> / month
+                              </p>
+                              <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-[#4A5A75]">
+                                <Icon name={commuteIcon(l)} size={14} /> {commuteText(l)}
+                              </p>
+                            </div>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ol>
+                )}
               </>
             ) : (
               <div className="grid items-center gap-10 py-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
