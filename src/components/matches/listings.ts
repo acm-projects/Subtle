@@ -7,6 +7,7 @@ export type Listing = {
   score: number // Subtle score, 0 to 100
   commuteMinutes: number
   commuteMode: 'walk' | 'transit' | 'bike' | 'drive'
+  commuteSource?: 'google' | 'estimate' // where commuteMinutes came from (see /api/matches)
   homeType: 'Apartment' | 'House' | 'Studio'
   roomType: 'Private room' | 'Shared room' | 'Entire place'
   tags: string[]

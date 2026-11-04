@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { dbListingToMatchListing, type Listing as MatchListing, type MatchContext, SAMPLE_CONTEXT, SAMPLE_LISTINGS } from '../../../components/matches/listings'
-import { estimateCommuteMinutes, geocodeAddress, haversineDistanceKm, pickOptimalCommuteMode } from '../../../lib/geocoding'
+import { type CommuteMode, estimateCommuteMinutes, geocodeAddress, haversineDistanceKm, pickOptimalCommuteMode } from '../../../lib/geocoding'
+import { googleCommuteMinutes, hasGoogleMapsKey } from '../../../lib/google-maps'
 import { getListings } from '../../../lib/listings'
 import { runPythonVectorMatcher } from '../../../lib/python-matcher'
 import { supabase } from '../../../lib/supabase'
@@ -76,6 +77,7 @@ export async function GET(request: Request) {
           ...l,
           commuteMinutes,
           commuteMode: optimalMode,
+          commuteSource: 'estimate' as const,
           latitude: listingCoords.lat,
           longitude: listingCoords.lon,
         }
@@ -84,6 +86,31 @@ export async function GET(request: Request) {
       return l
     }),
   )
+
+  // 2b. Replace the estimate with real Google Maps travel times wherever Google has a route.
+  //     Listings are grouped by travel mode so each mode is one request (in batches).
+  let googleCount = 0
+  if (workplaceCoords && hasGoogleMapsKey()) {
+    const byMode = new Map<CommuteMode, number[]>()
+    combined.forEach((l, i) => {
+      if (l.latitude == null || l.longitude == null) return
+      const mode = l.commuteMode as CommuteMode
+      byMode.set(mode, [...(byMode.get(mode) ?? []), i])
+    })
+    for (const [mode, indexes] of byMode) {
+      const minutes = await googleCommuteMinutes(
+        indexes.map((i) => ({ lat: combined[i].latitude as number, lon: combined[i].longitude as number })),
+        workplaceCoords,
+        mode,
+      )
+      indexes.forEach((i, k) => {
+        const m = minutes[k]
+        if (m == null) return
+        combined[i] = { ...combined[i], commuteMinutes: m, commuteSource: 'google' }
+        googleCount++
+      })
+    }
+  }
 
   // 3. Primary: Run Python Machine Learning & Vector Matching Engine (ml/vector_matcher.py)
   let scored: MatchListing[] = []
@@ -120,6 +147,8 @@ export async function GET(request: Request) {
     userProfile,
     engine,
     geocodedWorkplace: workplaceCoords,
+    // how many commute times came from Google Maps vs. the distance estimate
+    commuteSources: { google: googleCount, estimate: combined.length - googleCount },
     total: scored.length,
     matches: scored,
     mlAnalytics,
