@@ -32,7 +32,7 @@ const isDemo = (id: string) => id.startsWith('c-')
 function readLocal(): Conversation[] {
   try {
     const raw = localStorage.getItem(KEY)
-    // older versions seeded made-up conversations (sample: true); drop them
+    // only real conversations (skip any marked sample)
     if (raw) return (JSON.parse(raw) as Conversation[]).filter((c) => !c.sample)
   } catch {}
   return []

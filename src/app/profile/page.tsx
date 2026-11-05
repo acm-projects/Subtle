@@ -211,7 +211,7 @@ try {
         if (stored) localAvatar = stored;
       } catch {}
 
-      // 4. Connections: always load them (they used to depend on a profiles table that doesn't exist)
+      // 4. Connections
       const p = null as Profile | null;
       try {
         const { data: mineRow } = await supabase.from("users_table").select("user_interests").eq("id", user.id).maybeSingle();

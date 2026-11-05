@@ -128,7 +128,6 @@ export default function PostListing() {
 
     try {
       // City from an address like "123 Main St, Apt 4, Houston, TX 77002": the part before the state.
-      // (The street used to be saved as the neighborhood; we don't know the neighborhood, so leave it empty.)
       const addrParts = listing.address.split(',').map((s) => s.trim()).filter(Boolean)
       const last = addrParts[addrParts.length - 1] ?? ''
       const endsWithState = /^[A-Za-z]{2}(\s+\d{5}(-\d{4})?)?$/.test(last)

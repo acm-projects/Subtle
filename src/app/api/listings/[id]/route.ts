@@ -23,7 +23,7 @@ function getSupabaseForRequest(request: Request) {
 
 /**
  * GET /api/listings/[id]
- * Returns a single listing by ID (checks Supabase listing_table first, then sample listings).
+ * Returns a single listing by ID from Supabase listing_table.
  */
 export async function GET(_request: Request, { params }: Context) {
   const { id } = await params

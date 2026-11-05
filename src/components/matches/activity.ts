@@ -8,7 +8,7 @@ import { authFetch } from '../../lib/auth-fetch'
 
 const SAVED_KEY = 'subtle-saved-v1'
 const BOOKINGS_KEY = 'subtle-bookings-v1'
-// ids of the made-up San Francisco listings that used to ship with the app; anything saved for them is dropped
+// listing ids that aren't real listings; ignored if they show up in this browser's saved data
 const OLD_SAMPLE_IDS = new Set(['soma-loft', 'hayes-valley-studio', 'mission-apartment', 'nob-hill-room', 'potrero-house'])
 
 function read<T>(key: string, fallback: T): T {
@@ -45,7 +45,7 @@ export async function syncSaved(): Promise<string[]> {
     const remote = (data ?? []).map((r) => r.listing_id as string)
     const missing = local.filter((id) => !remote.includes(id))
     if (missing.length) {
-      // only real listings can be saved (old ids that no longer exist are dropped by the foreign key)
+      // only real listings can be saved (the database rejects ids that aren't listings)
       await Promise.all(missing.map((listing_id) => supabase.from('saved_homes').insert({ listing_id })))
       const { data: again } = await supabase.from('saved_homes').select('listing_id').order('created_at', { ascending: false })
       const ids = (again ?? []).map((r) => r.listing_id as string)

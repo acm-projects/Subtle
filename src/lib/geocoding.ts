@@ -18,8 +18,7 @@ export type CommuteMode = 'walk' | 'transit' | 'bike' | 'drive'
 // In-memory cache to prevent repeated calls to Nominatim
 const GEO_CACHE = new Map<string, Coordinates | null>()
 
-// Shortcuts for addresses we already know (none right now: the old San Francisco sample
-// neighborhoods were removed with the sample listings). Format: 'lowercase name': { lat, lon }.
+// Shortcuts for addresses we already know. Format: 'lowercase name': { lat, lon }.
 const KNOWN_PLACES: Record<string, Coordinates> = {}
 
 /**
