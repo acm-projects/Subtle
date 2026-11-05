@@ -28,13 +28,27 @@ export default function ContactHost({ listing, context = SAMPLE_CONTEXT }: { lis
   const [conversationId, setConversationId] = useState<string | null>(null)
 
   // Saves through the messages store (TODO(backend) lives in src/components/messages/store.ts)
+  const [error, setError] = useState<string | null>(null)
   const sendMessage = async () => {
-    setSending(true)
-    const id = await startConversation({ id: listing.id, title: listing.title, score: listing.score, hostName: listing.hostName }, message.trim())
-    setConversationId(id)
-    setSending(false)
-    setSent(true)
+  if (!listing.hostId) {
+    setError('This listing has no host to message.')
+    return
   }
+  setSending(true)
+  setError(null)
+  try {
+    const id = await startConversation(
+      { id: listing.id, title: listing.title, score: listing.score, hostName: listing.hostName, hostId: listing.hostId },
+      message.trim(),
+    )
+    setConversationId(id)
+    setSent(true)
+  } catch (e: any) {
+    setError(e?.message ?? "Couldn't send your message. Please try again.")
+  } finally {
+    setSending(false)
+  }
+}
 
   const commute = `${listing.commuteMinutes} min ${listing.commuteMode === 'walk' ? 'walk' : listing.commuteMode === 'transit' ? 'by transit' : listing.commuteMode === 'bike' ? 'bike' : 'drive'}`
   const hostMeta = [listing.hostVerified ? 'Verified .edu sub-leaser' : 'Sub-leaser', listing.hostReplyTime].filter(Boolean).join(' · ')

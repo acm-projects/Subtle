@@ -15,6 +15,7 @@ export type Listing = {
   description: string
   amenities: string[]
   hostName: string
+  hostId?: string // auth user id of the lister; undefined for sample listings
   subtitle?: string // e.g. "Private room in a furnished apartment"
   whyScore?: string[] // short reasons behind the score; derived from the fields above if missing
   features?: string[] // chips under "The place"; derived if missing
@@ -150,8 +151,10 @@ export function dbListingToMatchListing(db: any): Listing {
   const homeType: Listing['homeType'] =
     db.building_type === 'Studio' ? 'Studio' : db.building_type === 'House' ? 'House' : 'Apartment'
 
-  const formattedStart = db.start_date
-    ? new Date(db.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  // The DB column is move_in (older code used start_date), so accept either
+  const startDate = db.move_in ?? db.start_date
+  const formattedStart = startDate
+    ? new Date(startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : 'Flexible'
   const formattedEnd = db.end_date
     ? new Date(db.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -174,7 +177,7 @@ export function dbListingToMatchListing(db: any): Listing {
     availableTo: formattedEnd,
     description: db.about || 'Comfortable sublet, fully furnished and close to transit.',
     amenities: db.amenities || [],
-    hostName: 'Student Host',
+    hostName: 'Student Host', // replaced by withHost() in lib/hosts.ts when the lister has a profile
     hostVerified: true,
     hostReplyTime: 'Replies within a few hours',
     subtitle: `${roomType} in a ${homeType.toLowerCase()}`,
