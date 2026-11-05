@@ -38,6 +38,8 @@ export default function Matches({
   const [savedOnly, setSavedOnly] = useState(false)
   const [saved, setSaved] = useState<string[]>([])
   const [context, setContext] = useState<MatchContext>(initialContext)
+  const [nearest, setNearest] = useState<Listing[]>([])
+  const [wrongDates, setWrongDates] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -45,6 +47,8 @@ export default function Matches({
       if (!alive) return
       if (payload) {
         setListings(payload.matches)
+        setNearest(payload.nearest ?? [])
+        setWrongDates(payload.wrongDates ?? 0)
         if (payload.context) setContext(payload.context)
         setStatus('ready')
       } else {
@@ -232,8 +236,29 @@ export default function Matches({
                 <>
                   <p className="font-[family-name:var(--font-serif)] text-3xl">{context.city ? `No listings near ${context.city} yet.` : 'No listings yet.'}</p>
                   <p className="mx-auto mt-2 max-w-md text-[#4A5A75]">
-                    We only show homes within {NEARBY_MILES} miles of {context.office || 'where you work'}. New sublets show up here as soon as they&apos;re posted.
+                    We only show homes within {NEARBY_MILES} miles of {context.office || 'where you work'}
+                    {wrongDates > 0 ? `. ${wrongDates} nearby ${wrongDates === 1 ? "home isn't" : "homes aren't"} free around your move-in date` : ''}. New sublets show up here as soon as they&apos;re posted.
                   </p>
+                  {nearest.length > 0 && (
+                    <div className="mx-auto mt-6 max-w-xl text-left">
+                      <p className="mb-2 text-sm font-semibold text-[#4A5A75]">Closest homes right now</p>
+                      <ul className="space-y-2">
+                        {nearest.map((l) => (
+                          <li key={l.id}>
+                            <Link href={`/matches/${l.id}`} className="flex items-center justify-between gap-3 rounded-2xl border border-white bg-white/80 px-4 py-3 transition hover:bg-white">
+                              <span className="min-w-0">
+                                <span className="block truncate font-semibold">{l.title}</span>
+                                <span className="text-sm text-[#4A5A75]">
+                                  {l.city || l.neighborhood} · ${l.price.toLocaleString()} / month
+                                </span>
+                              </span>
+                              <span className="shrink-0 text-sm font-semibold">{l.distanceMiles} mi away</span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <Link href="/questionnaire" className="mt-5 inline-flex rounded-full bg-[#1E2B44] px-6 py-3 font-semibold text-white">
                     Check my work address
                   </Link>

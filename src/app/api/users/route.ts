@@ -55,7 +55,7 @@ function mapTransportation(t: unknown): string | null {
   if (val === 'transit') return 'Public Transit'
   if (val === 'driving') return 'Car'
   if (val === 'rideshare') return 'Rideshare'
-  if (val === 'biking') return 'Walking' // fallback to closest valid enum
+  if (val === 'biking') return 'Bike/Scooter'
   return 'Public Transit'
 }
 

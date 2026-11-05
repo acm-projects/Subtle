@@ -17,7 +17,9 @@ export type MatchesPayload = {
   matches: Listing[]
   nearby?: number
   radiusKm?: number | null
-  userProfile?: Record<string, unknown> | null
+  wrongDates?: number
+  moveIn?: string | null
+  nearest?: Listing[] // closest homes outside the radius, only when nothing is nearby
 }
 
 let cached: { email: string; at: number; promise: Promise<MatchesPayload | null> } | null = null

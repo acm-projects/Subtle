@@ -145,9 +145,10 @@ export default function ProfilePage() {
     if (!rows?.length) return setConnections([]);
 
     const otherIds = rows.map((r) => (r.requester_id === userId ? r.addressee_id : r.requester_id));
+    // names and interests live in users_table (there is no profiles table)
     const { data: people } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name, avatar_url, interests")
+      .from("users_table")
+      .select("id, first_name, last_name, user_interests")
       .in("id", otherIds);
     const byId = new Map((people ?? []).map((p) => [p.id, p]));
 
@@ -159,8 +160,8 @@ export default function ProfilePage() {
           id: r.id,
           otherId,
           name: p ? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "Subtle user" : "Subtle user",
-          avatarUrl: p?.avatar_url ?? null,
-          shared: (p?.interests ?? []).filter((i: string) => mine.includes(i)).length,
+          avatarUrl: null,
+          shared: (p?.user_interests ?? []).filter((i: string) => mine.includes(i)).length,
           score: r.score,
           status: r.status,
           incoming: r.addressee_id === userId,
@@ -211,16 +212,11 @@ try {
         if (stored) localAvatar = stored;
       } catch {}
 
-      // 4. Fetch from public.profiles table
-      let p: Profile | null = null;
+      // 4. Connections: always load them (they used to depend on a profiles table that doesn't exist)
+      const p = null as Profile | null;
       try {
-        const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-        if (data) {
-          p = data as Profile;
-          if (!firstName && p.first_name) firstName = p.first_name;
-          if (!lastName && p.last_name) lastName = p.last_name;
-          await loadConnections(user.id, p.interests ?? []);
-        }
+        const { data: mineRow } = await supabase.from("users_table").select("user_interests").eq("id", user.id).maybeSingle();
+        await loadConnections(user.id, (mineRow?.user_interests as string[] | null) ?? []);
       } catch {}
 
       const finalAvatar = localAvatar || p?.avatar_url || null;

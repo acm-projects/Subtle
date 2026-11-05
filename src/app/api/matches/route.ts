@@ -34,6 +34,13 @@ function cityLabel(userCity?: string | null, office?: string | null): string {
   return userCity?.trim() ?? ''
 }
 
+/** 'YYYY-MM-DD' (or anything starting with it) -> Date at UTC midnight; null for 'Flexible' / empty / junk */
+function parseDay(v: unknown): Date | null {
+  const m = typeof v === 'string' ? v.match(/^(\d{4})-(\d{2})-(\d{2})/) : null
+  return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null
+}
+const addDays = (d: Date, n: number) => new Date(d.getTime() + n * 86_400_000)
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const email = searchParams.get('email')
@@ -122,10 +129,34 @@ export async function GET(request: Request) {
 
   // 2a. Only homes within NEARBY_KM of the workplace. A listing we couldn't place on the map is left out,
   //     since we can't tell if it's near. If the workplace itself couldn't be found, nothing is filtered.
-  const combined: MatchListing[] = workplaceCoords
+  const nearbyOnes = workplaceCoords
     ? located.filter((x) => x.distKm != null && x.distKm <= NEARBY_KM).map((x) => x.listing)
     : located.map((x) => x.listing)
+
+  // 2a'. Dates: drop homes that aren't free around the user's move-in day. A home counts if it opens no
+  //      more than 3 weeks after they arrive and is still free 4 weeks after. Homes or users with no
+  //      dates ("Flexible") are kept.
+  const moveIn = parseDay(userProfile?.move_in_date)
+  const fitsDates = (l: MatchListing) => {
+    if (!moveIn) return true
+    const from = parseDay(l.startDate)
+    const to = parseDay(l.endDate)
+    if (from && from > addDays(moveIn, 21)) return false
+    if (to && to < addDays(moveIn, 28)) return false
+    return true
+  }
+  const combined: MatchListing[] = nearbyOnes.filter(fitsDates)
+  const wrongDates = nearbyOnes.length - combined.length
   let filteredOut = rawCombined.length - combined.length
+
+  // 2a''. If nothing is nearby, the closest few within 3x the radius (with the right dates), so the page isn't a dead end
+  const nearest: MatchListing[] = workplaceCoords
+    ? located
+        .filter((x) => x.distKm != null && x.distKm > NEARBY_KM && x.distKm <= NEARBY_KM * 3 && fitsDates(x.listing))
+        .sort((a, b) => (a.distKm as number) - (b.distKm as number))
+        .slice(0, 3)
+        .map((x) => ({ ...x.listing, nearWork: false, distanceMiles: Math.round((x.distKm as number) / 1.609) }))
+    : []
 
   // 2b. Replace the estimate with real Google Maps travel times wherever Google has a route.
   //     Listings are grouped by travel mode so each mode is one request (in batches).
@@ -212,7 +243,6 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     context,
-    userProfile,
     engine,
     geocodedWorkplace: workplaceCoords,
     // how many commute times came from Google Maps vs. the distance estimate
@@ -220,6 +250,9 @@ export async function GET(request: Request) {
     // homes within NEARBY_MILES of the workplace, and how many were left out for being too far or unplaceable
     nearby: combined.length,
     filteredOut,
+    wrongDates, // nearby homes left out because they aren't free around the user's move-in day
+    moveIn: moveIn ? moveIn.toISOString().slice(0, 10) : null,
+    nearest: combined.length === 0 ? nearest : [],
     radiusKm: workplaceCoords ? NEARBY_KM : null,
     safetyCoverage: { withData: safetyById.size, without: combined.length - safetyById.size },
     total: scored.length,

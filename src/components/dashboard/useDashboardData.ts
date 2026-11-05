@@ -102,7 +102,7 @@ export function useDashboardData(): DashboardData {
         firstName = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
         if (!firstName && auth.user) {
           try {
-            const { data: prof } = await supabase.from('profiles').select('first_name').eq('id', auth.user.id).single()
+            const { data: prof } = await supabase.from('users_table').select('first_name').eq('id', auth.user.id).maybeSingle()
             firstName = ((prof?.first_name ?? '') as string).trim()
           } catch {}
         }

@@ -127,10 +127,13 @@ export default function PostListing() {
     setStatus('posting')
 
     try {
-      // Parse city & neighborhood from address if formatted with commas
+      // City from an address like "123 Main St, Apt 4, Houston, TX 77002": the part before the state.
+      // (The street used to be saved as the neighborhood; we don't know the neighborhood, so leave it empty.)
       const addrParts = listing.address.split(',').map((s) => s.trim()).filter(Boolean)
-      const neighborhood = addrParts[0] || null
-      const city = addrParts.length > 1 ? addrParts[1] : null
+      const last = addrParts[addrParts.length - 1] ?? ''
+      const endsWithState = /^[A-Za-z]{2}(\s+\d{5}(-\d{4})?)?$/.test(last)
+      const city = addrParts.length >= 3 && endsWithState ? addrParts[addrParts.length - 2] : addrParts.length >= 2 ? addrParts[1] : null
+      const neighborhood = null
 
       const files = photos.map((p) => p.file)
       const payload = {

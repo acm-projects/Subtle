@@ -28,6 +28,9 @@ export type Listing = {
   city?: string // the listing's own city (listing_table.city); used to place it on the map
   nearWork?: boolean // false when /api/matches left it out for being too far from the user's office
   hostId?: string | null // listing_table.user_id: who posted it (only they can edit it)
+  startDate?: string | null // 'YYYY-MM-DD' first day available (listing_table.move_in)
+  endDate?: string | null // 'YYYY-MM-DD' last day available (listing_table.end_date)
+  distanceMiles?: number // straight-line miles to the user's office (only on /api/matches `nearest`)
   latitude?: number | null
   longitude?: number | null
 }
@@ -57,8 +60,10 @@ export function dbListingToMatchListing(db: any): Listing {
   const homeType: Listing['homeType'] =
     db.building_type === 'Studio' ? 'Studio' : db.building_type === 'House' ? 'House' : 'Apartment'
 
-  const formattedStart = db.start_date
-    ? new Date(db.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  // listing_table stores the first available day in `move_in`
+  const startDate: string | null = db.move_in ?? db.start_date ?? null
+  const formattedStart = startDate
+    ? new Date(startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : 'Flexible'
   const formattedEnd = db.end_date
     ? new Date(db.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -90,6 +95,8 @@ export function dbListingToMatchListing(db: any): Listing {
     address: db.address || undefined,
     city: db.city || undefined,
     hostId: db.user_id ?? null,
+    startDate,
+    endDate: db.end_date ?? null,
     latitude: db.latitude || null,
     longitude: db.longitude || null,
   }

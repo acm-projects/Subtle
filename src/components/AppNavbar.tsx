@@ -24,7 +24,11 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
     let active = true
     const load = async () => {
       const { data: auth } = await supabase.auth.getUser()
-      if (!auth.user) return
+      // every page with this navbar is for signed-in users: send everyone else to log in
+      if (!auth.user) {
+        router.replace('/login?mode=login')
+        return
+      }
       const user = auth.user
       const meta = user.user_metadata ?? {}
       let pic = (meta.avatar_url ?? meta.avatarUrl ?? null) as string | null
@@ -42,7 +46,7 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
       let last = String(meta.last_name || meta.lastName || '').trim()
       if (!first || !last) {
         try {
-          const { data } = await supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single()
+          const { data } = await supabase.from('users_table').select('first_name, last_name').eq('id', user.id).maybeSingle()
           first = first || String(data?.first_name ?? '').trim()
           last = last || String(data?.last_name ?? '').trim()
         } catch {}
