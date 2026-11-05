@@ -3,13 +3,14 @@ import ListingDetail from '../../../components/matches/ListingDetail'
 import PageFrame from '../../../components/matches/PageFrame'
 import { dbListingToMatchListing } from '../../../components/matches/listings'
 import { getListing as getDbListing } from '../../../lib/listings'
+import { withHost } from '../../../lib/hosts'
 
 type Props = { params: Promise<{ id: string }> }
 
 async function findListing(id: string) {
   try {
     const db = await getDbListing(id)
-    if (db) return dbListingToMatchListing(db)
+    if (db) return await withHost(dbListingToMatchListing(db), db.user_id)
   } catch (e) {
     console.error('Error fetching listing from DB:', e)
   }

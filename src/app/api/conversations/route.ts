@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { createUserClient, supabaseAdmin } from '../../../lib/supabaseServer'
 
 // GET: list the logged-in user's conversations
-// GET: list the logged-in user's conversations
 export async function GET(req: Request) {
   const { client, token } = createUserClient(req)
 
@@ -33,32 +32,21 @@ export async function GET(req: Request) {
     .in('conversation_id', ids)
     .neq('user_id', user.id)
 
-  // Look up each other person's display name by their auth user id
+  // Display names come from users_table (first name + last initial)
   const otherIds = [...new Set((others ?? []).map((o) => o.user_id))]
   const names = new Map<string, string>()
 
-  await Promise.all(
-    otherIds.map(async (uid) => {
-      const { data } = await supabaseAdmin.auth.admin.getUserById(uid)
-      const meta = data?.user?.user_metadata ?? {}
+  if (otherIds.length > 0) {
+    const { data: profiles } = await supabaseAdmin
+      .from('users_table')
+      .select('user_id, first_name, last_name')
+      .in('user_id', otherIds)
 
-      // console.log('USER METADATA:', JSON.stringify(meta)) // uncomment to find the right key
-
-      const fullFromParts = [meta.first_name, meta.last_name].filter(Boolean).join(' ')
-
-      names.set(
-        uid,
-        meta.display_name ??
-          meta.displayName ??
-          meta.full_name ??
-          meta.fullName ??
-          meta.name ??
-          (fullFromParts || undefined) ??
-          data?.user?.email?.split('@')[0] ??
-          'User'
-      )
-    })
-  )
+    for (const p of profiles ?? []) {
+      const initial = p.last_name ? ` ${p.last_name[0]}.` : ''
+      names.set(p.user_id, `${p.first_name}${initial}`)
+    }
+  }
 
   // Latest message for each conversation
   const latest = await Promise.all(
@@ -99,7 +87,7 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   let otherUserId: unknown
-  let listingId: unknown // NEW
+  let listingId: unknown
   try {
     ({ otherUserId, listingId } = await req.json())
   } catch {
@@ -112,8 +100,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "You can't message yourself" }, { status: 400 })
   }
 
-  // NEW: listingId is optional; null means a general chat not tied to a listing
+  // listingId is optional; null means a general chat not tied to a listing
   const listing = typeof listingId === 'string' && listingId ? listingId : null
+
+  // If a listing is attached, its owner must be one of the two people in the chat
+  if (listing) {
+    const { data: row } = await supabaseAdmin
+      .from('listing_table')
+      .select('user_id')
+      .eq('id', listing)
+      .maybeSingle()
+
+    if (!row || (row.user_id !== otherUserId && row.user_id !== user.id)) {
+      return NextResponse.json({ error: 'Listing does not belong to either user' }, { status: 400 })
+    }
+  }
 
   // 1. Does a conversation between these two users about this listing already exist?
   const { data: myRows } = await supabaseAdmin
@@ -133,7 +134,7 @@ export async function POST(req: Request) {
     const sharedIds = (shared ?? []).map((r) => r.conversation_id)
 
     if (sharedIds.length > 0) {
-      // NEW: of the shared conversations, find one for the same listing
+      // Of the shared conversations, find one for the same listing
       let query = supabaseAdmin.from('conversations').select('id').in('id', sharedIds)
       query = listing ? query.eq('listing_id', listing) : query.is('listing_id', null)
       const { data: match } = await query.limit(1)
@@ -147,7 +148,7 @@ export async function POST(req: Request) {
   // 2. Otherwise create the conversation, with the listing attached
   const { data: convo, error: convoError } = await supabaseAdmin
     .from('conversations')
-    .insert({ listing_id: listing }) // CHANGED: was insert({})
+    .insert({ listing_id: listing })
     .select()
     .single()
 

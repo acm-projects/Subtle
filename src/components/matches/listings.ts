@@ -27,7 +27,7 @@ export type Listing = {
   address?: string
   city?: string // the listing's own city (listing_table.city); used to place it on the map
   nearWork?: boolean // false when /api/matches left it out for being too far from the user's office
-  hostId?: string | null // listing_table.user_id: who posted it (only they can edit it)
+  hostId?: string | null // listing_table.user_id: the lister's auth id (only they can edit it; messages go to them)
   startDate?: string | null // 'YYYY-MM-DD' first day available (listing_table.move_in)
   endDate?: string | null // 'YYYY-MM-DD' last day available (listing_table.end_date)
   distanceMiles?: number // straight-line miles to the user's office (only on /api/matches `nearest`)
@@ -86,7 +86,7 @@ export function dbListingToMatchListing(db: any): Listing {
     availableTo: formattedEnd,
     description: db.about || 'Comfortable sublet, fully furnished and close to transit.',
     amenities: db.amenities || [],
-    hostName: 'Student Host',
+    hostName: 'Student Host', // replaced by withHost() in lib/hosts.ts when the lister has a profile
     hostVerified: true,
     hostReplyTime: 'Replies within a few hours',
     subtitle: `${roomType} in ${homeType === 'Apartment' ? 'an' : 'a'} ${homeType.toLowerCase()}`,
