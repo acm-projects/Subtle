@@ -6,7 +6,7 @@ import { fetchMatchesPayload } from './useScored'
 import AppNavbar from '../AppNavbar'
 import { EMPTY_CONTEXT, NEARBY_MILES, type Listing, type MatchContext } from './listings'
 import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from './parts'
-import { loadSaved, toggleSavedId } from './activity'
+import { loadSaved, syncSaved, toggleSavedId } from './activity'
 import HouseMascot from '../HouseMascot'
 
 const NO_LISTINGS: Listing[] = []
@@ -67,7 +67,10 @@ export default function Matches({
   }, [listings, saved, savedOnly, sort])
 
   // hearts are kept in activity.ts, the same list the dashboard and listing page use
-  useEffect(() => setSaved(loadSaved()), [])
+  useEffect(() => {
+    setSaved(loadSaved())
+    syncSaved().then(setSaved)
+  }, [])
   const toggleSaved = (id: string) => setSaved(toggleSavedId(id))
   return (
     <>

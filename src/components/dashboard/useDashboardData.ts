@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { getListing as getDbListing, getListings } from '../../lib/listings'
-import { loadMyBookings, loadSaved, type Booking } from '../matches/activity'
+import { loadMyBookings, syncSaved, type Booking } from '../matches/activity'
 import { dbListingToMatchListing, type Listing } from '../matches/listings'
 import { EMPTY, type QuizAnswers } from '../quiz/options'
 import { userRowToQuizAnswers } from '../../lib/quiz-sync'
@@ -136,7 +136,7 @@ export function useDashboardData(): DashboardData {
       }
 
       const savedHomes: Listing[] = []
-      for (const id of loadSaved().slice(0, 4)) {
+      for (const id of (await syncSaved()).slice(0, 4)) {
         try {
           const db = await getDbListing(id)
           if (db) savedHomes.push(withScore(dbListingToMatchListing(db), scoredById.get(db.id), scored !== null))

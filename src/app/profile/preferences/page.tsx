@@ -198,7 +198,7 @@ export default function PreferencesPage() {
           housingType: a.housingType,
           accommodations: a.accommodations,
           moveIn: a.moveInDate || a.moveIn,
-          moveOut: a.moveOutDate, // TODO(backend): save the move-out date (users_table has no column yet)
+          moveOut: a.moveOutDate,
           commuteMode: a.commuteMode,
           car: a.car,
           maxCommute: a.maxCommute,

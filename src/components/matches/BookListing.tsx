@@ -7,6 +7,7 @@ import FlowShell from './FlowShell'
 import { EMPTY_CONTEXT, stayMonths, type Listing, type MatchContext } from './listings'
 import { Icon } from './parts'
 import { addBookingRequest } from './activity'
+import { authFetch } from '../../lib/auth-fetch'
 import HouseMascot from '../HouseMascot'
 import { supabase } from '../../lib/supabase'
 
@@ -49,7 +50,7 @@ export default function BookListing({ listing: loadedListing, context = EMPTY_CO
         if (fn) guestName = `${fn} ${ln}`.trim()
       } catch {}
 
-      await fetch('/api/bookings', {
+      await authFetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

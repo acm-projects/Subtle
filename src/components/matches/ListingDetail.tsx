@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { EMPTY_CONTEXT, NEARBY_MILES, type Listing, type MatchContext } from './listings'
 import { commuteIcon, Icon, ListingPhoto, ScoreBadge, scoreColor } from './parts'
-import { loadSaved, toggleSavedId } from './activity'
+import { loadSaved, syncSaved, toggleSavedId } from './activity'
 
 const commuteTo = (l: Listing, office: string) => {
   const how = l.commuteMode === 'walk' ? 'walk' : l.commuteMode === 'transit' ? 'by transit' : l.commuteMode === 'bike' ? 'bike ride' : 'drive'
@@ -46,7 +46,10 @@ export default function ListingDetail({ listing: loadedListing, context: initial
   }, [listing.hostId])
 
   // saved homes live in activity.ts (TODO(backend) there)
-  useEffect(() => setSaved(loadSaved().includes(listing.id)), [listing.id])
+  useEffect(() => {
+    setSaved(loadSaved().includes(listing.id))
+    syncSaved().then((ids) => setSaved(ids.includes(listing.id)))
+  }, [listing.id])
   // count a view for the host's listing page (once per visit)
   const counted = useRef<string | null>(null)
   useEffect(() => {

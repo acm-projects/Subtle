@@ -69,7 +69,9 @@ function mapInterests(arr: unknown): string[] | null {
   if (!Array.isArray(arr) || !arr.length) return null
 
   // Allowed database enum values for interest_types:
+  // the values of the interest_types enum in Supabase
   const ALLOWED_ENUM_VALUES = new Set([
+    'Fitness',
     'Cooking',
     'Nightlife',
     'Reading',
@@ -90,7 +92,7 @@ function mapInterests(arr: unknown): string[] | null {
 
   // Mapping from variations/aliases (lowercase) to valid database enum values
   const aliasMap: Record<string, string> = {
-    fitness: 'Basketball',
+    fitness: 'Fitness',
     music: 'Live Music',
     'live music': 'Live Music',
     outdoors: 'Hiking',
@@ -262,6 +264,8 @@ async function upsertUser(request: Request) {
   if (body.housingType !== undefined || body.housing_style !== undefined) row.housing_style = mapHousing(body.housingType ?? body.housing_style)
   if (body.accommodations !== undefined || body.user_accommodations !== undefined) row.user_accommodations = mapAccommodations(body.accommodations ?? body.user_accommodations)
   if (body.moveIn !== undefined || body.move_in_date !== undefined) row.move_in_date = mapMoveIn(body.moveIn ?? body.move_in_date)
+  if (body.moveOut !== undefined || body.move_out_date !== undefined) row.move_out_date = orNull(body.moveOut ?? body.move_out_date)
+  if (body.university !== undefined) row.university = orNull(body.university)
   if (body.commuteMode !== undefined || body.user_transportation !== undefined) row.user_transportation = mapTransportation(body.commuteMode ?? body.user_transportation)
   if (body.car !== undefined || body.has_car !== undefined) row.has_car = mapCar(body.car ?? body.has_car)
   if (body.maxCommute !== undefined || body.commute_time !== undefined) row.commute_time = toInt(body.maxCommute ?? body.commute_time)

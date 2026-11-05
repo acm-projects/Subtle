@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
-import { dbListingToMatchListing, type Listing } from '../../../components/matches/listings'
-import { getListing as getDbListing } from '../../../lib/listings'
+import { supabaseForRequest } from '../../../lib/supabase-server'
+
+// Booking requests live in public.bookings. Every call runs as the signed-in caller, and the table's
+// access rules decide what they see: the guest sees their own requests, the host sees requests for
+// their listings and is the only one who can accept or decline them.
 
 export type BookingRequest = {
   id: string
@@ -17,117 +20,123 @@ export type BookingRequest = {
   createdAt: string
 }
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __subtleBookings: BookingRequest[] | undefined
+type Row = {
+  id: string
+  listing_id: string
+  guest_id: string
+  guest_name: string | null
+  move_in: string | null
+  move_out: string | null
+  monthly_rent: number | null
+  note: string | null
+  status: 'pending' | 'accepted' | 'declined'
+  created_at: string
+  listing_table?: { title: string | null } | null
 }
 
-function getBookingsStore(): BookingRequest[] {
-  if (!globalThis.__subtleBookings) {
-    globalThis.__subtleBookings = []
-  }
-  return globalThis.__subtleBookings
-}
+const toBooking = (r: Row, emails: Map<string, string>): BookingRequest => ({
+  id: r.id,
+  listingId: r.listing_id,
+  listingTitle: r.listing_table?.title ?? 'Sublet listing',
+  hostName: 'Student Host',
+  guestEmail: emails.get(r.guest_id) ?? '',
+  guestName: r.guest_name ?? 'An intern',
+  moveIn: r.move_in ?? '',
+  moveOut: r.move_out ?? '',
+  monthlyRent: r.monthly_rent ?? 0,
+  note: r.note ?? '',
+  status: r.status,
+  createdAt: r.created_at,
+})
+
+const SELECT = 'id, listing_id, guest_id, guest_name, move_in, move_out, monthly_rent, note, status, created_at, listing_table(title)'
 
 /**
- * GET /api/bookings
- * Query params:
- *   - listingId: filter bookings for a specific listing
- *   - email: filter bookings requested by a specific student email
+ * GET /api/bookings            -> the caller's own requests (as a guest)
+ * GET /api/bookings?listingId= -> requests for that listing (only its host gets any back)
  */
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const listingId = searchParams.get('listingId')
-  const email = searchParams.get('email')
+  const auth = supabaseForRequest(request)
+  if (!auth) return NextResponse.json({ total: 0, bookings: [] })
+  const { client } = auth
+  const { data: me } = await client.auth.getUser(auth.token)
+  if (!me.user) return NextResponse.json({ total: 0, bookings: [] })
 
-  let list = getBookingsStore()
-  if (listingId) list = list.filter((b) => b.listingId === listingId)
-  if (email) list = list.filter((b) => b.guestEmail.toLowerCase() === email.toLowerCase())
+  const listingId = new URL(request.url).searchParams.get('listingId')
+  let query = client.from('bookings').select(SELECT).order('created_at', { ascending: false })
+  query = listingId ? query.eq('listing_id', listingId) : query.eq('guest_id', me.user.id)
+  const { data, error } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({
-    total: list.length,
-    bookings: list,
-  })
+  const rows = (data ?? []) as unknown as Row[]
+  // guest emails for the host's view
+  const emails = new Map<string, string>()
+  const guestIds = Array.from(new Set(rows.map((r) => r.guest_id)))
+  if (guestIds.length) {
+    const { data: people } = await client.from('users_table').select('id, student_email').in('id', guestIds)
+    for (const p of people ?? []) if (p.student_email) emails.set(p.id, p.student_email)
+  }
+  const bookings = rows.map((r) => toBooking(r, emails))
+  return NextResponse.json({ total: bookings.length, bookings })
 }
 
 /**
- * POST /api/bookings
- * Body: {
- *   listingId: string,
- *   moveIn?: string,
- *   moveOut?: string,
- *   note?: string,
- *   guestEmail?: string,
- *   guestName?: string
- * }
+ * POST /api/bookings  body: { listingId, moveIn?, moveOut?, monthlyRent?, note?, guestName? }
+ * One request per guest per listing; sending again updates it (and puts it back to pending).
  */
 export async function POST(request: Request) {
+  const auth = supabaseForRequest(request)
+  if (!auth) return NextResponse.json({ error: 'Log in to request a booking' }, { status: 401 })
+  const { data: me } = await auth.client.auth.getUser(auth.token)
+  if (!me.user) return NextResponse.json({ error: 'Log in to request a booking' }, { status: 401 })
+
   let body: Record<string, any>
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
+  const listingId = String(body.listingId ?? '').trim()
+  if (!listingId) return NextResponse.json({ error: 'listingId is required' }, { status: 400 })
 
-  const listingId = (body.listingId ?? '').toString().trim()
-  if (!listingId) {
-    return NextResponse.json({ error: 'listingId is required' }, { status: 400 })
+  const row = {
+    listing_id: listingId,
+    guest_id: me.user.id,
+    guest_name: String(body.guestName ?? '').trim() || null,
+    move_in: body.moveIn ? String(body.moveIn) : null,
+    move_out: body.moveOut ? String(body.moveOut) : null,
+    monthly_rent: Number.isFinite(Number(body.monthlyRent)) ? Math.round(Number(body.monthlyRent)) : null,
+    note: String(body.note ?? '').trim() || null,
+    status: 'pending' as const,
   }
-
-  let listing: Listing | undefined
-  {
-    try {
-      const db = await getDbListing(listingId)
-      if (db) listing = dbListingToMatchListing(db)
-    } catch {}
-  }
-
-  const booking: BookingRequest = {
-    id: `bk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-    listingId,
-    listingTitle: body.listingTitle ?? listing?.title ?? 'Sublet listing',
-    hostName: body.hostName ?? listing?.hostName ?? 'Student Host',
-    guestEmail: (body.guestEmail ?? body.email ?? 'intern@subtle.edu').toString().trim(),
-    guestName: (body.guestName ?? body.name ?? 'Summer Intern').toString().trim(),
-    moveIn: (body.moveIn ?? listing?.availableFrom ?? 'June 1').toString(),
-    moveOut: (body.moveOut ?? listing?.availableTo ?? 'Aug 22').toString(),
-    monthlyRent: Number(body.monthlyRent ?? listing?.price ?? 1800),
-    note: (body.note ?? '').toString().trim(),
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-  }
-
-  const store = getBookingsStore()
-  store.unshift(booking)
-
-  return NextResponse.json(booking, { status: 201 })
+  const { data, error } = await auth.client.from('bookings').upsert(row, { onConflict: 'listing_id,guest_id' }).select(SELECT).single()
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(toBooking(data as unknown as Row, new Map([[me.user.id, me.user.email ?? '']])), { status: 201 })
 }
 
-
 /**
- * PATCH /api/bookings
- * Body: { id: string, status: 'accepted' | 'declined' | 'pending' }
- * The host accepts or declines a request. Returns the updated booking.
- * TODO(backend): check that the caller owns the listing once bookings move to Supabase.
+ * PATCH /api/bookings  body: { id, status: 'accepted' | 'declined' | 'pending' }
+ * Only the listing's host can do this (the table's rules enforce it).
  */
 export async function PATCH(request: Request) {
+  const auth = supabaseForRequest(request)
+  if (!auth) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+
   let body: Record<string, any>
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
-
-  const id = (body.id ?? '').toString().trim()
+  const id = String(body.id ?? '').trim()
   const status = body.status
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
   if (status !== 'accepted' && status !== 'declined' && status !== 'pending') {
     return NextResponse.json({ error: "status must be 'accepted', 'declined' or 'pending'" }, { status: 400 })
   }
 
-  const booking = getBookingsStore().find((b) => b.id === id)
-  if (!booking) return NextResponse.json({ error: `Booking "${id}" not found` }, { status: 404 })
-
-  booking.status = status
-  return NextResponse.json(booking)
+  const { data, error } = await auth.client.from('bookings').update({ status }).eq('id', id).select(SELECT).maybeSingle()
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!data) return NextResponse.json({ error: 'Booking not found, or it is not for one of your listings' }, { status: 404 })
+  return NextResponse.json(toBooking(data as unknown as Row, new Map()))
 }

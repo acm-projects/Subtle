@@ -182,12 +182,12 @@ export default function Questionnaire() {
             address: latestAnswers.address,
             budget: latestAnswers.budget,
             roommates: latestAnswers.roommates,
-            university: latestAnswers.university.trim(), // TODO(backend): add a university column in users_table and map it in /api/users
+            university: latestAnswers.university.trim(),
             interests: allInterests(latestAnswers),
             housingType: latestAnswers.housingType,
             accommodations: latestAnswers.accommodations,
             moveIn: latestAnswers.moveInDate || latestAnswers.moveIn,
-            moveOut: latestAnswers.moveOutDate, // TODO(backend): save the move-out date (users_table has no column yet)
+            moveOut: latestAnswers.moveOutDate,
             commuteMode: latestAnswers.commuteMode,
             car: latestAnswers.car,
             maxCommute: latestAnswers.maxCommute,

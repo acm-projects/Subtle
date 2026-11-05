@@ -148,7 +148,7 @@ export async function GET(request: Request) {
       initials: initials || 'IN',
       role: u.company_name ? `Intern at ${u.company_name}` : 'Summer intern',
       company: u.company_name ?? undefined,
-      school: schoolFromEmail(u.student_email),
+      school: String(u.university ?? '').trim() || schoolFromEmail(u.student_email),
       interests,
       shared,
       match: score,

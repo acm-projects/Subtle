@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { authFetch } from '../../lib/auth-fetch'
 import { useEffect, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import HouseMascot from '../HouseMascot'
@@ -30,7 +31,7 @@ const ago = (iso: string) => {
 
 /*
   Renter (host) view: every place this user posted, with views and who wants to talk.
-  Data: getMyListings (Supabase), /api/listing-views, /api/bookings?listingId=, /api/messages.
+  Data: getMyListings (Supabase), /api/listing-views, /api/bookings?listingId= (public.bookings), /api/messages.
   TODO(backend): messages need the sender's name/email so hosts can see who wrote.
 */
 async function loadActivity(id: string, threads: Thread[]): Promise<Activity> {
@@ -39,7 +40,7 @@ async function loadActivity(id: string, threads: Thread[]): Promise<Activity> {
       .then((r) => (r.ok ? r.json() : { views: 0 }))
       .then((j) => Number(j.views) || 0)
       .catch(() => 0),
-    fetch(`/api/bookings?listingId=${encodeURIComponent(id)}`, { cache: 'no-store' })
+    authFetch(`/api/bookings?listingId=${encodeURIComponent(id)}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : { bookings: [] }))
       .then((j) => (Array.isArray(j.bookings) ? (j.bookings as Booking[]) : []))
       .catch(() => [] as Booking[]),
@@ -84,11 +85,10 @@ export default function RenterDashboard() {
   }
 
   // accept or decline a booking request; the intern sees the result on their dashboard
-  // TODO(backend): PATCH /api/bookings keeps this in server memory until bookings move to Supabase
   const decide = async (listingId: string, bookingId: string, status: 'accepted' | 'declined' | 'pending') => {
     setBusy(bookingId)
     try {
-      const res = await fetch('/api/bookings', {
+      const res = await authFetch('/api/bookings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: bookingId, status }),
