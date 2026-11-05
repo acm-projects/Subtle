@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import ThemeToggle from './ThemeToggle'
 
 // Dark glass over the photo; switches to light glass once the photo has faded.
 export default function Navbar({ light: alwaysLight = false }: { light?: boolean }) {
@@ -29,6 +30,7 @@ export default function Navbar({ light: alwaysLight = false }: { light?: boolean
         <Link href="/" className="mr-auto font-[family-name:var(--font-serif)] text-[26px] font-medium">
           subtle.
         </Link>
+        <ThemeToggle className={link} />
         <a href="/login?mode=login" className={`rounded-full px-4 py-3 text-sm font-medium transition-colors ${link}`}>
           Log in
         </a>

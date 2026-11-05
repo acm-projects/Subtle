@@ -105,14 +105,12 @@
   margin-bottom: 0.35rem;
 }
 .sb-label {
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.95rem;
+  font-weight: 600;
   color: #1E2B44;
 }
 .sb-req { color: #A35F33; }
-.sb-hint { font-size: 0.78rem; font-style: italic; color: #4A5A75; }
+.sb-hint { font-size: 0.875rem; font-style: italic; color: #4A5A75; }
 
 .sb-badge {
   display: inline-flex;
@@ -122,7 +120,7 @@
   border-radius: 999px;
   background: #EEF3F8;
   color: #2F4161;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 
@@ -235,7 +233,7 @@
   align-items: center;
   gap: 0.6rem;
   margin: 0 0 clamp(0.9rem, 2.2vh, 1.3rem);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   line-height: 1.4;
   color: #4A5A75;
   cursor: pointer;
@@ -249,7 +247,7 @@
   align-items: center;
   gap: 0.9rem;
   margin: clamp(1rem, 2.4vh, 1.4rem) 0;
-  font-size: 0.82rem;
+  font-size: 0.875rem;
   color: #4A5A75;
 }
 .sb-or::before,
@@ -300,7 +298,7 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   padding: 1.25rem 1.5rem;
-  font-size: 0.82rem;
+  font-size: 0.875rem;
   color: #4A5A75;
 }
 .sb-footer nav { display: flex; gap: 1.8rem; }
@@ -324,3 +322,6 @@
   .sb-card { border-radius: 24px; }
   .sb-footer { flex-direction: column; }
 }
+
+/* keep the first/last name boxes inside the card */
+.sb-row > *, .sb-input input { min-width: 0; }

@@ -73,7 +73,7 @@ export function ListingPhoto({ listing, seed, className = 'min-h-[220px]' }: { l
 
 export const commuteText = (l: Listing) =>
   l.commuteMode === 'walk'
-    ? `${l.commuteMinutes} min walk to your office`
+    ? `${l.commuteMinutes} min walk to the office`
     : l.commuteMode === 'transit'
       ? `${l.commuteMinutes} min by transit`
       : l.commuteMode === 'bike'

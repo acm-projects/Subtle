@@ -12,7 +12,9 @@ export type QuizAnswers = {
   housingType: string | null
   accommodations: string[]
   car: string | null
-  moveIn: string | null
+  moveIn: string | null // month id (may/june/july/flexible), kept for older pages
+  moveInDate: string // 'YYYY-MM-DD' from the calendar
+  moveOutDate: string // 'YYYY-MM-DD' from the calendar
   transitImportance: number // 0 = not important, 1 = nice to have, 2 = very important
   interests: string[]
   hangouts: string[] // how they like to spend free time with other interns
@@ -32,6 +34,8 @@ export const EMPTY: QuizAnswers = {
   accommodations: [],
   car: null,
   moveIn: null,
+  moveInDate: '',
+  moveOutDate: '',
   transitImportance: 1,
   interests: [],
   hangouts: [],
@@ -130,7 +134,7 @@ export const ROOMMATE_GROUPS = [
 ]
 export const TRANSIT_LEVELS = ['Not important', 'Nice to have', 'Very important']
 
-export const SECTIONS: Record<number, string> = { 1: 'You & your work', 2: 'Housing', 3: 'Priorities', 4: 'Interests' }
+export const SECTIONS: Record<number, string> = { 1: 'School & Work', 2: 'Housing', 3: 'Interests' }
 
 export const label = (list: { id: string; title: string }[], id: string | null) => list.find((o) => o.id === id)?.title ?? ''
 
@@ -153,21 +157,31 @@ export type StepId =
 export type Step = { id: StepId; section: number; extra?: boolean }
 
 // Roommate preferences only show up if they said yes to roommates.
-export function buildSteps(a: QuizAnswers): Step[] {
+// Short version: no roommate, housing type, transportation, transit or free-time questions.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function buildSteps(_a?: QuizAnswers): Step[] {
   return [
     { id: 'school', section: 1 },
     { id: 'work', section: 1 },
     { id: 'commute', section: 1 },
     { id: 'budget', section: 2 },
-    { id: 'roommates', section: 2 },
-    ...(a.roommates === 'yes' ? [{ id: 'roommatePrefs' as const, section: 2, extra: true }] : []),
-    { id: 'housingType', section: 2 },
     { id: 'accommodations', section: 2 },
-    { id: 'car', section: 2 },
     { id: 'moveIn', section: 2 },
-    { id: 'transit', section: 3 },
-    { id: 'interests', section: 4 },
-    { id: 'hangouts', section: 4 },
-    { id: 'done', section: 5 },
+    { id: 'interests', section: 3 },
+    { id: 'done', section: 4 },
   ]
+}
+
+// month id for older pages that still read a.moveIn
+export function monthIdFor(iso: string): string | null {
+  const m = Number(iso.split('-')[1])
+  if (!m) return null
+  return m === 5 ? 'may' : m === 6 ? 'june' : m === 7 ? 'july' : 'flexible'
+}
+
+// "2026-06-01" -> "Jun 1"
+export function prettyDate(iso: string) {
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return ''
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
