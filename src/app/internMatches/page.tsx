@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { authFetch } from '../../lib/auth-fetch'
 import AppNavbar from '../../components/AppNavbar'
 import { supabase } from '../../lib/supabase'
-
-//Backend: replace these 
-const MY_INTERESTS = ['Hiking', 'Cooking', 'Film', 'Photography', 'Basketball', 'Live music']
+import { NEARBY_MILES } from '../../components/matches/listings'
+import Link from 'next/link'
 
 // angle and radius from older versions of the API are no longer used: dots are placed by the layout below.
 type Intern = {
@@ -18,37 +18,18 @@ type Intern = {
   match?: number // 0-100. Only set for interns who matched with the user.
 }
 
-const INTERNS: Intern[] = [
-  //backend Replace with user data
-  { id: 'aisha', name: 'Aisha Rahman', initials: 'AR', role: 'Product design intern', school: 'UCLA', interests: ['Hiking', 'Cooking', 'Film', 'Photography', 'Pottery'], match: 96 },
-  { id: 'leo', name: 'Leo Martinez', initials: 'LM', role: 'Software intern', school: 'USC', interests: ['Basketball', 'Live music', 'Cooking', 'Film', 'Gaming'], match: 92 },
-  { id: 'priya', name: 'Priya Shah', initials: 'PS', role: 'Data intern', school: 'Stanford', interests: ['Hiking', 'Photography', 'Live music', 'Chess'], match: 89 },
-  { id: 'marcus', name: 'Marcus Tran', initials: 'MT', role: 'Marketing intern', school: 'UC Berkeley', interests: ['Cooking', 'Hiking', 'Basketball', 'Soccer'], match: 86 },
-  { id: 'sofia', name: 'Sofia Lopez', initials: 'SL', role: 'Finance intern', school: 'NYU', interests: ['Film', 'Live music', 'Yoga', 'Travel'], match: 82 },
-  { id: 'daniel', name: 'Daniel Kim', initials: 'DK', role: 'Research intern', school: 'Michigan', interests: ['Photography', 'Basketball', 'Reading', 'Chess'], match: 78 },
-  // also in the city, not matched
-  { id: 'emma', name: 'Emma Walsh', initials: 'EW', role: 'Design intern', school: 'Brown', interests: ['Painting', 'Yoga', 'Thrifting'] },
-  { id: 'jon', name: 'Jon Park', initials: 'JP', role: 'Software intern', school: 'UCSD', interests: ['Gaming', 'Anime', 'Running'] },
-  { id: 'nia', name: 'Nia Brooks', initials: 'NB', role: 'Policy intern', school: 'Howard', interests: ['Debate', 'Dance', 'Reading'] },
-  { id: 'omar', name: 'Omar Haddad', initials: 'OH', role: 'Software intern', school: 'UT Austin', interests: ['Soccer', 'Coding', 'Coffee'] },
-  { id: 'chloe', name: 'Chloe Evans', initials: 'CE', role: 'Media intern', school: 'Northwestern', interests: ['Writing', 'Theatre', 'Baking'] },
-  { id: 'ravi', name: 'Ravi Patel', initials: 'RP', role: 'Data intern', school: 'Georgia Tech', interests: ['Cricket', 'Chess', 'Travel'] },
-  { id: 'zoe', name: 'Zoe Chen', initials: 'ZC', role: 'Product intern', school: 'Columbia', interests: ['Surfing', 'Pottery', 'Fashion'] },
-  { id: 'sam', name: 'Sam Okafor', initials: 'SO', role: 'Finance intern', school: 'Duke', interests: ['Golf', 'Podcasts', 'Cars'] },
-  { id: 'lily', name: 'Lily Nguyen', initials: 'LN', role: 'Design intern', school: 'RISD', interests: ['Illustration', 'Anime', 'Baking'] },
-  { id: 'ben', name: 'Ben Carter', initials: 'BC', role: 'Software intern', school: 'MIT', interests: ['Robotics', 'Climbing', 'Gaming'] },
-  { id: 'maya', name: 'Maya Singh', initials: 'MS', role: 'Policy intern', school: 'Yale', interests: ['Volunteering', 'Reading', 'Yoga'] },
-  { id: 'theo', name: 'Theo Grant', initials: 'TG', role: 'Data intern', school: 'Rice', interests: ['Running', 'Board games', 'Coffee'] },
-]
 
-// sample meetup ideas by interest (replace with real events later)
+// meetup ideas by interest (generic, so they work in any city)
 const MEETUP_IDEAS: Record<string, string> = {
-  Hiking: 'Sunrise hike at Griffith Park',
-  Cooking: 'Potluck dinner in Silver Lake',
-  Film: 'Outdoor movie night downtown',
+  Hiking: 'Sunrise hike on a nearby trail',
+  Cooking: 'Potluck dinner at someone’s place',
+  Film: 'Movie night downtown',
   Photography: 'Golden hour photo walk',
   Basketball: 'Pickup game at the park',
-  'Live music': 'Live music night in Echo Park',
+  'Live music': 'Live music night',
+  Nightlife: 'Night out downtown',
+  Art: 'Museum afternoon',
+  Volunteering: 'Volunteer shift together',
   Gaming: 'LAN party or arcade night',
   Anime: 'Anime screening & boba meetup',
   Soccer: 'Pickup soccer match at the turf',
@@ -68,21 +49,26 @@ const MEETUP_IDEAS: Record<string, string> = {
 }
 
 const serif = 'font-[family-name:var(--font-serif)]'
-const label = 'text-[11px] font-semibold uppercase tracking-[0.14em] text-[#4A5A75]'
+const label = 'text-[15px] font-semibold text-[#4A5A75]'
 const card = 'rounded-[28px] border border-white bg-white/80 p-6 shadow-[0_20px_50px_-30px_rgba(30,43,68,0.35)]'
 const pill = 'rounded-full border border-[#D5DFEA] bg-white px-3 py-1 text-xs font-medium text-[#1E2B44]'
 const pillShared = 'rounded-full border border-[#86abcc] bg-[#86abcc] px-3 py-1 text-xs font-medium text-white'
 const btnDark = 'rounded-full bg-[#1E2B44] text-sm font-semibold text-white transition hover:bg-[#2F4161] disabled:cursor-default disabled:bg-[#9CB5CE]'
 const btnLight = 'rounded-full border border-[#D5DFEA] bg-white text-sm font-semibold text-[#1E2B44] transition hover:bg-[#F7F9FB] disabled:cursor-default disabled:text-[#4A5A75]'
 
-// Score colors: navy for the best matches, then blue, then brown as the score drops.
-// All keep white text above 4.5:1 contrast.
+// Score colors: the stronger the match, the darker the blue.
+// Text on each shade passes 4.5:1 contrast (white on the two dark ones, navy on the two light ones).
+const SCORE_SHADES = [
+  { min: 90, bg: '#22507F', text: '#FFFFFF' },
+  { min: 80, bg: '#3D6D9F', text: '#FFFFFF' },
+  { min: 70, bg: '#8EB2D6', text: '#15203A' },
+  { min: 0, bg: '#C9DBEA', text: '#15203A' },
+]
+const shadeFor = (score: number) => SCORE_SHADES.find((s) => score >= s.min) ?? SCORE_SHADES[SCORE_SHADES.length - 1]
 function scoreColor(score: number) {
-  if (score >= 90) return '#739dc2'
-  if (score >= 80) return '#a0c8ec'
-  if (score >= 70) return '#B9D6F0' 
-  return 'rgb(221, 167, 131)'
+  return shadeFor(score).bg
 }
+const scoreStyle = (score: number) => ({ backgroundColor: shadeFor(score).bg, color: shadeFor(score).text })
 
 const joinNames = (list: string[]) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0] ?? '')
 
@@ -243,7 +229,7 @@ function Tooltip({
       <div className="flex items-center gap-3">
         <span
           className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold text-white"
-          style={{ backgroundColor: matched ? scoreColor(intern.match ?? 0) : '#9CB5CE' }}
+          style={matched ? scoreStyle(intern.match ?? 0) : { backgroundColor: '#9CB5CE' }}
         >
           {matched ? intern.match : intern.initials}
         </span>
@@ -274,6 +260,10 @@ function Tooltip({
   )
 }
 
+// interests are stored as e.g. "Live Music", the ideas use "Live music": match case-insensitively
+const ideaFor = (interest: string) =>
+  Object.entries(MEETUP_IDEAS).find(([k]) => k.toLowerCase() === interest.toLowerCase())?.[1]
+
 export default function MatchesPage() {
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
@@ -282,8 +272,10 @@ export default function MatchesPage() {
   const [toast, setToast] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null)
   const [firstName, setFirstName] = useState('')
   const [matchesOnly, setMatchesOnly] = useState(false)
-  const [myInterests, setMyInterests] = useState<string[]>(MY_INTERESTS)
-  const [internList, setInternList] = useState<Intern[]>(INTERNS)
+  const [myInterests, setMyInterests] = useState<string[]>([])
+  const [internList, setInternList] = useState<Intern[]>([])
+  const [city, setCity] = useState('')
+  const [status, setStatus] = useState<'loading' | 'ready' | 'needsOffice' | 'error'>('loading')
 
   const flash = (text: string, tone: 'ok' | 'err' = 'ok') => {
     setToast({ tone, text })
@@ -316,34 +308,17 @@ export default function MatchesPage() {
         setConnectedIds(linked)
       }
 
-      let localInterests: string[] = []
+      // everything comes from users_table (interests, office) through /api/intern-matches
       try {
-        const raw = localStorage.getItem('subtle-quiz-v1')
-        if (raw) {
-          const parsed = JSON.parse(raw)
-          if (Array.isArray(parsed.interests) && parsed.interests.length > 0) {
-            localInterests = parsed.interests
-            setMyInterests(parsed.interests)
-          }
-        }
-      } catch {}
-
-      try {
-        const params = new URLSearchParams()
-        if (email) params.set('email', email)
-        if (localInterests.length > 0) params.set('interests', localInterests.join(','))
-        const res = await fetch(`/api/intern-matches?${params.toString()}`)
-        if (res.ok) {
-          const json = await res.json()
-          if (Array.isArray(json.myInterests) && json.myInterests.length > 0) {
-            setMyInterests(json.myInterests)
-          }
-          if (Array.isArray(json.interns) && json.interns.length > 0) {
-            setInternList(json.interns)
-          }
-        }
+        const res = await authFetch('/api/intern-matches', { cache: 'no-store' })
+        if (!res.ok) return setStatus('error')
+        const json = await res.json()
+        setMyInterests(Array.isArray(json.myInterests) ? json.myInterests : [])
+        setInternList(Array.isArray(json.interns) ? json.interns : [])
+        setCity(json.city ?? '')
+        setStatus(json.needsOffice ? 'needsOffice' : 'ready')
       } catch {
-        // Fallback to static INTERNS on network error
+        setStatus('error')
       }
     })
   }, [])
@@ -386,8 +361,8 @@ export default function MatchesPage() {
   // meetup ideas for the interests you share with your matches
   const meetups = useMemo(
     () =>
-      myInterests.filter((x) => MEETUP_IDEAS[x])
-        .map((interest) => ({ interest, idea: MEETUP_IDEAS[interest], people: matches.filter((m) => m.shared.some((s) => s.toLowerCase() === interest.toLowerCase())) }))
+      myInterests.filter((x) => ideaFor(x))
+        .map((interest) => ({ interest, idea: ideaFor(interest) as string, people: matches.filter((m) => m.shared.some((s) => s.toLowerCase() === interest.toLowerCase())) }))
         .filter((m) => m.people.length > 0)
         .sort((a, b) => b.people.length - a.people.length)
         .slice(0, 4),
@@ -405,8 +380,15 @@ export default function MatchesPage() {
     // mark it right away so a double-click can't send two requests
     setRequested((prev) => new Set(prev).add(id))
 
-    // sample interns have no account to send to, so only the button changes
-    if (!UUID.test(intern.id)) return flash(`Connection request sent to ${first}.`)
+    // every intern here is a real account; an id that isn't a user id can't be saved
+    if (!UUID.test(intern.id)) {
+      setRequested((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+      return flash("Couldn't send the request. Try again.", 'err')
+    }
 
     const { error } = await supabase.from('connections').insert({
       requester_id: userId,
@@ -438,13 +420,15 @@ export default function MatchesPage() {
           {/* header: the interests block sits on the right, label directly above its tags */}
           <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
             <div>
-              <h1 className={`${serif} text-[44px] font-medium leading-[1.02] tracking-[-0.02em] md:text-[56px]`}>Matches</h1>
-              <p className="mt-2 text-[15px] text-[#4A5A75]">Interns living in Los Angeles this summer who share your interests.</p>
+              <h1 className={`${serif} text-[44px] font-medium leading-[1.02] tracking-[-0.02em] md:text-[56px]`}>Intern Matches</h1>
+              <p className="mt-2 text-[15px] text-[#4A5A75]">
+                {city ? `Interns working within ${NEARBY_MILES} miles of you in ${city} with shared interests.` : 'Interns working near you with shared interests.'}
+              </p>
             </div>
 
             <div className="max-w-[460px]">
-              <div className={`${label} mb-2`}>Your Interests</div>
-              <ul className="flex flex-wrap gap-1.5" aria-label="Your interests">
+              <div className={`${label} mb-2`}>Interests</div>
+              <ul className="flex flex-wrap gap-1.5" aria-label="Interests">
                 {myInterests.map((i) => (
                   <li key={i} className="rounded-full bg-[#DCEBF6] px-2.5 py-1 text-[11px] font-semibold text-[#245F90] ring-[1.5px] ring-inset ring-[#2E7DB5]">
                     {titleCase(i)}
@@ -454,6 +438,32 @@ export default function MatchesPage() {
             </div>
           </header>
 
+          {status !== 'loading' && status !== 'ready' || (status === 'ready' && interns.length === 0) ? (
+            <div className="mt-6 rounded-[28px] border border-dashed border-[#C9DBEA] bg-white/60 p-8 text-center">
+              <p className={`${serif} text-3xl`}>
+                {status === 'needsOffice'
+                  ? 'Add your work address to meet interns near you.'
+                  : status === 'error'
+                    ? "Couldn't load intern matches."
+                    : city
+                      ? `No interns near ${city} share your interests yet.`
+                      : 'No interns near you share your interests yet.'}
+              </p>
+              <p className="mx-auto mt-2 max-w-md text-[15px] text-[#4A5A75]">
+                {status === 'error'
+                  ? 'Refresh the page to try again.'
+                  : `We match you with interns whose office is within ${NEARBY_MILES} miles of yours and who picked at least one of the same interests.`}
+              </p>
+              {status !== 'error' && (
+                <Link href="/questionnaire" className={`mt-5 inline-flex px-6 py-3 ${btnDark}`}>
+                  {status === 'needsOffice' ? 'Add my work address' : 'Edit my interests'}
+                </Link>
+              )}
+            </div>
+          ) : null}
+
+{interns.length > 0 && (
+          <>
           {/* filters */}
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <div className="flex gap-2">
@@ -465,7 +475,7 @@ export default function MatchesPage() {
               </button>
             </div>
             <span className="text-xs text-[#4A5A75]">
-              {topMatches.length} of {matches.length} matches on the map · sample interns
+              {status === 'loading' ? 'Finding interns near you…' : `${topMatches.length} of ${matches.length} matches on the map`}
             </span>
           </div>
 
@@ -485,11 +495,11 @@ export default function MatchesPage() {
                     y1="50"
                     x2={m.x}
                     y2={m.y}
-                    stroke="#B9D6F0"
+                    stroke={scoreColor(m.match ?? 0)}
                     strokeLinecap="round"
                     vectorEffect="non-scaling-stroke"
                     strokeWidth={hoverId === m.id ? 3 : 1.2 + ((m.match ?? 0) / 100) * 1.2}
-                    strokeOpacity={hoverId === m.id ? 0.85 : 0.22}
+                    strokeOpacity={hoverId === m.id ? 0.9 : 0.25 + ((m.match ?? 0) / 100) * 0.3}
                     style={{ transition: 'stroke-opacity .2s, stroke-width .2s' }}
                   />
                 ))}
@@ -527,7 +537,7 @@ export default function MatchesPage() {
                           ? 'h-[52px] w-[52px] text-sm shadow-[0_10px_20px_-8px_rgba(30,43,68,0.6)]'
                           : 'h-[16px] w-[16px] bg-[#9CB5CE] shadow-[0_4px_10px_rgba(30,43,68,0.2)] group-hover:bg-[#1E2B44]'
                       } ${active ? 'scale-125' : ''}`}
-                      style={i.big ? { backgroundColor: scoreColor(i.match ?? 0) } : undefined}
+                      style={i.big ? scoreStyle(i.match ?? 0) : undefined}
                     >
                       {i.big ? i.initials : null}
                     </span>
@@ -546,9 +556,17 @@ export default function MatchesPage() {
 
               {/* legend */}
               <div className="absolute bottom-3.5 left-3.5 z-10 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-full border border-white bg-white/85 px-4 py-2 text-[11px] font-semibold shadow-sm backdrop-blur">
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#B9D6F0]" />You</span>
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#2F5D8C]" />Top 10 Matches</span>
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#9CB5CE]" />Also in LA</span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#1E2B44]" />You</span>
+                <span className="flex items-center gap-1.5">
+                  Stronger
+                  <span className="flex">
+                    {SCORE_SHADES.map((sh) => (
+                      <span key={sh.bg} className="h-3 w-3 rounded-full border border-white" style={{ backgroundColor: sh.bg }} />
+                    ))}
+                  </span>
+                  Weaker
+                </span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#9CB5CE]" />{city ? `Also near ${city.split(',')[0]}` : 'Also nearby'}</span>
               </div>
               <div className="absolute right-3.5 top-3.5 z-10 rounded-full border border-white bg-white/85 px-3.5 py-1.5 text-[11px] font-semibold shadow-sm backdrop-blur">Hover a dot to see who they are</div>
             </div>
@@ -576,7 +594,7 @@ export default function MatchesPage() {
                         onMouseLeave={() => setHoverId(null)}
                         className={`flex h-[57px] items-center gap-3 border-t border-[#E3ECF5] px-1 transition-colors ${hoverId === m.id ? 'bg-[#F4F7FB]' : ''}`}
                       >
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white" style={{ backgroundColor: scoreColor(m.match ?? 0) }}>
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white" style={scoreStyle(m.match ?? 0)}>
                           {m.match}
                         </span>
                         <div className="min-w-0 flex-1">
@@ -590,11 +608,10 @@ export default function MatchesPage() {
                     )
                   })}
                 </div>
-                {matches.length > 5 && <p className="mt-2 text-center text-[11px] text-[#4A5A75]">Scroll for {matches.length - 5} more</p>}
               </div>
 
               <div className={card}>
-                <div className={label}>Matched on Your Interests</div>
+                <div className={label}>Shared Interests</div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {myInterests.map((i) => (
                     <span key={i} className={pillShared}>
@@ -609,8 +626,8 @@ export default function MatchesPage() {
           {/* popular interests + meetup ideas */}
           <div className="mt-5 grid gap-5 lg:grid-cols-2">
             <div className={card}>
-              <h2 className={`${serif} text-2xl font-medium`}>Popular in Los Angeles</h2>
-              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">What interns in your city are into. Yours are in navy.</p>
+              <h2 className={`${serif} text-2xl font-medium`}>{city ? `Popular near ${city.split(',')[0]}` : 'Popular nearby'}</h2>
+              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">What interns in the city are into. Shared ones are in navy.</p>
               <div className="grid gap-3.5">
                 {popular.map(([interest, count]) => {
                   const mine = myInterests.some((m) => m.toLowerCase() === interest.toLowerCase())
@@ -631,7 +648,7 @@ export default function MatchesPage() {
 
             <div className={card}>
               <h2 className={`${serif} text-2xl font-medium`}>Ways to Meet Up</h2>
-              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">Ideas based on what you share with your matches. Sample ideas.</p>
+              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">Ideas based on shared interests.</p>
               <div className="grid gap-3">
                 {meetups.map((m) => (
                   // fixed first column so every idea title starts at the same x position
@@ -649,6 +666,8 @@ export default function MatchesPage() {
               </div>
             </div>
           </div>
+          </>
+          )}
         </div>
 
         <p className="mt-6 text-center text-xs text-[#4A5A75]">© 2026 Subtle Technologies, Inc. All rights reserved.</p>

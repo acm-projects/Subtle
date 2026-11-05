@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
 
-// Navbar for logged-in pages: logo (back to the dashboard), Messages, Post a listing, Your listings, and Log out (with a confirm step).
+// Navbar for logged-in pages: logo (back to the dashboard), Messages, Post a listing, Listings, and Log out (light/dark mode lives in Profile > Appearance) (with a confirm step).
 export default function AppNavbar({ firstName }: { firstName: string }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -16,6 +16,7 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
   const [confirming, setConfirming] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [initials, setInitials] = useState('')
   const stayRef = useRef<HTMLButtonElement>(null)
 
   // load the signed-in user's profile picture; refresh when they change it on the profile page
@@ -23,7 +24,11 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
     let active = true
     const load = async () => {
       const { data: auth } = await supabase.auth.getUser()
-      if (!auth.user) return
+      // every page with this navbar is for signed-in users: send everyone else to log in
+      if (!auth.user) {
+        router.replace('/login?mode=login')
+        return
+      }
       const user = auth.user
       const meta = user.user_metadata ?? {}
       let pic = (meta.avatar_url ?? meta.avatarUrl ?? null) as string | null
@@ -33,13 +38,30 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
         if (stored) pic = stored
       } catch {}
 
-      if (active) setAvatarUrl(pic)
+      if (!active) return
+      setAvatarUrl(pic)
+
+      // first + last initial: what they entered at sign-up, then their profile row
+      let first = String(meta.first_name || meta.firstName || '').trim()
+      let last = String(meta.last_name || meta.lastName || '').trim()
+      if (!first || !last) {
+        try {
+          const { data } = await supabase.from('users_table').select('first_name, last_name').eq('id', user.id).maybeSingle()
+          first = first || String(data?.first_name ?? '').trim()
+          last = last || String(data?.last_name ?? '').trim()
+        } catch {}
+      }
+      first = first || String(meta.given_name ?? '').trim()
+      last = last || String(meta.family_name ?? '').trim()
+      if (active) setInitials(`${first.charAt(0)}${last.charAt(0)}`.toUpperCase())
     }
     load()
     window.addEventListener('avatar-updated', load)
+    window.addEventListener('profile-updated', load)
     return () => {
       active = false
       window.removeEventListener('avatar-updated', load)
+      window.removeEventListener('profile-updated', load)
     }
   }, [pathname])
 
@@ -119,7 +141,7 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
                   viewingProfile ? 'bg-white text-[#1E2B44]' : 'bg-[#1E2B44] text-white'
                 }`}
               >
-                {firstName?.[0]?.toUpperCase() ?? (
+                {initials || firstName?.[0]?.toUpperCase() || (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="8" r="4" />
                     <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
@@ -154,7 +176,7 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
             <h2 id="logout-title" className="mt-4 font-[family-name:var(--font-serif)] text-3xl font-medium">
               Log out?
             </h2>
-            <p className="mt-2 text-[15px] text-[#4A5A75]">You can stay signed in so your matches are ready next time.</p>
+            <p className="mt-2 text-[15px] text-[#4A5A75]">You can stay signed in so matches are ready next time.</p>
             <div className="mt-6 flex flex-col gap-2.5">
               <button
                 ref={stayRef}

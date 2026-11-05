@@ -239,7 +239,7 @@ function OfficePin({ px, py, hidden }: { px: number; py: number; hidden: boolean
     <div
       role="img"
       tabIndex={hidden ? -1 : 0}
-      aria-label="Your office"
+      aria-label="Office"
       className={`group absolute z-20 -translate-x-1/2 -translate-y-full transition-[left,top,opacity] duration-300 ease-out hover:z-30 focus:z-30 focus:outline-none ${
         hidden ? 'pointer-events-none opacity-0' : 'opacity-100'
       }`}
@@ -266,10 +266,10 @@ function OfficePin({ px, py, hidden }: { px: number; py: number; hidden: boolean
         </g>
       </svg>
       <span className="pointer-events-none absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#2E7DB5] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-white shadow-md">
-        Your office
+        Office
       </span>
       <div className="pointer-events-none invisible absolute bottom-full left-1/2 mb-2 w-52 -translate-x-1/2 rounded-[14px] bg-white p-3 text-left text-xs text-[#1E2B44] opacity-0 shadow-[0_24px_50px_-20px_rgba(30,43,68,0.45)] transition-opacity duration-200 group-hover:visible group-hover:opacity-100 group-focus:visible group-focus:opacity-100">
-        <span className="block text-[13px] font-bold">Your office</span>
+        <span className="block text-[13px] font-bold">Office</span>
         <span className="mt-0.5 block text-[#4A5A75]">Commute times on each home are measured to here.</span>
       </div>
     </div>

@@ -127,7 +127,7 @@ export default function Login() {
             {isSignUpMode ? (
               <>
                 <h1>create your account<span className="sb-dot">.</span></h1>
-                <p>Join <em>4,500+</em> verified students and tech interns booking safely.</p>
+                <p>Join verified students and tech interns booking safely.</p>
               </>
             ) : (
               <>
@@ -410,7 +410,7 @@ export default function Login() {
             {isSignUpMode ? (
               <>
                 <h1>create your account<span className="sb-dot">.</span></h1>
-                <p>Join <em>4,500+</em> verified students and tech interns booking safely.</p>
+                <p>Join verified students and tech interns booking safely.</p>
               </>
             ) : (
               <>

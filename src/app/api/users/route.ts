@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { supabase } from '../../../lib/supabase'
+import { admin, callerFrom } from '../../../lib/supabase-admin'
 
 // '' (unanswered) -> null, so integer and enum columns don't reject it
 const orNull = (v: unknown) =>
@@ -37,9 +36,13 @@ function mapHousing(h: unknown): string | null {
 function mapMoveIn(m: unknown): string | null {
   if (!m || typeof m !== 'string') return null
   const val = m.trim().toLowerCase()
-  if (val === 'may') return '2026-05-01'
-  if (val === 'june') return '2026-06-01'
-  if (val === 'july') return '2026-07-01'
+  // a month on its own means the next one coming up (in Nov 2026, "june" is June 2027)
+  const month = { may: 5, june: 6, july: 7 }[val]
+  if (month) {
+    const now = new Date()
+    const year = now.getMonth() + 1 >= month ? now.getFullYear() + 1 : now.getFullYear()
+    return `${year}-${String(month).padStart(2, '0')}-01`
+  }
   if (val === 'flexible') return 'Flexible'
   return m.toString()
 }
@@ -51,7 +54,7 @@ function mapTransportation(t: unknown): string | null {
   if (val === 'transit') return 'Public Transit'
   if (val === 'driving') return 'Car'
   if (val === 'rideshare') return 'Rideshare'
-  if (val === 'biking') return 'Walking' // fallback to closest valid enum
+  if (val === 'biking') return 'Bike/Scooter'
   return 'Public Transit'
 }
 
@@ -65,7 +68,9 @@ function mapInterests(arr: unknown): string[] | null {
   if (!Array.isArray(arr) || !arr.length) return null
 
   // Allowed database enum values for interest_types:
+  // the values of the interest_types enum in Supabase
   const ALLOWED_ENUM_VALUES = new Set([
+    'Fitness',
     'Cooking',
     'Nightlife',
     'Reading',
@@ -86,7 +91,7 @@ function mapInterests(arr: unknown): string[] | null {
 
   // Mapping from variations/aliases (lowercase) to valid database enum values
   const aliasMap: Record<string, string> = {
-    fitness: 'Basketball',
+    fitness: 'Fitness',
     music: 'Live Music',
     'live music': 'Live Music',
     outdoors: 'Hiking',
@@ -144,49 +149,37 @@ function mapAgeGroup(a: unknown): string | null {
   return null
 }
 
+/**
+ * GET /api/users            -> the signed-in caller's own users_table row
+ * GET /api/users?ids=a,b,c  -> just names / interests / school of people the caller is connected to
+ *                              (or has a pending request with). Nobody can look up anyone else.
+ */
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const email = searchParams.get('email')
-  const id = searchParams.get('id')
+  const me = await callerFrom(request)
+  if (!me) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+  const db = admin()
 
-  if (email) {
-    const { data, error } = await supabase
-      .from('users_table')
-      .select('*')
-      .eq('student_email', email)
+  const ids = (new URL(request.url).searchParams.get('ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  if (ids.length) {
+    const { data: links } = await db
+      .from('connections')
+      .select('requester_id, addressee_id')
+      .or(`requester_id.eq.${me.id},addressee_id.eq.${me.id}`)
+    const allowed = new Set((links ?? []).map((l) => (l.requester_id === me.id ? l.addressee_id : l.requester_id)))
+    const wanted = ids.filter((id) => allowed.has(id))
+    if (!wanted.length) return NextResponse.json([])
+    const { data, error } = await db.from('users_table').select('id, first_name, last_name, user_interests, university').in('id', wanted)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json(data && data.length > 0 ? data[data.length - 1] : null)
+    return NextResponse.json(data ?? [])
   }
 
-  if (id) {
-    const { data, error } = await supabase
-      .from('users_table')
-      .select('*')
-      .eq('id', id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json(data && data.length > 0 ? data[data.length - 1] : null)
-  }
-
-  const { data, error } = await supabase.from('users_table').select('*')
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-  return NextResponse.json(data)
+  const { data, error } = await db.from('users_table').select('*').eq('id', me.id).maybeSingle()
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data ?? null)
 }
 
 async function upsertUser(request: Request) {
-  // Build a per-request client that carries the caller's JWT so that
-  // every PostgREST query runs as 'authenticated' with the correct auth.uid().
-  const authHeader = request.headers.get('authorization') ?? ''
-  const token = authHeader.replace(/^Bearer\s+/i, '').trim()
-  const client = token
-    ? createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
-        { global: { headers: { Authorization: `Bearer ${token}` } } },
-      )
-    : supabase
+  const db = admin()
 
   let body: Record<string, any>
   try {
@@ -195,44 +188,34 @@ async function upsertUser(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const email = orNull(body.email ?? body.student_email)
+  // Who is this? Normally the signed-in caller (login token). Right after sign-up there may be no
+  // session yet (email not confirmed), so then we accept the new account's id + email, check them
+  // against Supabase Auth, and only allow creating a row that doesn't exist yet.
+  let authUserId: string
+  let email: string
+  const me = await callerFrom(request)
+  if (me) {
+    authUserId = me.id
+    email = me.email ?? ''
+  } else {
+    const id = orNull(body.id)
+    const claimed = orNull(body.email ?? body.student_email)
+    if (!id || !claimed) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+    const { data: acct } = await db.auth.admin.getUserById(id)
+    if (!acct?.user || (acct.user.email ?? '').toLowerCase() !== claimed.toLowerCase()) {
+      return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+    }
+    const { data: exists } = await db.from('users_table').select('id').eq('id', id).maybeSingle()
+    if (exists) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+    authUserId = id
+    email = acct.user.email ?? claimed
+  }
+  if (!email) return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+
   const firstName = orNull(body.firstName ?? body.first_name)
   const lastName = orNull(body.lastName ?? body.last_name)
 
-  if (!email) {
-    return NextResponse.json({ error: 'Email is required' }, { status: 400 })
-  }
-
-  // Look up existing user by email or ID using the base supabase client (to avoid RLS read restrictions)
-  let existingUser: any = null
-
-  const { data: existingRows } = await supabase
-    .from('users_table')
-    .select('*')
-    .eq('student_email', email)
-
-  if (existingRows && existingRows.length > 0) {
-    existingUser = existingRows[existingRows.length - 1]
-  }
-
-  // If not found by email, try by ID if available from body or token
-  let authUserId: string | null = body.id ?? null
-  if (!authUserId && token) {
-    try {
-      const { data: authData } = await client.auth.getUser(token)
-      if (authData?.user?.id) authUserId = authData.user.id
-    } catch {}
-  }
-
-  if (!existingUser && authUserId) {
-    const { data: byId } = await supabase
-      .from('users_table')
-      .select('*')
-      .eq('id', authUserId)
-    if (byId && byId.length > 0) {
-      existingUser = byId[byId.length - 1]
-    }
-  }
+  const { data: existingUser } = await db.from('users_table').select('*').eq('id', authUserId).maybeSingle()
 
   const wantsRoommates =
     body.roommates !== undefined
@@ -247,12 +230,8 @@ async function upsertUser(request: Request) {
     last_name: lastName ?? existingUser?.last_name ?? 'Student',
   }
 
-  // Resolve the row's id: prefer body/existing, then fall back to auth.uid()
-  if (authUserId || existingUser?.id) {
-    const finalId = existingUser?.id ?? authUserId
-    row.id = finalId
-    row.user_id = finalId
-  }
+  row.id = authUserId
+  row.user_id = authUserId
   if (body.city !== undefined) row.user_city = orNull(body.city)
   if (body.company !== undefined || body.company_name !== undefined) row.company_name = orNull(body.company ?? body.company_name)
   if (body.address !== undefined || body.office_address !== undefined) row.office_address = orNull(body.address ?? body.office_address)
@@ -262,6 +241,8 @@ async function upsertUser(request: Request) {
   if (body.housingType !== undefined || body.housing_style !== undefined) row.housing_style = mapHousing(body.housingType ?? body.housing_style)
   if (body.accommodations !== undefined || body.user_accommodations !== undefined) row.user_accommodations = mapAccommodations(body.accommodations ?? body.user_accommodations)
   if (body.moveIn !== undefined || body.move_in_date !== undefined) row.move_in_date = mapMoveIn(body.moveIn ?? body.move_in_date)
+  if (body.moveOut !== undefined || body.move_out_date !== undefined) row.move_out_date = orNull(body.moveOut ?? body.move_out_date)
+  if (body.university !== undefined) row.university = orNull(body.university)
   if (body.commuteMode !== undefined || body.user_transportation !== undefined) row.user_transportation = mapTransportation(body.commuteMode ?? body.user_transportation)
   if (body.car !== undefined || body.has_car !== undefined) row.has_car = mapCar(body.car ?? body.has_car)
   if (body.maxCommute !== undefined || body.commute_time !== undefined) row.commute_time = toInt(body.maxCommute ?? body.commute_time)
@@ -286,51 +267,8 @@ async function upsertUser(request: Request) {
     }
   }
 
-  let saveResult: any
-  let saveError: any
-
-  const targetId = existingUser?.id ?? row.id
-
-  if (targetId) {
-    // 1. Try updating by ID with authenticated client first
-    const { data: updateData, error: updateErr } = await client
-      .from('users_table')
-      .update(row)
-      .eq('id', targetId)
-      .select()
-
-    if (!updateErr && updateData && updateData.length > 0) {
-      saveResult = updateData
-    } else {
-      // 2. Fallback: update with base supabase client (in case of RLS update policy mismatch)
-      const { data: fbData, error: fbErr } = await supabase
-        .from('users_table')
-        .update(row)
-        .eq('id', targetId)
-        .select()
-
-      if (!fbErr && fbData && fbData.length > 0) {
-        saveResult = fbData
-      } else {
-        // 3. Fallback: upsert on conflict 'id' so duplicate key can NEVER be thrown
-        const { data: upsertData, error: upsertErr } = await (token ? client : supabase)
-          .from('users_table')
-          .upsert(row, { onConflict: 'id' })
-          .select()
-
-        saveResult = upsertData
-        saveError = upsertErr ?? updateErr ?? fbErr
-      }
-    }
-  } else {
-    // Insert new user row using upsert to guarantee idempotency
-    const { data, error } = await (token ? client : supabase)
-      .from('users_table')
-      .upsert(row, { onConflict: 'student_email' })
-      .select()
-    saveResult = data
-    saveError = error
-  }
+  // one row per account, keyed by the auth user id
+  const { data: saveResult, error: saveError } = await db.from('users_table').upsert(row, { onConflict: 'id' }).select()
 
   if (saveError) {
     console.error('Error saving to users_table:', saveError)

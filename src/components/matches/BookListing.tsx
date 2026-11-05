@@ -1,22 +1,26 @@
 'use client'
 
 import Link from 'next/link'
+import { useScoredListing } from './useScored'
 import { useState } from 'react'
 import FlowShell from './FlowShell'
-import { SAMPLE_CONTEXT, stayMonths, type Listing, type MatchContext } from './listings'
+import { EMPTY_CONTEXT, stayMonths, type Listing, type MatchContext } from './listings'
 import { Icon } from './parts'
 import { addBookingRequest } from './activity'
+import { authFetch } from '../../lib/auth-fetch'
 import HouseMascot from '../HouseMascot'
 import { supabase } from '../../lib/supabase'
 
-const STEPS = ['Choose your dates', 'Review the total', 'Send a request']
+const STEPS = ['Choose dates', 'Review the total', 'Send a request']
 
 /*
   Backend hook-up points:
   - listing / context props: the real listing and the user's quiz context
   - requestBooking: create the booking request (dates + note) and return when it is saved
 */
-export default function BookListing({ listing, context = SAMPLE_CONTEXT }: { listing: Listing; context?: MatchContext }) {
+export default function BookListing({ listing: loadedListing, context = EMPTY_CONTEXT }: { listing: Listing; context?: MatchContext }) {
+  // same score, commute and safety as the Matches page and dashboard
+  const listing = useScoredListing(loadedListing)
   const [note, setNote] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
@@ -46,7 +50,7 @@ export default function BookListing({ listing, context = SAMPLE_CONTEXT }: { lis
         if (fn) guestName = `${fn} ${ln}`.trim()
       } catch {}
 
-      await fetch('/api/bookings', {
+      await authFetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -68,7 +72,7 @@ export default function BookListing({ listing, context = SAMPLE_CONTEXT }: { lis
     setSent(true)
   }
 
-  const commute = `${listing.commuteMinutes} min ${listing.commuteMode === 'walk' ? 'walk' : listing.commuteMode === 'transit' ? 'by transit' : listing.commuteMode === 'bike' ? 'bike' : 'drive'}`
+  const commute = listing.nearWork === false ? 'far from your office' : `${listing.commuteMinutes} min ${listing.commuteMode === 'walk' ? 'walk' : listing.commuteMode === 'transit' ? 'by transit' : listing.commuteMode === 'bike' ? 'bike' : 'drive'}`
 
   return (
     <FlowShell listing={listing} context={context} caption={`${listing.roomType} · ${listing.tags[0] ?? listing.homeType} · From ${listing.availableFrom}`}>
@@ -90,10 +94,9 @@ export default function BookListing({ listing, context = SAMPLE_CONTEXT }: { lis
         </div>
       ) : (
         <>
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">How to book</p>
-          <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Book the {listing.title}</h1>
+          <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Book the {listing.title}</h1>
           <p className="mt-2 text-[17px] text-[#4A5A75]">
-            {listing.score} Subtle score · ${listing.price.toLocaleString()} / month · {commute}
+            {listing.nearWork === false ? 'Not scored' : `${listing.score} Subtle score`} · ${listing.price.toLocaleString()} / month · {commute}
           </p>
 
           <ol className="mt-6 space-y-2.5">

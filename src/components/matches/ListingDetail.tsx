@@ -1,11 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import { useMatchContext, useScoredListing } from './useScored'
+import { supabase } from '../../lib/supabase'
 import { useEffect, useRef, useState } from 'react'
 import AppNavbar from '../AppNavbar'
-import { SAMPLE_CONTEXT, type Listing, type MatchContext } from './listings'
+import { EMPTY_CONTEXT, NEARBY_MILES, type Listing, type MatchContext } from './listings'
 import { commuteIcon, Icon, ListingPhoto, ScoreBadge, scoreColor } from './parts'
-import { loadSaved, toggleSavedId } from './activity'
+import { loadSaved, syncSaved, toggleSavedId } from './activity'
 
 const commuteTo = (l: Listing, office: string) => {
   const how = l.commuteMode === 'walk' ? 'walk' : l.commuteMode === 'transit' ? 'by transit' : l.commuteMode === 'bike' ? 'bike ride' : 'drive'
@@ -14,11 +16,11 @@ const commuteTo = (l: Listing, office: string) => {
 
 // Fallbacks so the page still reads well if the backend only sends the basic fields.
 const subtitleFor = (l: Listing) =>
-  l.subtitle ?? (l.roomType === 'Entire place' ? `Entire ${l.homeType.toLowerCase()}` : `${l.roomType} in a ${l.homeType.toLowerCase()}`)
+  l.subtitle ?? (l.roomType === 'Entire place' ? `Entire ${l.homeType.toLowerCase()}` : `${l.roomType} in ${l.homeType === 'Apartment' ? 'an' : 'a'} ${l.homeType.toLowerCase()}`)
 const whyFor = (l: Listing) =>
   l.whyScore ?? [
     `${l.commuteMode === 'walk' ? 'Walk' : 'Commute'} to the office · ${l.commuteMinutes} minutes`,
-    `Dates match your summer · ${l.availableFrom}`,
+    `Dates match the summer · ${l.availableFrom}`,
     l.tags.length ? l.tags.join(' · ') : l.roomType,
   ]
 const featuresFor = (l: Listing) => l.features ?? Array.from(new Set([l.homeType, l.roomType, ...l.tags, ...l.amenities]))
@@ -28,31 +30,26 @@ const featuresFor = (l: Listing) => l.features ?? Array.from(new Set([l.homeType
   - listing / context props: pass the real listing (fetched by id) and the user's quiz context
   - toggleSaved: persist; Book and Contact are their own pages (/matches/[id]/book and /contact)
 */
-export default function ListingDetail({ listing, context: initialContext = SAMPLE_CONTEXT }: { listing: Listing; context?: MatchContext }) {
+export default function ListingDetail({ listing: loadedListing, context: initialContext = EMPTY_CONTEXT }: { listing: Listing; context?: MatchContext }) {
+  // same score, commute and safety as the Matches page and dashboard
+  const listing = useScoredListing(loadedListing)
   const [saved, setSaved] = useState(false)
-  const [context, setContext] = useState<MatchContext>(initialContext)
-
+  // the user's company and office come from users_table via /api/matches
+  const context = useMatchContext(initialContext)
+  const far = listing.nearWork === false
+  const place = listing.city || listing.neighborhood
+  // only the person who posted a listing can edit it
+  const [isHost, setIsHost] = useState(false)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('subtle-quiz-v1')
-      if (raw) {
-        const q = JSON.parse(raw)
-        if (q.company || q.address) {
-          const addr = (q.address as string | undefined)?.trim() || initialContext.office
-          const parts = addr.split(',').map((s) => s.trim()).filter(Boolean)
-          const city = parts.length >= 2 ? parts.slice(-2).join(', ') : initialContext.city
-          setContext({
-            company: (q.company as string | undefined)?.trim() || initialContext.company,
-            office: addr,
-            city,
-          })
-        }
-      }
-    } catch {}
-  }, [initialContext])
+    if (!listing.hostId) return setIsHost(false)
+    supabase.auth.getUser().then(({ data }) => setIsHost(data.user?.id === listing.hostId)).catch(() => setIsHost(false))
+  }, [listing.hostId])
 
   // saved homes live in activity.ts (TODO(backend) there)
-  useEffect(() => setSaved(loadSaved().includes(listing.id)), [listing.id])
+  useEffect(() => {
+    setSaved(loadSaved().includes(listing.id))
+    syncSaved().then((ids) => setSaved(ids.includes(listing.id)))
+  }, [listing.id])
   // count a view for the host's listing page (once per visit)
   const counted = useRef<string | null>(null)
   useEffect(() => {
@@ -64,7 +61,7 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
 
   const facts = [
     { icon: 'dollar', label: 'Rent', value: `$${listing.price.toLocaleString()} / month` },
-    { icon: commuteIcon(listing), label: 'Commute', value: commuteTo(listing, context.office) },
+    { icon: commuteIcon(listing), label: 'Commute', value: far ? `Far from ${context.office || 'your office'}` : commuteTo(listing, context.office || 'your office') },
     { icon: 'calendar', label: 'Available', value: `${listing.availableFrom} – ${listing.availableTo}` },
   ]
 
@@ -79,7 +76,6 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
               <Link href="/matches" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-[#4A5A75] hover:text-[#1E2B44]">
                 <Icon name="arrowL" size={16} /> All matches
               </Link>
-              <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">Listing details</p>
               <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">{listing.title}</h1>
               <p className="mt-2 text-[17px] text-[#4A5A75]">{subtitleFor(listing)}</p>
             </div>
@@ -96,7 +92,7 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
                 </svg>
               </button>
               <span className="inline-flex items-center gap-2 rounded-full border border-white bg-white/80 px-4 py-2 text-sm font-semibold">
-                <Icon name="pin" size={15} /> {context.city} · {context.company}
+                <Icon name="pin" size={15} /> {place}
               </span>
             </div>
           </header>
@@ -108,7 +104,7 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
               <div className="group relative">
                 <ListingPhoto listing={listing} seed={0} className="min-h-[300px] md:min-h-[440px]" />
                 <span className="absolute bottom-4 left-4 inline-flex items-center gap-3 rounded-full border border-white bg-white/85 py-1.5 pl-1.5 pr-5 shadow-[0_12px_30px_-14px_rgba(30,43,68,0.5)] backdrop-blur">
-                  <ScoreBadge score={listing.score} size={44} />
+                  <ScoreBadge score={listing.score} size={44} listing={listing} />
                   <span className="text-[15px] font-semibold">Subtle score</span>
                 </span>
               </div>
@@ -119,7 +115,7 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
                     className="animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] rounded-[22px] border border-white bg-white/75 p-4"
                     style={{ animationDelay: `${150 + i * 70}ms` }}
                   >
-                    <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-[#4A5A75]">
+                    <span className="flex items-center gap-2 text-[15px] font-semibold text-[#4A5A75]">
                       <Icon name={f.icon} size={15} /> {f.label}
                     </span>
                     <p className="mt-1.5 text-[15px] font-semibold leading-snug">{f.value}</p>
@@ -131,16 +127,16 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
             {/* why, the place, about, actions */}
             <div className="flex flex-col gap-5">
               <section aria-labelledby="why-title" className="rounded-[28px] border border-white bg-white/75 p-6">
-                <h2 id="why-title" className="text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">
-                  Why this score
+                <h2 id="why-title" className="font-[family-name:var(--font-serif)] text-2xl font-medium">
+                  Why This Score
                 </h2>
                 <ul className="mt-4 space-y-3">
-                  {whyFor(listing).map((reason) => (
+                  {(far ? [`This home is more than ${NEARBY_MILES} miles from ${context.office || 'your office'}, so it isn't scored for you.`] : whyFor(listing)).map((reason) => (
                     <li key={reason} className="flex items-start gap-3 text-[15px]">
                       <span
                         aria-hidden="true"
                         className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white"
-                        style={{ backgroundColor: scoreColor(listing.score) }}
+                        style={{ backgroundColor: far ? '#4A5A75' : scoreColor(listing.score) }}
                       >
                         <Icon name="check" size={13} />
                       </span>
@@ -151,8 +147,8 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
               </section>
 
               <section aria-labelledby="place-title" className="rounded-[28px] border border-white bg-white/75 p-6">
-                <h2 id="place-title" className="text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">
-                  The place
+                <h2 id="place-title" className="font-[family-name:var(--font-serif)] text-2xl font-medium">
+                  The Place
                 </h2>
                 <ul className="mt-4 flex flex-wrap gap-2 text-[13px] font-medium">
                   {featuresFor(listing).map((f, idx) => (
@@ -182,16 +178,17 @@ export default function ListingDetail({ listing, context: initialContext = SAMPL
                     Contact
                   </Link>
                 </div>
+                {isHost && (
                 <Link
                   href={`/my-listings/${listing.id}/edit`}
                   className="flex min-h-10 items-center justify-center rounded-full border border-dashed border-[#A9C7E8] bg-white/70 text-xs font-semibold text-[#1E2B44] transition hover:bg-white"
                 >
                   Edit this listing
                 </Link>
+                )}
               </div>
             </div>
           </div>
-          <p className="mt-6 text-[13px] text-[#4A5A75]">Sample listing for design only. Real listings will come from verified hosts.</p>
         </article>
         <p className="mt-8 text-center text-[13px] text-[#4A5A75]">&copy; 2026 Subtle Technologies, Inc. All rights reserved.</p>
       </section>

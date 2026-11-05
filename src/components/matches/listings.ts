@@ -7,6 +7,8 @@ export type Listing = {
   score: number // Subtle score, 0 to 100
   commuteMinutes: number
   commuteMode: 'walk' | 'transit' | 'bike' | 'drive'
+  commuteSource?: 'google' | 'estimate' // where commuteMinutes came from (see /api/matches)
+  safety?: import('../../lib/safety').SafetyInfo // reported incidents nearby (SF only, see lib/safety.ts)
   homeType: 'Apartment' | 'House' | 'Studio'
   roomType: 'Private room' | 'Shared room' | 'Entire place'
   tags: string[]
@@ -23,9 +25,19 @@ export type Listing = {
   hostVerified?: boolean // verified .edu sub-leaser
   hostReplyTime?: string // e.g. "Replies within a day"
   address?: string
+  city?: string // the listing's own city (listing_table.city); used to place it on the map
+  nearWork?: boolean // false when /api/matches left it out for being too far from the user's office
+  hostId?: string | null // listing_table.user_id: the lister's auth id (only they can edit it; messages go to them)
+  startDate?: string | null // 'YYYY-MM-DD' first day available (listing_table.move_in)
+  endDate?: string | null // 'YYYY-MM-DD' last day available (listing_table.end_date)
+  distanceMiles?: number // straight-line miles to the user's office (only on /api/matches `nearest`)
   latitude?: number | null
   longitude?: number | null
 }
+
+// Homes (and Intern Matches) only count as "near" within this many miles of the user's office.
+// Change it here and the API and every page follow.
+export const NEARBY_MILES = 50
 
 export type MatchContext = {
   city: string
@@ -33,111 +45,9 @@ export type MatchContext = {
   office: string
 }
 
-// SAMPLE DATA ONLY (made up). Swap for the real matches from the backend.
-export const SAMPLE_CONTEXT: MatchContext = {
-  city: 'San Francisco',
-  company: 'Stripe',
-  office: '500 Howard St',
-}
+// Used until the user's own company / office load (from users_table via /api/matches).
+export const EMPTY_CONTEXT: MatchContext = { city: '', company: '', office: '' }
 
-export const SAMPLE_LISTINGS: Listing[] = [
-  {
-    id: 'soma-loft',
-    title: 'SoMa loft',
-    neighborhood: 'SoMa',
-    price: 1840,
-    score: 96,
-    commuteMinutes: 11,
-    commuteMode: 'walk',
-    homeType: 'Apartment',
-    roomType: 'Private room',
-    tags: ['Pets allowed'],
-    availableFrom: 'June 1',
-    availableTo: 'Aug 22',
-    description: 'Bright loft with tall windows, a shared kitchen, and a quiet workspace corner.',
-    amenities: ['In-unit laundry', 'Wi-Fi', 'Desk', 'Furnished'],
-    hostName: 'Maya',
-    subtitle: 'Private room in a furnished apartment',
-    whyScore: ['Walk to the office · 11 minutes', 'Dates match your summer · June 1', 'Pets allowed · Verified sublet'],
-    features: ['Apartment', 'Private room', 'Pets allowed', 'Furnished', 'Washer', '4th floor'],
-    hostEmail: 'maya@example.edu',
-    hostVerified: true,
-    hostReplyTime: 'Replies within a day',
-  },
-  {
-    id: 'hayes-valley-studio',
-    title: 'Hayes Valley studio',
-    neighborhood: 'Hayes Valley',
-    price: 1690,
-    score: 87,
-    commuteMinutes: 16,
-    commuteMode: 'transit',
-    homeType: 'Studio',
-    roomType: 'Entire place',
-    tags: ['No roommates', 'Furnished'],
-    availableFrom: 'June 1',
-    availableTo: 'Aug 31',
-    description: 'A cozy studio a block from the park, close to the Muni line.',
-    amenities: ['Wi-Fi', 'Kitchenette', 'Furnished'],
-    hostName: 'Daniel',
-  },
-  {
-    id: 'mission-apartment',
-    title: 'Mission apartment',
-    neighborhood: 'Mission',
-    price: 1520,
-    score: 73,
-    commuteMinutes: 22,
-    commuteMode: 'transit',
-    homeType: 'Apartment',
-    roomType: 'Shared room',
-    tags: ['2 roommates'],
-    availableFrom: 'May 28',
-    availableTo: 'Aug 15',
-    description: 'Sunny shared apartment with two other interns and a big living room.',
-    amenities: ['Wi-Fi', 'Shared kitchen', 'Bike storage'],
-    hostName: 'Priya',
-  },
-  {
-    id: 'nob-hill-room',
-    title: 'Nob Hill room',
-    neighborhood: 'Nob Hill',
-    price: 1950,
-    score: 84,
-    commuteMinutes: 14,
-    commuteMode: 'transit',
-    homeType: 'Apartment',
-    roomType: 'Private room',
-    tags: ['Furnished', 'Doorman'],
-    availableFrom: 'June 8',
-    availableTo: 'Aug 30',
-    description: 'Private room in a classic building with city views and a quiet street.',
-    amenities: ['Elevator', 'Wi-Fi', 'Desk'],
-    hostName: 'Leo',
-  },
-  {
-    id: 'potrero-house',
-    title: 'Potrero Hill house',
-    neighborhood: 'Potrero Hill',
-    price: 1420,
-    score: 69,
-    commuteMinutes: 25,
-    commuteMode: 'bike',
-    homeType: 'House',
-    roomType: 'Private room',
-    tags: ['Backyard', '3 roommates'],
-    availableFrom: 'June 1',
-    availableTo: 'Aug 20',
-    description: 'A shared house with a backyard and an easy bike ride downtown.',
-    amenities: ['Backyard', 'Washer and dryer', 'Wi-Fi'],
-    hostName: 'Sam',
-  },
-]
-
-// Fetch listing by id from Supabase DB, falling back to sample listings
-export function getListing(id: string, listings: Listing[] = SAMPLE_LISTINGS) {
-  return listings.find((l) => l.id === id)
-}
 
 // Convert a database row to the UI matched listing format
 export function dbListingToMatchListing(db: any): Listing {
@@ -150,8 +60,10 @@ export function dbListingToMatchListing(db: any): Listing {
   const homeType: Listing['homeType'] =
     db.building_type === 'Studio' ? 'Studio' : db.building_type === 'House' ? 'House' : 'Apartment'
 
-  const formattedStart = db.start_date
-    ? new Date(db.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  // listing_table stores the first available day in `move_in`
+  const startDate: string | null = db.move_in ?? db.start_date ?? null
+  const formattedStart = startDate
+    ? new Date(startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : 'Flexible'
   const formattedEnd = db.end_date
     ? new Date(db.end_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -174,13 +86,17 @@ export function dbListingToMatchListing(db: any): Listing {
     availableTo: formattedEnd,
     description: db.about || 'Comfortable sublet, fully furnished and close to transit.',
     amenities: db.amenities || [],
-    hostName: 'Student Host',
+    hostName: 'Student Host', // replaced by withHost() in lib/hosts.ts when the lister has a profile
     hostVerified: true,
     hostReplyTime: 'Replies within a few hours',
-    subtitle: `${roomType} in a ${homeType.toLowerCase()}`,
+    subtitle: `${roomType} in ${homeType === 'Apartment' ? 'an' : 'a'} ${homeType.toLowerCase()}`,
     features: [homeType, roomType, ...(db.amenities || [])],
     imageUrl: coverImage,
     address: db.address || undefined,
+    city: db.city || undefined,
+    hostId: db.user_id ?? null,
+    startDate,
+    endDate: db.end_date ?? null,
     latitude: db.latitude || null,
     longitude: db.longitude || null,
   }

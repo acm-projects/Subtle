@@ -61,7 +61,7 @@ export default function PhotoPicker({ photos, onChange }: { photos: Photo[]; onC
           </svg>
         </span>
         <p className="mt-4 font-[family-name:var(--font-serif)] text-2xl font-medium">Drag photos here</p>
-        <p className="mt-1 text-sm text-[#4A5A75]">or pick them from your device. JPG or PNG, up to {MAX_PHOTOS} photos.</p>
+        <p className="mt-1 text-sm text-[#4A5A75]">or pick them from a device. JPG or PNG, up to {MAX_PHOTOS} photos.</p>
         <button
           type="button"
           onClick={() => input.current?.click()}
@@ -132,7 +132,7 @@ export default function PhotoPicker({ photos, onChange }: { photos: Photo[]; onC
             ))}
           </ul>
           <p className="mt-2 text-sm text-[#4A5A75]">
-            {photos.length} of {MAX_PHOTOS} · Your first photo is the cover. Drag to reorder.
+            {photos.length} of {MAX_PHOTOS} · The first photo is the cover. Drag to reorder.
           </p>
         </>
       )}
