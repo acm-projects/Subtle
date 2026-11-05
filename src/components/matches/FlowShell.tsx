@@ -2,13 +2,13 @@
 
 import { useMatchContext } from './useScored'
 import AppNavbar from '../AppNavbar'
-import { SAMPLE_CONTEXT, type Listing, type MatchContext } from './listings'
+import { EMPTY_CONTEXT, type Listing, type MatchContext } from './listings'
 import { Icon, ListingPhoto, ScoreBadge } from './parts'
 
 // Two-column glass layout shared by the Book and Contact pages: content on the left, the home on the right.
 export default function FlowShell({
   listing,
-  context: initialContext = SAMPLE_CONTEXT,
+  context: initialContext = EMPTY_CONTEXT,
   caption,
   children,
 }: {
@@ -27,7 +27,7 @@ export default function FlowShell({
         <article className="mx-auto w-full max-w-[1240px] animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] rounded-[36px] border border-white bg-white/60 p-5 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-9">
           <div className="flex justify-end">
             <span className="inline-flex items-center gap-2 rounded-full border border-white bg-white/80 px-4 py-2 text-sm font-semibold">
-              <Icon name="pin" size={15} /> {listing.nearWork === false ? `${listing.city || listing.neighborhood} · far from your office` : `${context.city} · ${context.company}`}
+              <Icon name="pin" size={15} /> {listing.nearWork === false ? `${listing.city || listing.neighborhood} · far from your office` : [context.city, context.company].filter(Boolean).join(' · ') || 'Your match'}
             </span>
           </div>
           <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">

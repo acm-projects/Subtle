@@ -18,20 +18,9 @@ export type CommuteMode = 'walk' | 'transit' | 'bike' | 'drive'
 // In-memory cache to prevent repeated calls to Nominatim
 const GEO_CACHE = new Map<string, Coordinates | null>()
 
-// Known coordinates for default sample neighborhoods / addresses
-const KNOWN_PLACES: Record<string, Coordinates> = {
-  soma: { lat: 37.7785, lon: -122.3998, displayName: 'SoMa, San Francisco, CA' },
-  'hayes valley': { lat: 37.7758, lon: -122.4243, displayName: 'Hayes Valley, San Francisco, CA' },
-  mission: { lat: 37.7599, lon: -122.4148, displayName: 'Mission District, San Francisco, CA' },
-  'nob hill': { lat: 37.7932, lon: -122.4145, displayName: 'Nob Hill, San Francisco, CA' },
-  'potrero hill': { lat: 37.7573, lon: -122.3995, displayName: 'Potrero Hill, San Francisco, CA' },
-  '500 howard st': { lat: 37.7885, lon: -122.3967, displayName: '500 Howard St, San Francisco, CA' },
-  'one apple park way': { lat: 37.3350, lon: -122.0131, displayName: 'One Apple Park Way, Cupertino, CA' },
-  '1600 amphitheatre pkwy': { lat: 37.4220, lon: -122.0841, displayName: 'Googleplex, Mountain View, CA' },
-  '2801 rutford ave': { lat: 32.9902, lon: -96.7513, displayName: '2801 Rutford Ave, Richardson, TX' },
-  '800 w campbell rd': { lat: 32.9857, lon: -96.7501, displayName: 'UT Dallas, Richardson, TX' },
-  '123 sunset blvd': { lat: 34.0417, lon: -118.5540, displayName: 'Sunset Blvd, Los Angeles, CA' },
-}
+// Shortcuts for addresses we already know (none right now: the old San Francisco sample
+// neighborhoods were removed with the sample listings). Format: 'lowercase name': { lat, lon }.
+const KNOWN_PLACES: Record<string, Coordinates> = {}
 
 /**
  * Geocodes an address string using Nominatim OpenStreetMap API.
@@ -50,7 +39,12 @@ export async function geocodeAddress(address: string): Promise<Coordinates | nul
     .trim()
   if (noUnit && noUnit !== full) candidates.push(noUnit)
   const parts = full.split(',').map((s) => s.trim()).filter(Boolean)
+  // "1600 Amphitheatre Parkway in Mountain View, California" -> "..., Mountain View, California"
+  if (/\s+in\s+/i.test(full)) candidates.push(full.replace(/\s+in\s+/gi, ', '))
   if (parts.length >= 3) candidates.push(parts.slice(-2).join(', '))
+  // last resort: just the city and state
+  const cityState = full.split(/,|\s+in\s+/i).map((s) => s.trim()).filter(Boolean).slice(-2).join(', ')
+  if (cityState && !candidates.includes(cityState)) candidates.push(cityState)
   for (const q of candidates) {
     const hit = await geocodeOnce(q)
     if (hit) return hit

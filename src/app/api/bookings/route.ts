@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { dbListingToMatchListing, getListing as getSampleListing } from '../../../components/matches/listings'
+import { dbListingToMatchListing, type Listing } from '../../../components/matches/listings'
 import { getListing as getDbListing } from '../../../lib/listings'
 
 export type BookingRequest = {
@@ -74,8 +74,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'listingId is required' }, { status: 400 })
   }
 
-  let listing = getSampleListing(listingId)
-  if (!listing) {
+  let listing: Listing | undefined
+  {
     try {
       const db = await getDbListing(listingId)
       if (db) listing = dbListingToMatchListing(db)

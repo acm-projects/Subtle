@@ -5,7 +5,7 @@ import { useMatchContext, useScoredListing } from './useScored'
 import { supabase } from '../../lib/supabase'
 import { useEffect, useRef, useState } from 'react'
 import AppNavbar from '../AppNavbar'
-import { SAMPLE_CONTEXT, SAMPLE_LISTINGS, type Listing, type MatchContext } from './listings'
+import { EMPTY_CONTEXT, NEARBY_MILES, type Listing, type MatchContext } from './listings'
 import { commuteIcon, Icon, ListingPhoto, ScoreBadge, scoreColor } from './parts'
 import { loadSaved, toggleSavedId } from './activity'
 
@@ -30,14 +30,13 @@ const featuresFor = (l: Listing) => l.features ?? Array.from(new Set([l.homeType
   - listing / context props: pass the real listing (fetched by id) and the user's quiz context
   - toggleSaved: persist; Book and Contact are their own pages (/matches/[id]/book and /contact)
 */
-export default function ListingDetail({ listing: loadedListing, context: initialContext = SAMPLE_CONTEXT }: { listing: Listing; context?: MatchContext }) {
+export default function ListingDetail({ listing: loadedListing, context: initialContext = EMPTY_CONTEXT }: { listing: Listing; context?: MatchContext }) {
   // same score, commute and safety as the Matches page and dashboard
   const listing = useScoredListing(loadedListing)
   const [saved, setSaved] = useState(false)
   // the user's company and office come from users_table via /api/matches
   const context = useMatchContext(initialContext)
   const far = listing.nearWork === false
-  const isSample = SAMPLE_LISTINGS.some((s) => s.id === listing.id)
   const place = listing.city || listing.neighborhood
   // only the person who posted a listing can edit it
   const [isHost, setIsHost] = useState(false)
@@ -59,7 +58,7 @@ export default function ListingDetail({ listing: loadedListing, context: initial
 
   const facts = [
     { icon: 'dollar', label: 'Rent', value: `$${listing.price.toLocaleString()} / month` },
-    { icon: commuteIcon(listing), label: 'Commute', value: far ? `Far from ${context.office}` : commuteTo(listing, context.office) },
+    { icon: commuteIcon(listing), label: 'Commute', value: far ? `Far from ${context.office || 'your office'}` : commuteTo(listing, context.office || 'your office') },
     { icon: 'calendar', label: 'Available', value: `${listing.availableFrom} – ${listing.availableTo}` },
   ]
 
@@ -129,7 +128,7 @@ export default function ListingDetail({ listing: loadedListing, context: initial
                   Why This Score
                 </h2>
                 <ul className="mt-4 space-y-3">
-                  {(far ? [`This home is more than about 40 miles from ${context.office}, so it isn't scored for you.`] : whyFor(listing)).map((reason) => (
+                  {(far ? [`This home is more than ${NEARBY_MILES} miles from ${context.office || 'your office'}, so it isn't scored for you.`] : whyFor(listing)).map((reason) => (
                     <li key={reason} className="flex items-start gap-3 text-[15px]">
                       <span
                         aria-hidden="true"
@@ -187,7 +186,6 @@ export default function ListingDetail({ listing: loadedListing, context: initial
               </div>
             </div>
           </div>
-          {isSample && <p className="mt-6 text-[13px] text-[#4A5A75]">Sample listing for design only. Real listings will come from verified hosts.</p>}
         </article>
         <p className="mt-8 text-center text-[13px] text-[#4A5A75]">&copy; 2026 Subtle Technologies, Inc. All rights reserved.</p>
       </section>

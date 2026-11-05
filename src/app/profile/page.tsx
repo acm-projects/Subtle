@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ThemeSetting from "../../components/ThemeToggle";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AppNavbar from "../../components/AppNavbar";
@@ -709,6 +710,11 @@ try {
                   <p className="text-xs text-[#4a5878]">No saved answers on this device yet.</p>
                 )}
               </div>
+            </Card>
+
+            <Card title="Appearance">
+              <p className="mb-5 mt-2.5 text-[15px] text-[#3d4a6b]">Choose light or dark mode. It's saved on this device.</p>
+              <ThemeSetting />
             </Card>
           </div>
         </div>

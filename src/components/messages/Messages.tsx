@@ -156,7 +156,6 @@ export default function Messages() {
           </li>
         )}
       </ul>
-      {conversations?.some((c) => c.sample) && <p className="px-6 pb-4 text-[11px] text-[#4A5A75]">Includes sample conversations for the demo.</p>}
     </div>
   )
 

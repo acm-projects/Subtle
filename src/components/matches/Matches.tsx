@@ -4,10 +4,12 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { fetchMatchesPayload } from './useScored'
 import AppNavbar from '../AppNavbar'
-import { SAMPLE_CONTEXT, SAMPLE_LISTINGS, type Listing, type MatchContext } from './listings'
+import { EMPTY_CONTEXT, NEARBY_MILES, type Listing, type MatchContext } from './listings'
 import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from './parts'
 import { loadSaved, toggleSavedId } from './activity'
 import HouseMascot from '../HouseMascot'
+
+const NO_LISTINGS: Listing[] = []
 
 type Sort = 'score' | 'price' | 'commute'
 const SORTS: { id: Sort; label: string }[] = [
@@ -22,8 +24,8 @@ const SORTS: { id: Sort; label: string }[] = [
   - Dynamically refreshes personalized matches via GET /api/matches?email=...
 */
 export default function Matches({
-  listings: initialListings = SAMPLE_LISTINGS,
-  context: initialContext = SAMPLE_CONTEXT,
+  listings: initialListings = NO_LISTINGS,
+  context: initialContext = EMPTY_CONTEXT,
 }: {
   listings?: Listing[]
   context?: MatchContext
@@ -77,7 +79,7 @@ export default function Matches({
                 <span title={context.office} className="inline-flex max-w-full items-center gap-2 rounded-full border border-white bg-white/80 px-4 py-2 text-sm font-semibold">
                   <Icon name="pin" size={15} />
                   <span className="truncate">
-                    Near {context.company} · {context.city}
+                    {context.city ? `Near ${context.company ? `${context.company} · ` : ''}${context.city}` : 'Add your work address to see homes near you'}
                   </span>
                 </span>
                 <Link href="/questionnaire" className="text-sm font-semibold underline underline-offset-2 hover:text-[#A35F33]">
@@ -119,7 +121,7 @@ export default function Matches({
             </div>
             <div className="flex items-center gap-3 text-sm">
               <span className="text-[#4A5A75]">
-                {status === 'loading' ? 'Finding homes near you…' : `${shown.length} ${shown.length === 1 ? 'home' : 'homes'} · verified & sample listings`}
+                {status === 'loading' ? 'Finding homes near you…' : `${shown.length} ${shown.length === 1 ? 'home' : 'homes'}`}
               </span>
               <button
                 type="button"
@@ -228,9 +230,9 @@ export default function Matches({
                 </>
               ) : (
                 <>
-                  <p className="font-[family-name:var(--font-serif)] text-3xl">No listings near {context.city} yet.</p>
+                  <p className="font-[family-name:var(--font-serif)] text-3xl">{context.city ? `No listings near ${context.city} yet.` : 'No listings yet.'}</p>
                   <p className="mx-auto mt-2 max-w-md text-[#4A5A75]">
-                    We only show homes within about 40 miles of {context.office || 'where you work'}. New sublets show up here as soon as they&apos;re posted.
+                    We only show homes within {NEARBY_MILES} miles of {context.office || 'where you work'}. New sublets show up here as soon as they&apos;re posted.
                   </p>
                   <Link href="/questionnaire" className="mt-5 inline-flex rounded-full bg-[#1E2B44] px-6 py-3 font-semibold text-white">
                     Check my work address

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { getListing as getDbListing, getListings } from '../../lib/listings'
 import { loadMyBookings, loadSaved, type Booking } from '../matches/activity'
-import { dbListingToMatchListing, SAMPLE_LISTINGS, type Listing } from '../matches/listings'
+import { dbListingToMatchListing, type Listing } from '../matches/listings'
 import { EMPTY, type QuizAnswers } from '../quiz/options'
 import { userRowToQuizAnswers } from '../../lib/quiz-sync'
 import { fetchMatchesPayload, fetchScoredMatches, withScore } from '../matches/useScored'
@@ -36,7 +36,7 @@ function quizStatusOf(q: QuizAnswers): QuizStatus {
   Everything the dashboard shows, in one place for backend:
   - name: Supabase user metadata, then the copy the login page saves
   - quiz: answers the questionnaire saves in this browser
-  - topMatches: /api/matches listings near the user's workplace, ranked by Subtle score
+  - topMatches: /api/matches listings near the user's workplace, ranked by Subtle score (real listings only)
   - savedHomes / bookings: matches/activity.ts
 */
 export function useDashboardData(): DashboardData {
@@ -132,16 +132,11 @@ export function useDashboardData(): DashboardData {
           const { listings } = await getListings({ pageSize: 20 })
           real = (listings ?? []).map(dbListingToMatchListing)
         } catch {}
-        topMatches = [...real, ...SAMPLE_LISTINGS].sort((a, b) => b.score - a.score).slice(0, 12)
+        topMatches = real.slice(0, 12)
       }
 
       const savedHomes: Listing[] = []
       for (const id of loadSaved().slice(0, 4)) {
-        const sample = SAMPLE_LISTINGS.find((l) => l.id === id)
-        if (sample) {
-          savedHomes.push(withScore(sample, scoredById.get(sample.id), scored !== null))
-          continue
-        }
         try {
           const db = await getDbListing(id)
           if (db) savedHomes.push(withScore(dbListingToMatchListing(db), scoredById.get(db.id), scored !== null))

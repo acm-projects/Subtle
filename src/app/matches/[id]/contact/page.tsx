@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import ContactHost from '../../../../components/matches/ContactHost'
 import PageFrame from '../../../../components/matches/PageFrame'
-import { getListing, dbListingToMatchListing } from '../../../../components/matches/listings'
+import { dbListingToMatchListing } from '../../../../components/matches/listings'
 import { getListing as getDbListing } from '../../../../lib/listings'
 
 type Props = { params: Promise<{ id: string }> }
@@ -13,7 +13,7 @@ async function findListing(id: string) {
   } catch (e) {
     console.error('Error fetching listing from DB:', e)
   }
-  return getListing(id)
+  return null
 }
 
 export async function generateMetadata({ params }: Props) {

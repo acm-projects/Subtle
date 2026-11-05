@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../lib/supabase'
+import { geocodeAddress, haversineDistanceKm, type Coordinates } from '../../../lib/geocoding'
+import { NEARBY_MILES } from '../../../components/matches/listings'
 
 export type InternProfile = {
   id: string
   name: string
   initials: string
-  email?: string
   role: string
   company?: string
   school: string
@@ -16,7 +17,6 @@ export type InternProfile = {
   match?: number
 }
 
-const DEFAULT_INTERESTS = ['Hiking', 'Cooking', 'Film', 'Photography', 'Basketball', 'Live music']
 
 // Semantic interest clusters for soft-cosine affinity matching
 const INTEREST_CLUSTERS: Record<string, string[]> = {
@@ -28,26 +28,6 @@ const INTEREST_CLUSTERS: Record<string, string[]> = {
   social_culture: ['live music', 'music', 'concerts', 'podcasts', 'travel', 'reading', 'volunteering', 'debate', 'dance'],
 }
 
-const BASE_SEED_INTERNS = [
-  { id: 'aisha', name: 'Aisha Rahman', initials: 'AR', role: 'Product design intern', school: 'UCLA', interests: ['Hiking', 'Cooking', 'Film', 'Photography', 'Pottery'] },
-  { id: 'leo', name: 'Leo Martinez', initials: 'LM', role: 'Software intern', school: 'USC', interests: ['Basketball', 'Live music', 'Cooking', 'Film', 'Gaming'] },
-  { id: 'priya', name: 'Priya Shah', initials: 'PS', role: 'Data intern', school: 'Stanford', interests: ['Hiking', 'Photography', 'Live music', 'Chess'] },
-  { id: 'marcus', name: 'Marcus Tran', initials: 'MT', role: 'Marketing intern', school: 'UC Berkeley', interests: ['Cooking', 'Hiking', 'Basketball', 'Soccer'] },
-  { id: 'sofia', name: 'Sofia Lopez', initials: 'SL', role: 'Finance intern', school: 'NYU', interests: ['Film', 'Live music', 'Yoga', 'Travel'] },
-  { id: 'daniel', name: 'Daniel Kim', initials: 'DK', role: 'Research intern', school: 'Michigan', interests: ['Photography', 'Basketball', 'Reading', 'Chess'] },
-  { id: 'emma', name: 'Emma Walsh', initials: 'EW', role: 'Design intern', school: 'Brown', interests: ['Painting', 'Yoga', 'Thrifting'] },
-  { id: 'jon', name: 'Jon Park', initials: 'JP', role: 'Software intern', school: 'UCSD', interests: ['Gaming', 'Anime', 'Running', 'Coding'] },
-  { id: 'nia', name: 'Nia Brooks', initials: 'NB', role: 'Policy intern', school: 'Howard', interests: ['Debate', 'Dance', 'Reading', 'Volunteering'] },
-  { id: 'omar', name: 'Omar Haddad', initials: 'OH', role: 'Software intern', school: 'UT Austin', interests: ['Soccer', 'Coding', 'Coffee', 'Gaming'] },
-  { id: 'chloe', name: 'Chloe Evans', initials: 'CE', role: 'Media intern', school: 'Northwestern', interests: ['Writing', 'Theatre', 'Baking', 'Film'] },
-  { id: 'ravi', name: 'Ravi Patel', initials: 'RP', role: 'Data intern', school: 'Georgia Tech', interests: ['Cricket', 'Chess', 'Travel', 'Coding'] },
-  { id: 'zoe', name: 'Zoe Chen', initials: 'ZC', role: 'Product intern', school: 'Columbia', interests: ['Surfing', 'Pottery', 'Fashion', 'Design'] },
-  { id: 'sam', name: 'Sam Okafor', initials: 'SO', role: 'Finance intern', school: 'Duke', interests: ['Golf', 'Podcasts', 'Cars', 'Basketball'] },
-  { id: 'lily', name: 'Lily Nguyen', initials: 'LN', role: 'Design intern', school: 'RISD', interests: ['Illustration', 'Anime', 'Baking', 'Art'] },
-  { id: 'ben', name: 'Ben Carter', initials: 'BC', role: 'Software intern', school: 'MIT', interests: ['Robotics', 'Climbing', 'Gaming', 'Coding'] },
-  { id: 'maya', name: 'Maya Singh', initials: 'MS', role: 'Policy intern', school: 'Yale', interests: ['Volunteering', 'Reading', 'Yoga', 'Travel'] },
-  { id: 'theo', name: 'Theo Grant', initials: 'TG', role: 'Data intern', school: 'Rice', interests: ['Running', 'Board games', 'Coffee', 'Hiking'] },
-]
 
 function schoolFromEmail(email: string): string {
   const domain = email.split('@')[1]?.toLowerCase() ?? ''
@@ -119,61 +99,41 @@ function scoreInternMatch(userInterests: string[], candidateInterests: string[])
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const email = searchParams.get('email')
-  const interestsParam = searchParams.get('interests')
+  const email = (searchParams.get('email') ?? '').trim().toLowerCase()
 
-  // 1. Resolve current user's interests
-  let myInterests: string[] = []
-
-  if (interestsParam) {
-    myInterests = interestsParam.split(',').map((s) => s.trim()).filter(Boolean)
-  }
-
-  // Also query users_table
+  // 1. Everyone in users_table (latest row per email). Interests, company and office come from the quiz.
   const { data: rows } = await supabase.from('users_table').select('*')
   const byEmail = new Map<string, Record<string, any>>()
   for (const r of rows ?? []) {
-    if (r.student_email) {
-      byEmail.set(r.student_email.toLowerCase(), r)
-    }
+    if (r.student_email) byEmail.set(String(r.student_email).toLowerCase(), r)
+  }
+  const me = email ? byEmail.get(email) : undefined
+
+  const myInterests: string[] = Array.isArray(me?.user_interests) ? me!.user_interests : []
+  const myOffice = String(me?.office_address ?? '').trim()
+  const city = cityLabel(myOffice)
+
+  // 2. Where I work. Without an office address there's no "near you", so nobody is shown.
+  const myCoords = myOffice ? await geocodeAddress(myOffice) : null
+  if (!myCoords) {
+    return NextResponse.json({ myInterests, city, needsOffice: !myOffice, totalInterns: 0, matchedCount: 0, interns: [], topMatches: [] })
   }
 
-  // If email was given and no query param interests, pull from users_table
-  if (myInterests.length === 0 && email) {
-    const dbUser = byEmail.get(email.toLowerCase())
-    if (Array.isArray(dbUser?.user_interests) && dbUser.user_interests.length > 0) {
-      myInterests = dbUser.user_interests
-    }
-  }
-
-  // Also check profiles table
-  if (myInterests.length === 0 && email) {
-    try {
-      const { data: profileRows } = await supabase.from('profiles').select('*')
-      const matchedProfile = (profileRows ?? []).find((p: any) =>
-        (p.email && p.email.toLowerCase() === email.toLowerCase()) || (p.student_email && p.student_email.toLowerCase() === email.toLowerCase())
-      )
-      if (Array.isArray(matchedProfile?.interests) && matchedProfile.interests.length > 0) {
-        myInterests = matchedProfile.interests
-      }
-    } catch {}
-  }
-
-  if (myInterests.length === 0) {
-    myInterests = DEFAULT_INTERESTS
-  }
-
-  // 2. Build Candidate Interns from Supabase Database
-  const dbInterns: InternProfile[] = []
+  // 3. Other interns whose office is within NEARBY_MILES of mine, scored on shared interests
+  const nearbyKm = NEARBY_MILES * 1.609
+  const interns: InternProfile[] = []
   for (const [userEmail, u] of byEmail.entries()) {
-    if (email && userEmail === email.toLowerCase()) continue
-    const interests: string[] = Array.isArray(u.user_interests) && u.user_interests.length > 0
-      ? u.user_interests
-      : ['Cooking', 'Hiking', 'Music']
+    if (userEmail === email || !u.id) continue
+    const office = String(u.office_address ?? '').trim()
+    if (!office) continue
+    const coords: Coordinates | null = await geocodeAddress(office)
+    if (!coords || haversineDistanceKm(coords, myCoords) > nearbyKm) continue
 
+    const interests: string[] = Array.isArray(u.user_interests) ? u.user_interests : []
     const { score, shared } = scoreInternMatch(myInterests, interests)
+    if (shared.length === 0) continue
 
-    const fullName = `${u.first_name ?? 'Intern'} ${u.last_name ?? ''}`.trim()
+    const fullName = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() || 'Subtle intern'
     const initials = fullName
       .split(' ')
       .map((p) => p[0])
@@ -181,12 +141,12 @@ export async function GET(request: Request) {
       .slice(0, 2)
       .toUpperCase()
 
-    dbInterns.push({
-      id: `db-${userEmail}`,
+    interns.push({
+      // the auth user id, so "Connect" can save a row in the connections table
+      id: String(u.id),
       name: fullName,
       initials: initials || 'IN',
-      email: u.student_email,
-      role: u.company_name ? `Intern at ${u.company_name}` : 'Summer Intern',
+      role: u.company_name ? `Intern at ${u.company_name}` : 'Summer intern',
       company: u.company_name ?? undefined,
       school: schoolFromEmail(u.student_email),
       interests,
@@ -195,33 +155,27 @@ export async function GET(request: Request) {
     })
   }
 
-  // 3. Build Candidate Interns from Seed Pool with Dynamic Matching
-  const seedInterns: InternProfile[] = BASE_SEED_INTERNS.map((seed) => {
-    const { score, shared } = scoreInternMatch(myInterests, seed.interests)
-    return {
-      ...seed,
-      shared,
-      match: score,
-    }
-  })
+  interns.sort((a, b) => (b.match ?? 0) - (a.match ?? 0) || (b.shared?.length ?? 0) - (a.shared?.length ?? 0))
+  const topMatches = interns.filter((i) => i.match !== undefined && i.match >= 65)
 
-  // 4. Combine and Rank by Match Score (descending)
-  // Only include interns who have at least one shared interest with the user
-  const allInterns = [...dbInterns, ...seedInterns].filter((i) => (i.shared?.length ?? 0) > 0)
-  allInterns.sort((a, b) => {
-    const scoreA = a.match ?? 0
-    const scoreB = b.match ?? 0
-    if (scoreB !== scoreA) return scoreB - scoreA
-    return (b.shared?.length ?? 0) - (a.shared?.length ?? 0)
-  })
-
-  const topMatches = allInterns.filter((i) => i.match !== undefined && i.match >= 65)
-
+  // no emails in the response: other users' addresses shouldn't reach the browser
   return NextResponse.json({
     myInterests,
-    totalInterns: allInterns.length,
+    city,
+    needsOffice: false,
+    totalInterns: interns.length,
     matchedCount: topMatches.length,
-    interns: allInterns,
+    interns,
     topMatches,
   })
+}
+
+/** "Houston, TX" from "315 Capitol St Unit 205, Houston, TX 77002" */
+function cityLabel(office: string): string {
+  const parts = office.split(/,|\s+in\s+/i).map((s) => s.trim()).filter(Boolean)
+  if (parts.length < 2) return ''
+  const last = parts[parts.length - 1]
+  const state = last.match(/^([A-Za-z]{2})(?:\s+\d{5}(?:-\d{4})?)?$/)
+  if (state) return `${parts[parts.length - 2]}, ${state[1].toUpperCase()}`
+  return parts.slice(-2).join(', ').replace(/\s*\d{5}(-\d{4})?$/, '')
 }

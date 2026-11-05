@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useScoredListing } from './useScored'
 import { useState } from 'react'
 import FlowShell from './FlowShell'
-import { SAMPLE_CONTEXT, stayMonths, type Listing, type MatchContext } from './listings'
+import { EMPTY_CONTEXT, stayMonths, type Listing, type MatchContext } from './listings'
 import { Icon } from './parts'
 import { addBookingRequest } from './activity'
 import HouseMascot from '../HouseMascot'
@@ -17,7 +17,7 @@ const STEPS = ['Choose dates', 'Review the total', 'Send a request']
   - listing / context props: the real listing and the user's quiz context
   - requestBooking: create the booking request (dates + note) and return when it is saved
 */
-export default function BookListing({ listing: loadedListing, context = SAMPLE_CONTEXT }: { listing: Listing; context?: MatchContext }) {
+export default function BookListing({ listing: loadedListing, context = EMPTY_CONTEXT }: { listing: Listing; context?: MatchContext }) {
   // same score, commute and safety as the Matches page and dashboard
   const listing = useScoredListing(loadedListing)
   const [note, setNote] = useState('')

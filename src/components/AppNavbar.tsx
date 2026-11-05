@@ -4,9 +4,8 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
-import ThemeToggle from './ThemeToggle'
 
-// Navbar for logged-in pages: logo (back to the dashboard), Messages, Post a listing, Listings, a light/dark toggle, and Log out (with a confirm step).
+// Navbar for logged-in pages: logo (back to the dashboard), Messages, Post a listing, Listings, and Log out (light/dark mode lives in Profile > Appearance) (with a confirm step).
 export default function AppNavbar({ firstName }: { firstName: string }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -113,7 +112,6 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
             <span className="hidden md:inline">Intern Matches</span>
             <span className="md:hidden">Matches</span>
           </Link>
-          <ThemeToggle className="hover:bg-[#1E2B44]/[0.06]" />
           <button
             type="button"
             onClick={() => setConfirming(true)}

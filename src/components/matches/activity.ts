@@ -5,6 +5,8 @@ import type { Listing } from './listings'
 
 const SAVED_KEY = 'subtle-saved-v1'
 const BOOKINGS_KEY = 'subtle-bookings-v1'
+// ids of the made-up San Francisco listings that used to ship with the app; anything saved for them is dropped
+const OLD_SAMPLE_IDS = new Set(['soma-loft', 'hayes-valley-studio', 'mission-apartment', 'nob-hill-room', 'potrero-house'])
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -25,7 +27,7 @@ function write(key: string, value: unknown) {
 
 // TODO(backend): load the ids of homes this user saved
 export function loadSaved(): string[] {
-  return read<string[]>(SAVED_KEY, [])
+  return read<string[]>(SAVED_KEY, []).filter((id) => !OLD_SAMPLE_IDS.has(id))
 }
 
 // TODO(backend): save or unsave this listing for the user
@@ -59,7 +61,7 @@ export const BOOKING_STEPS: { id: BookingStatus; label: string }[] = [
 
 // TODO(backend): load this user's booking requests with their current status
 export function loadBookings(): Booking[] {
-  return read<Booking[]>(BOOKINGS_KEY, [])
+  return read<Booking[]>(BOOKINGS_KEY, []).filter((b) => !OLD_SAMPLE_IDS.has(b.listingId))
 }
 
 // TODO(backend): create the booking request
@@ -103,6 +105,7 @@ export async function loadMyBookings(email: string | null): Promise<Booking[]> {
       )
     }
   } catch {}
+  server = server.filter((b) => !OLD_SAMPLE_IDS.has(b.listingId))
   const seen = new Set(server.map((b) => b.listingId))
   return [...server, ...local.filter((b) => !seen.has(b.listingId))].sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
 }

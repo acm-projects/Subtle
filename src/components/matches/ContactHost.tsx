@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useMatchContext, useScoredListing } from './useScored'
 import { useEffect, useState } from 'react'
 import FlowShell from './FlowShell'
-import { SAMPLE_CONTEXT, type Listing, type MatchContext } from './listings'
+import { EMPTY_CONTEXT, type Listing, type MatchContext } from './listings'
 import { Icon } from './parts'
 import { startConversation } from '../messages/store'
 
@@ -13,7 +13,7 @@ import { startConversation } from '../messages/store'
   - listing / context props: the real listing (with host info) and the user's quiz context
   - sendMessage: send the message to the host and return when it is saved
 */
-export default function ContactHost({ listing: loadedListing, context: initialContext = SAMPLE_CONTEXT }: { listing: Listing; context?: MatchContext }) {
+export default function ContactHost({ listing: loadedListing, context: initialContext = EMPTY_CONTEXT }: { listing: Listing; context?: MatchContext }) {
   // same score, commute and safety as the Matches page and dashboard
   const listing = useScoredListing(loadedListing)
   const context = useMatchContext(initialContext)
@@ -24,7 +24,7 @@ export default function ContactHost({ listing: loadedListing, context: initialCo
     .join('')
     .slice(0, 2)
     .toUpperCase()
-  const draft = (company: string) => `Hi ${host}, I'm interning at ${company} this summer and I'm interested in the ${listing.title}.`
+  const draft = (company: string) => `Hi ${host}, I'm interning${company ? ` at ${company}` : ''} this summer and I'm interested in the ${listing.title}.`
   const [message, setMessage] = useState(draft(context.company))
   const [edited, setEdited] = useState(false)
   // once the real company loads, swap it into the draft (unless they've started typing)

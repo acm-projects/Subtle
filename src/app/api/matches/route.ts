@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { dbListingToMatchListing, type Listing as MatchListing, type MatchContext, SAMPLE_CONTEXT, SAMPLE_LISTINGS } from '../../../components/matches/listings'
+import { dbListingToMatchListing, type Listing as MatchListing, type MatchContext, NEARBY_MILES } from '../../../components/matches/listings'
 import { type CommuteMode, estimateCommuteMinutes, geocodeAddress, haversineDistanceKm, pickOptimalCommuteMode } from '../../../lib/geocoding'
 import { googleCommuteMinutes, hasGoogleMapsKey } from '../../../lib/google-maps'
 import { safetyFit, safetyForMany, safetyReason, type SafetyInfo } from '../../../lib/safety'
@@ -13,10 +13,9 @@ import { computeSubtleScore } from '../../../lib/vector-matching'
  * Query params:
  *   - email: optional student_email to personalize scores using their public.users_table profile
  *   - sort: 'score' | 'price' | 'commute' (default 'score')
- *   - includeSamples: 'true' | 'false' (default 'true')
  */
-// ~40 miles: about as far as an intern would commute every day
-const NEARBY_KM = 65
+// NEARBY_MILES (listings.ts) in km
+const NEARBY_KM = NEARBY_MILES * 1.609
 // longest one-way commute we'll show
 const MAX_COMMUTE_MIN = 90
 
@@ -25,7 +24,7 @@ const MAX_COMMUTE_MIN = 90
  * The office address wins over users_table.user_city, which the quiz doesn't update.
  */
 function cityLabel(userCity?: string | null, office?: string | null): string {
-  const parts = (office ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  const parts = (office ?? '').split(/,|\s+in\s+/i).map((s) => s.trim()).filter(Boolean)
   if (parts.length >= 2) {
     const last = parts[parts.length - 1]
     const state = last.match(/^([A-Za-z]{2})(?:\s+\d{5}(?:-\d{4})?)?$/)
@@ -39,7 +38,6 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const email = searchParams.get('email')
   const sort = searchParams.get('sort') ?? 'score'
-  const includeSamples = searchParams.get('includeSamples') !== 'false'
 
   let userProfile: Record<string, any> | null = null
   if (email) {
@@ -52,18 +50,19 @@ export async function GET(request: Request) {
     }
   }
 
-  const officeAddress = userProfile?.office_address || SAMPLE_CONTEXT.office
+  // whatever company and office address the user typed in the quiz / preferences (free text)
+  const officeAddress: string = (userProfile?.office_address ?? '').trim()
 
   const preferredMode = userProfile?.user_transportation || 'Public Transit'
 
   const context: MatchContext = {
-    company: userProfile?.company_name || SAMPLE_CONTEXT.company,
+    company: (userProfile?.company_name ?? '').trim(),
     office: officeAddress,
-    city: cityLabel(userProfile?.user_city, userProfile?.office_address) || SAMPLE_CONTEXT.city,
+    city: cityLabel(userProfile?.user_city, officeAddress),
   }
 
   // 1. Geocode the user's workplace address with Nominatim
-  const workplaceCoords = await geocodeAddress(officeAddress)
+  const workplaceCoords = officeAddress ? await geocodeAddress(officeAddress) : null
 
   let dbMatched: MatchListing[] = []
   try {
@@ -75,9 +74,7 @@ export async function GET(request: Request) {
     console.error('Error loading DB listings in /api/matches:', err)
   }
 
-  // sample listings are all in San Francisco
-  const samples = SAMPLE_LISTINGS.map((l) => ({ ...l, city: SAMPLE_CONTEXT.city }))
-  const rawCombined = includeSamples ? [...dbMatched, ...samples] : dbMatched
+  const rawCombined = dbMatched
 
   // 2. Geocode listings and compute approximate commute duration based on real coordinates
   const located: { listing: MatchListing; distKm: number | null }[] = await Promise.all(
@@ -220,7 +217,7 @@ export async function GET(request: Request) {
     geocodedWorkplace: workplaceCoords,
     // how many commute times came from Google Maps vs. the distance estimate
     commuteSources: { google: googleCount, estimate: combined.length - googleCount },
-    // homes within ~40 miles of the workplace, and how many were left out for being too far or unplaceable
+    // homes within NEARBY_MILES of the workplace, and how many were left out for being too far or unplaceable
     nearby: combined.length,
     filteredOut,
     radiusKm: workplaceCoords ? NEARBY_KM : null,

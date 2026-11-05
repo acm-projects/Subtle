@@ -7,6 +7,7 @@ import HouseMascot from '../HouseMascot'
 import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from '../matches/parts'
 import { BOOKING_STEPS } from '../matches/activity'
 import { useDashboardData } from './useDashboardData'
+import { NEARBY_MILES } from '../matches/listings'
 
 const glass = 'rounded-[32px] border border-white bg-white/65 shadow-[0_30px_70px_-40px_rgba(30,43,68,0.38)] backdrop-blur-xl'
 const serif = 'font-[family-name:var(--font-serif)]'
@@ -82,7 +83,7 @@ export default function Dashboard() {
                 {d.topMatches.length === 0 ? (
                   <div className="mt-8 rounded-[26px] border border-dashed border-[#C9DBEA] p-8 text-center">
                     <p className={`${serif} text-3xl`}>{d.nearCity ? `No listings near ${d.nearCity} yet.` : 'No listings near you yet.'}</p>
-                    <p className="mx-auto mt-2 max-w-md text-[#4A5A75]">We only show homes within about 40 miles of where you work. New sublets show up here as soon as they're posted.</p>
+                    <p className="mx-auto mt-2 max-w-md text-[#4A5A75]">We only show homes within {NEARBY_MILES} miles of where you work. New sublets show up here as soon as they're posted.</p>
                     <Link href="/questionnaire" className={`${btnLight} mt-5`}>
                       Check my work address
                     </Link>

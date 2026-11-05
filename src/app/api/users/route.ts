@@ -37,9 +37,13 @@ function mapHousing(h: unknown): string | null {
 function mapMoveIn(m: unknown): string | null {
   if (!m || typeof m !== 'string') return null
   const val = m.trim().toLowerCase()
-  if (val === 'may') return '2026-05-01'
-  if (val === 'june') return '2026-06-01'
-  if (val === 'july') return '2026-07-01'
+  // a month on its own means the next one coming up (in Nov 2026, "june" is June 2027)
+  const month = { may: 5, june: 6, july: 7 }[val]
+  if (month) {
+    const now = new Date()
+    const year = now.getMonth() + 1 >= month ? now.getFullYear() + 1 : now.getFullYear()
+    return `${year}-${String(month).padStart(2, '0')}-01`
+  }
   if (val === 'flexible') return 'Flexible'
   return m.toString()
 }
@@ -167,12 +171,8 @@ export async function GET(request: Request) {
     return NextResponse.json(data && data.length > 0 ? data[data.length - 1] : null)
   }
 
-  const { data, error } = await supabase.from('users_table').select('*')
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-  return NextResponse.json(data)
+  // listing every user (with their emails and addresses) isn't something any page needs
+  return NextResponse.json({ error: 'Pass ?email= or ?id=' }, { status: 400 })
 }
 
 async function upsertUser(request: Request) {
