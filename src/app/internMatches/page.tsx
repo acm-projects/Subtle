@@ -49,6 +49,22 @@ const MEETUP_IDEAS: Record<string, string> = {
   Photography: 'Golden hour photo walk',
   Basketball: 'Pickup game at the park',
   'Live music': 'Live music night in Echo Park',
+  Gaming: 'LAN party or arcade night',
+  Anime: 'Anime screening & boba meetup',
+  Soccer: 'Pickup soccer match at the turf',
+  Coffee: 'Specialty coffee crawl',
+  Coding: 'Hackathon & weekend co-working session',
+  Yoga: 'Morning yoga in the park',
+  Reading: 'Book club discussion at a local cafe',
+  Travel: 'Weekend road trip scouting',
+  Running: 'Morning 5K run around the lake',
+  Baking: 'Pastry & dessert tasting session',
+  Pottery: 'Ceramics workshop studio visit',
+  Painting: 'Sip & paint social evening',
+  Chess: 'Casual chess matches in the square',
+  'Board games': 'Board game cafe night',
+  Robotics: 'Hardware hack & makerspace tour',
+  Thrifting: 'Vintage market thrift crawl',
 }
 
 const serif = 'font-[family-name:var(--font-serif)]'
@@ -300,9 +316,23 @@ export default function MatchesPage() {
         setConnectedIds(linked)
       }
 
+      let localInterests: string[] = []
       try {
-        const query = email ? `?email=${encodeURIComponent(email)}` : ''
-        const res = await fetch(`/api/intern-matches${query}`)
+        const raw = localStorage.getItem('subtle-quiz-v1')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          if (Array.isArray(parsed.interests) && parsed.interests.length > 0) {
+            localInterests = parsed.interests
+            setMyInterests(parsed.interests)
+          }
+        }
+      } catch {}
+
+      try {
+        const params = new URLSearchParams()
+        if (email) params.set('email', email)
+        if (localInterests.length > 0) params.set('interests', localInterests.join(','))
+        const res = await fetch(`/api/intern-matches?${params.toString()}`)
         if (res.ok) {
           const json = await res.json()
           if (Array.isArray(json.myInterests) && json.myInterests.length > 0) {
@@ -325,12 +355,18 @@ export default function MatchesPage() {
 
   const interns: Placed[] = useMemo(
     () =>
-      internList.map((i) => ({
-        ...i,
-        ...(positions[i.id] ?? { x: 50, y: 50 }),
-        shared: i.interests.filter((x) => myInterests.includes(x)),
-        big: bigIds.has(i.id),
-      })),
+      internList
+        .map((i) => {
+          const shared = i.interests.filter((x) => myInterests.some((m) => m.toLowerCase() === x.toLowerCase()))
+          return {
+            ...i,
+            ...(positions[i.id] ?? { x: 50, y: 50 }),
+            shared,
+            big: bigIds.has(i.id),
+          }
+        })
+        // Only show people who share at least 1 interest with you
+        .filter((i) => i.shared.length > 0),
     [internList, myInterests, positions, bigIds],
   )
   const matches = interns.filter((i) => i.match !== undefined).sort((a, b) => (b.match ?? 0) - (a.match ?? 0))
@@ -350,12 +386,12 @@ export default function MatchesPage() {
   // meetup ideas for the interests you share with your matches
   const meetups = useMemo(
     () =>
-      MY_INTERESTS.filter((x) => MEETUP_IDEAS[x])
-        .map((interest) => ({ interest, idea: MEETUP_IDEAS[interest], people: matches.filter((m) => m.shared.includes(interest)) }))
+      myInterests.filter((x) => MEETUP_IDEAS[x])
+        .map((interest) => ({ interest, idea: MEETUP_IDEAS[interest], people: matches.filter((m) => m.shared.some((s) => s.toLowerCase() === interest.toLowerCase())) }))
         .filter((m) => m.people.length > 0)
         .sort((a, b) => b.people.length - a.people.length)
         .slice(0, 4),
-    [matches],
+    [matches, myInterests],
   )
 
   // send a connection request to this intern; they accept or decline it from their profile
@@ -560,7 +596,7 @@ export default function MatchesPage() {
               <div className={card}>
                 <div className={label}>Matched on Your Interests</div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {MY_INTERESTS.map((i) => (
+                  {myInterests.map((i) => (
                     <span key={i} className={pillShared}>
                       {titleCase(i)}
                     </span>
@@ -577,7 +613,7 @@ export default function MatchesPage() {
               <p className="mb-5 mt-1 text-sm text-[#4A5A75]">What interns in your city are into. Yours are in navy.</p>
               <div className="grid gap-3.5">
                 {popular.map(([interest, count]) => {
-                  const mine = MY_INTERESTS.includes(interest)
+                  const mine = myInterests.some((m) => m.toLowerCase() === interest.toLowerCase())
                   return (
                     <div key={interest}>
                       <div className="mb-1 flex justify-between text-sm font-semibold">
