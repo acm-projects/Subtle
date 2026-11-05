@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useScoredListing } from './useScored'
 import { useState } from 'react'
 import FlowShell from './FlowShell'
 import { SAMPLE_CONTEXT, type Listing, type MatchContext } from './listings'
@@ -12,7 +13,9 @@ import { startConversation } from '../messages/store'
   - listing / context props: the real listing (with host info) and the user's quiz context
   - sendMessage: send the message to the host and return when it is saved
 */
-export default function ContactHost({ listing, context = SAMPLE_CONTEXT }: { listing: Listing; context?: MatchContext }) {
+export default function ContactHost({ listing: loadedListing, context = SAMPLE_CONTEXT }: { listing: Listing; context?: MatchContext }) {
+  // same score, commute and safety as the Matches page and dashboard
+  const listing = useScoredListing(loadedListing)
   const host = listing.hostName.split(' ')[0]
   const initials = listing.hostName
     .split(' ')
@@ -61,7 +64,7 @@ export default function ContactHost({ listing, context = SAMPLE_CONTEXT }: { lis
             <Icon name="check" size={24} />
           </span>
           <h1 className="mt-5 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Message sent.</h1>
-          <p className="mt-3 text-[17px] text-[#4A5A75]">{host} will reply in your messages. (Demo only for now.)</p>
+          <p className="mt-3 text-[17px] text-[#4A5A75]">{host} will reply in Messages. (Demo only for now.)</p>
           <div className="mt-8 grid grid-cols-2 gap-3">
             <Link href={`/matches/${listing.id}`} className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white font-semibold transition hover:-translate-y-0.5">
               Back to listing
@@ -76,8 +79,7 @@ export default function ContactHost({ listing, context = SAMPLE_CONTEXT }: { lis
         </div>
       ) : (
         <>
-          <p className="w-fit rounded-full bg-[#EEF3F8] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[#4A5A75]">Contact</p>
-          <h1 className="mt-3 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Message the sub-leaser</h1>
+          <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Message the sub-leaser</h1>
           <p className="mt-2 text-[17px] text-[#4A5A75]">
             About the {listing.title} · {listing.score} Subtle score
           </p>
@@ -103,8 +105,8 @@ export default function ContactHost({ listing, context = SAMPLE_CONTEXT }: { lis
             </div>
           </div>
 
-          <label htmlFor="contact-message" className="mt-6 block text-xs font-bold uppercase tracking-[0.1em]">
-            Your message
+          <label htmlFor="contact-message" className="mt-6 block text-[15px] font-semibold">
+            Message
           </label>
           <textarea
             id="contact-message"

@@ -246,10 +246,10 @@ export default function EditListingPage() {
               href="/my-listings"
               className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-[#4A5A75] hover:text-[#1E2B44]"
             >
-              &larr; Back to your listings
+              &larr; Back to listings
             </Link>
             <h1 className="mt-2 font-[family-name:var(--font-serif)] text-4xl font-medium tracking-tight">
-              Edit your place
+              Edit Listing
             </h1>
           </div>
           <button
@@ -270,7 +270,7 @@ export default function EditListingPage() {
 
         {success && (
           <div className="mb-6 rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
-            ✓ Changes saved! Redirecting to your listings dashboard…
+            ✓ Changes saved! Redirecting to listings…
           </div>
         )}
 

@@ -68,21 +68,26 @@ const MEETUP_IDEAS: Record<string, string> = {
 }
 
 const serif = 'font-[family-name:var(--font-serif)]'
-const label = 'text-[11px] font-semibold uppercase tracking-[0.14em] text-[#4A5A75]'
+const label = 'text-[15px] font-semibold text-[#4A5A75]'
 const card = 'rounded-[28px] border border-white bg-white/80 p-6 shadow-[0_20px_50px_-30px_rgba(30,43,68,0.35)]'
 const pill = 'rounded-full border border-[#D5DFEA] bg-white px-3 py-1 text-xs font-medium text-[#1E2B44]'
 const pillShared = 'rounded-full border border-[#86abcc] bg-[#86abcc] px-3 py-1 text-xs font-medium text-white'
 const btnDark = 'rounded-full bg-[#1E2B44] text-sm font-semibold text-white transition hover:bg-[#2F4161] disabled:cursor-default disabled:bg-[#9CB5CE]'
 const btnLight = 'rounded-full border border-[#D5DFEA] bg-white text-sm font-semibold text-[#1E2B44] transition hover:bg-[#F7F9FB] disabled:cursor-default disabled:text-[#4A5A75]'
 
-// Score colors: navy for the best matches, then blue, then brown as the score drops.
-// All keep white text above 4.5:1 contrast.
+// Score colors: the stronger the match, the darker the blue.
+// Text on each shade passes 4.5:1 contrast (white on the two dark ones, navy on the two light ones).
+const SCORE_SHADES = [
+  { min: 90, bg: '#22507F', text: '#FFFFFF' },
+  { min: 80, bg: '#3D6D9F', text: '#FFFFFF' },
+  { min: 70, bg: '#8EB2D6', text: '#15203A' },
+  { min: 0, bg: '#C9DBEA', text: '#15203A' },
+]
+const shadeFor = (score: number) => SCORE_SHADES.find((s) => score >= s.min) ?? SCORE_SHADES[SCORE_SHADES.length - 1]
 function scoreColor(score: number) {
-  if (score >= 90) return '#739dc2'
-  if (score >= 80) return '#a0c8ec'
-  if (score >= 70) return '#B9D6F0' 
-  return 'rgb(221, 167, 131)'
+  return shadeFor(score).bg
 }
+const scoreStyle = (score: number) => ({ backgroundColor: shadeFor(score).bg, color: shadeFor(score).text })
 
 const joinNames = (list: string[]) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0] ?? '')
 
@@ -243,7 +248,7 @@ function Tooltip({
       <div className="flex items-center gap-3">
         <span
           className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold text-white"
-          style={{ backgroundColor: matched ? scoreColor(intern.match ?? 0) : '#9CB5CE' }}
+          style={matched ? scoreStyle(intern.match ?? 0) : { backgroundColor: '#9CB5CE' }}
         >
           {matched ? intern.match : intern.initials}
         </span>
@@ -438,13 +443,13 @@ export default function MatchesPage() {
           {/* header: the interests block sits on the right, label directly above its tags */}
           <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
             <div>
-              <h1 className={`${serif} text-[44px] font-medium leading-[1.02] tracking-[-0.02em] md:text-[56px]`}>Matches</h1>
-              <p className="mt-2 text-[15px] text-[#4A5A75]">Interns living in Los Angeles this summer who share your interests.</p>
+              <h1 className={`${serif} text-[44px] font-medium leading-[1.02] tracking-[-0.02em] md:text-[56px]`}>Intern Matches</h1>
+              <p className="mt-2 text-[15px] text-[#4A5A75]">Interns living in Los Angeles this summer with shared interests.</p>
             </div>
 
             <div className="max-w-[460px]">
-              <div className={`${label} mb-2`}>Your Interests</div>
-              <ul className="flex flex-wrap gap-1.5" aria-label="Your interests">
+              <div className={`${label} mb-2`}>Interests</div>
+              <ul className="flex flex-wrap gap-1.5" aria-label="Interests">
                 {myInterests.map((i) => (
                   <li key={i} className="rounded-full bg-[#DCEBF6] px-2.5 py-1 text-[11px] font-semibold text-[#245F90] ring-[1.5px] ring-inset ring-[#2E7DB5]">
                     {titleCase(i)}
@@ -485,11 +490,11 @@ export default function MatchesPage() {
                     y1="50"
                     x2={m.x}
                     y2={m.y}
-                    stroke="#B9D6F0"
+                    stroke={scoreColor(m.match ?? 0)}
                     strokeLinecap="round"
                     vectorEffect="non-scaling-stroke"
                     strokeWidth={hoverId === m.id ? 3 : 1.2 + ((m.match ?? 0) / 100) * 1.2}
-                    strokeOpacity={hoverId === m.id ? 0.85 : 0.22}
+                    strokeOpacity={hoverId === m.id ? 0.9 : 0.25 + ((m.match ?? 0) / 100) * 0.3}
                     style={{ transition: 'stroke-opacity .2s, stroke-width .2s' }}
                   />
                 ))}
@@ -527,7 +532,7 @@ export default function MatchesPage() {
                           ? 'h-[52px] w-[52px] text-sm shadow-[0_10px_20px_-8px_rgba(30,43,68,0.6)]'
                           : 'h-[16px] w-[16px] bg-[#9CB5CE] shadow-[0_4px_10px_rgba(30,43,68,0.2)] group-hover:bg-[#1E2B44]'
                       } ${active ? 'scale-125' : ''}`}
-                      style={i.big ? { backgroundColor: scoreColor(i.match ?? 0) } : undefined}
+                      style={i.big ? scoreStyle(i.match ?? 0) : undefined}
                     >
                       {i.big ? i.initials : null}
                     </span>
@@ -546,8 +551,16 @@ export default function MatchesPage() {
 
               {/* legend */}
               <div className="absolute bottom-3.5 left-3.5 z-10 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-full border border-white bg-white/85 px-4 py-2 text-[11px] font-semibold shadow-sm backdrop-blur">
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#B9D6F0]" />You</span>
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#2F5D8C]" />Top 10 Matches</span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#1E2B44]" />You</span>
+                <span className="flex items-center gap-1.5">
+                  Stronger
+                  <span className="flex">
+                    {SCORE_SHADES.map((sh) => (
+                      <span key={sh.bg} className="h-3 w-3 rounded-full border border-white" style={{ backgroundColor: sh.bg }} />
+                    ))}
+                  </span>
+                  Weaker
+                </span>
                 <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#9CB5CE]" />Also in LA</span>
               </div>
               <div className="absolute right-3.5 top-3.5 z-10 rounded-full border border-white bg-white/85 px-3.5 py-1.5 text-[11px] font-semibold shadow-sm backdrop-blur">Hover a dot to see who they are</div>
@@ -576,7 +589,7 @@ export default function MatchesPage() {
                         onMouseLeave={() => setHoverId(null)}
                         className={`flex h-[57px] items-center gap-3 border-t border-[#E3ECF5] px-1 transition-colors ${hoverId === m.id ? 'bg-[#F4F7FB]' : ''}`}
                       >
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white" style={{ backgroundColor: scoreColor(m.match ?? 0) }}>
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white" style={scoreStyle(m.match ?? 0)}>
                           {m.match}
                         </span>
                         <div className="min-w-0 flex-1">
@@ -590,11 +603,10 @@ export default function MatchesPage() {
                     )
                   })}
                 </div>
-                {matches.length > 5 && <p className="mt-2 text-center text-[11px] text-[#4A5A75]">Scroll for {matches.length - 5} more</p>}
               </div>
 
               <div className={card}>
-                <div className={label}>Matched on Your Interests</div>
+                <div className={label}>Shared Interests</div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {myInterests.map((i) => (
                     <span key={i} className={pillShared}>
@@ -610,7 +622,7 @@ export default function MatchesPage() {
           <div className="mt-5 grid gap-5 lg:grid-cols-2">
             <div className={card}>
               <h2 className={`${serif} text-2xl font-medium`}>Popular in Los Angeles</h2>
-              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">What interns in your city are into. Yours are in navy.</p>
+              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">What interns in the city are into. Shared ones are in navy.</p>
               <div className="grid gap-3.5">
                 {popular.map(([interest, count]) => {
                   const mine = myInterests.some((m) => m.toLowerCase() === interest.toLowerCase())
@@ -631,7 +643,7 @@ export default function MatchesPage() {
 
             <div className={card}>
               <h2 className={`${serif} text-2xl font-medium`}>Ways to Meet Up</h2>
-              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">Ideas based on what you share with your matches. Sample ideas.</p>
+              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">Ideas based on shared interests. Sample ideas.</p>
               <div className="grid gap-3">
                 {meetups.map((m) => (
                   // fixed first column so every idea title starts at the same x position
