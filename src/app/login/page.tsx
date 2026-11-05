@@ -26,9 +26,10 @@ function passwordStrength(pw: string): number {
 }
 
 const CONSENT_ERROR = 'Please agree to share your name with other users to create an account.'
+const EDU_ERROR = 'Subtle is for students. Please sign in with your school (.edu) Google account.'
 
-// The redirect to Google wipes the page's state, so the tick is carried across in localStorage.
-// This key must match the one in app/auth/callback/page.tsx.
+// Set just before we send the person to Google, because the redirect wipes this page's state.
+// /auth/callback reads it to know the sign-up box was ticked.
 const CONSENT_KEY = 'subtle-google-consent'
 
 function LoginForm() {
@@ -53,15 +54,15 @@ function LoginForm() {
   const needsConsent = isSignUpMode && !agreed
   const submitBlocked = loading || needsConsent
 
-  // the Google callback page sends people back here with ?notice=edu or ?notice=consent
+  // /auth/callback sends people back here with a notice if their Google sign-in couldn't be finished
   const notice = searchParams.get('notice')
   useEffect(() => {
-    if (notice === 'edu') {
+    if (notice === 'consent') {
       setIsError(true)
-      setMessage('Subtle is for students. Please use your .edu email.')
-    } else if (notice === 'consent') {
+      setMessage(CONSENT_ERROR)
+    } else if (notice === 'edu') {
       setIsError(true)
-      setMessage('Please tick the box to agree to share your name, then try Google again.')
+      setMessage(EDU_ERROR)
     }
   }, [notice])
 
@@ -169,7 +170,8 @@ function LoginForm() {
     handleAuth(isSignUpMode)
   }
 
-  // Runs only when the Google button is clicked. After Google, the person lands on /auth/callback.
+  // Google sign-up and sign-in. Google sends the person back to /auth/callback, which finishes the account
+  // (name, consent, users_table row) and then goes to /home.
   const handleGoogle = async () => {
     if (needsConsent) {
       setIsError(true)
@@ -177,26 +179,25 @@ function LoginForm() {
       return
     }
 
-    // carry the tick across the redirect (the callback page reads and clears it)
-    try {
-      if (isSignUpMode && agreed) localStorage.setItem(CONSENT_KEY, '1')
-      else localStorage.removeItem(CONSENT_KEY)
-    } catch {}
-
     setLoading(true)
     setMessage('')
     setIsError(false)
 
+    // remember that the consent box was ticked, because the redirect to Google wipes this page's state
+    try {
+      if (isSignUpMode) localStorage.setItem(CONSENT_KEY, '1')
+      else localStorage.removeItem(CONSENT_KEY)
+    } catch {}
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // your own page, NOT the supabase.co address (that one only goes in Google Cloud)
         redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: { prompt: 'select_account' },
+        queryParams: { prompt: 'select_account' }, // let people pick their school account, not just the last one used
       },
     })
 
-    // on success the browser leaves for Google, so only an error needs handling here
+    // on success the browser leaves for Google, so there is nothing more to do here
     if (error) {
       setLoading(false)
       setIsError(true)
@@ -316,7 +317,7 @@ function LoginForm() {
               )}
             </div>
 
-            {/* consent: sign-up only, unchecked by default */}
+            {/* consent: sign-up only, unchecked by default. It also covers signing up with Google. */}
             {isSignUpMode && (
               <label className="sb-check">
                 <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />

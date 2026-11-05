@@ -24,8 +24,16 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
     const load = async () => {
       const { data: auth } = await supabase.auth.getUser()
       if (!auth.user) return
-      const { data } = await supabase.from('profiles').select('avatar_url').eq('id', auth.user.id).single()
-      if (active) setAvatarUrl(data?.avatar_url ?? null)
+      const user = auth.user
+      const meta = user.user_metadata ?? {}
+      let pic = (meta.avatar_url ?? meta.avatarUrl ?? null) as string | null
+
+      try {
+        const stored = localStorage.getItem(`subtle-avatar-${user.id}`)
+        if (stored) pic = stored
+      } catch {}
+
+      if (active) setAvatarUrl(pic)
     }
     load()
     window.addEventListener('avatar-updated', load)

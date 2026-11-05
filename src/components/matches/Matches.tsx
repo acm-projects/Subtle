@@ -202,8 +202,8 @@ export default function Matches({
                         <Icon name={commuteIcon(l)} size={17} /> {commuteText(l)}
                       </p>
                       <ul className="mt-3 flex flex-wrap gap-2 text-[13px] font-medium">
-                        {[l.homeType, l.roomType, ...l.tags, `From ${l.availableFrom}`].map((t) => (
-                          <li key={t} className="rounded-full border border-[#D5DFEA] bg-white px-3 py-1">
+                        {Array.from(new Set([l.homeType, l.roomType, ...l.tags, `From ${l.availableFrom}`])).map((t, idx) => (
+                          <li key={`${t}-${idx}`} className="rounded-full border border-[#D5DFEA] bg-white px-3 py-1">
                             {t}
                           </li>
                         ))}

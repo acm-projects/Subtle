@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import AppNavbar from '../../components/AppNavbar'
 import { supabase } from '../../lib/supabase'
@@ -14,31 +15,47 @@ type Intern = {
   match?: number // 0-100. Only set for interns who matched with the user.
 }
 
-// Ids of the old built-in demo interns. If the API still sends any of them, they are dropped here.
-const SAMPLE_IDS = new Set([
-  'aisha', 'leo', 'priya', 'marcus', 'sofia', 'daniel', 'emma', 'jon', 'nia',
-  'omar', 'chloe', 'ravi', 'zoe', 'sam', 'lily', 'ben', 'maya', 'theo',
-])
+// What /api/intern-matches sends for each person. Only the email and the match score are used from it:
+// the id and interests come straight from users_table, so they are always the real ones.
+type ApiIntern = { email?: string; match?: number | null; role?: string; school?: string }
 
-// Keeps only the fields this page uses and drops duplicate ids, so odd API data can't break the layout.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const cleanInterns = (raw: any[]): Intern[] => {
-  const seen = new Set<string>()
-  return raw.flatMap((r, n) => {
-    const id = String(r.id ?? `${r.name}-${n}`)
-    if (seen.has(id) || SAMPLE_IDS.has(id)) return []
-    seen.add(id)
-    const name = String(r.name ?? 'Intern')
-    const m = r.match == null ? NaN : Number(r.match)
+type UserRow = {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  student_email: string | null
+  company_name: string | null
+  user_interests: string[] | null
+}
+
+// Turns the API's list into real people from Supabase. Anyone the API lists without an email (its built-in
+// demo people) is dropped, and so is anyone who hasn't picked interests yet.
+async function loadInterns(raw: ApiIntern[], me: string | null): Promise<Intern[]> {
+  const byEmail = new Map<string, ApiIntern>()
+  raw.forEach((r) => r.email && byEmail.set(r.email.toLowerCase(), r))
+  const emails = [...byEmail.values()].map((r) => r.email as string)
+  if (emails.length === 0) return []
+
+  const { data } = await supabase
+    .from('users_table')
+    .select('id, first_name, last_name, student_email, company_name, user_interests')
+    .in('student_email', emails)
+
+  return ((data ?? []) as UserRow[]).flatMap((u) => {
+    const api = byEmail.get((u.student_email ?? '').toLowerCase())
+    const interests = Array.isArray(u.user_interests) ? u.user_interests.map(String).filter(Boolean) : []
+    if (!api || u.id === me || interests.length === 0) return []
+    const name = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() || (u.student_email ?? 'Intern').split('@')[0]
+    const school = api.school && api.school !== 'University Student' ? api.school : ''
     return [
       {
-        id,
+        id: u.id, // users_table.id is also the person's login id, which is what connections use
         name,
-        initials: String(r.initials ?? name.split(' ').map((w: string) => w[0]).join('').slice(0, 2)),
-        role: String(r.role ?? 'Intern'),
-        school: String(r.school ?? ''),
-        interests: Array.isArray(r.interests) ? r.interests.map(String) : [],
-        match: Number.isNaN(m) ? undefined : m,
+        initials: name.split(' ').map((w) => w[0]).join('').slice(0, 2),
+        role: u.company_name ? `Intern at ${u.company_name}` : api.role ?? 'Summer intern',
+        school,
+        interests,
+        match: api.match == null || Number.isNaN(Number(api.match)) ? undefined : Number(api.match),
       },
     ]
   })
@@ -62,7 +79,11 @@ const MEETUP_IDEAS: Record<string, string> = {
   Surfing: 'Early surf session in Santa Monica',
   Climbing: 'Bouldering night at a climbing gym',
   Dance: 'Salsa night in Hollywood',
+  Art: 'Gallery hop in the Arts District',
+  Volunteering: 'Volunteer day at a local food bank',
+  Music: 'Live music night in Echo Park',
 }
+const IDEAS_BY_LOWER: Record<string, string> = Object.fromEntries(Object.entries(MEETUP_IDEAS).map(([k, v]) => [k.toLowerCase(), v]))
 
 const serif = 'font-[family-name:var(--font-serif)]'
 const label = 'text-[13px] font-semibold text-[#4A5A75]'
@@ -317,23 +338,25 @@ export default function MatchesPage() {
   const [myInterests, setMyInterests] = useState<string[]>([])
   const [internList, setInternList] = useState<Intern[]>([]) // only real data from /api/intern-matches
   const [loaded, setLoaded] = useState(false)
+  const [needsQuiz, setNeedsQuiz] = useState(false) // true when you haven't picked interests yet
 
   const flash = (text: string, tone: 'ok' | 'err' = 'ok') => {
     setToast({ tone, text })
     window.setTimeout(() => setToast(null), 3500)
   }
 
-  // AppNavbar takes the user's first name; also fetch live intern matches from /api/intern-matches
+  // Load who you are, your interests and your matches, all from Supabase.
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       const meta = data.user?.user_metadata
       const email = data.user?.email ?? ''
       setFirstName(meta?.first_name ?? email.split('@')[0] ?? '')
 
-      // remember who the user has already connected with or asked
-      if (data.user) {
-        const me = data.user.id
+      const me = data.user?.id ?? null
+      if (data.user && me) {
         setUserId(me)
+
+        // remember who the user has already connected with or asked
         const { data: rows } = await supabase
           .from('connections')
           .select('requester_id, addressee_id, status')
@@ -350,13 +373,34 @@ export default function MatchesPage() {
         setConnectedIds(linked)
       }
 
+      // your interests: from your row in users_table, or the answers saved in this browser
+      let mine: string[] = []
+      if (me) {
+        const { data: row } = await supabase.from('users_table').select('user_interests').eq('id', me).maybeSingle()
+        if (Array.isArray(row?.user_interests)) mine = row.user_interests.map(String).filter(Boolean)
+      }
+      if (mine.length === 0) {
+        try {
+          const parsed = JSON.parse(localStorage.getItem('subtle-quiz-v1') ?? '{}')
+          if (Array.isArray(parsed.interests)) mine = parsed.interests.map(String).filter(Boolean)
+        } catch {}
+      }
+      setMyInterests(mine)
+
+      // no interests means nothing to match on. Skip the API so it can't fall back to made-up interests.
+      if (mine.length === 0) {
+        setNeedsQuiz(true)
+        setLoaded(true)
+        return
+      }
+
       try {
-        const query = email ? `?email=${encodeURIComponent(email)}` : ''
-        const res = await fetch(`/api/intern-matches${query}`)
+        const params = new URLSearchParams({ interests: mine.join(',') })
+        if (email) params.set('email', email)
+        const res = await fetch(`/api/intern-matches?${params.toString()}`)
         if (res.ok) {
           const json = await res.json()
-          if (Array.isArray(json.myInterests)) setMyInterests(json.myInterests.map(String))
-          if (Array.isArray(json.interns)) setInternList(cleanInterns(json.interns))
+          setInternList(await loadInterns(Array.isArray(json.interns) ? json.interns : [], me))
         }
       } catch {
         // network error: the page just shows no matches
@@ -365,22 +409,28 @@ export default function MatchesPage() {
     })
   }, [])
 
+  // your interests in lowercase, so "Live Music" and "Live music" count as the same thing
+  const mineLower = useMemo(() => new Set(myInterests.map((x) => x.toLowerCase())), [myInterests])
+
+  // only people who share at least one interest with you
+  const eligible = useMemo(() => internList.filter((i) => i.interests.some((x) => mineLower.has(x.toLowerCase()))), [internList, mineLower])
+
   // positions are worked out once for everyone, so dots stay put when you switch filters
-  const positions = useMemo(() => layoutInterns(internList), [internList])
+  const positions = useMemo(() => layoutInterns(eligible), [eligible])
   // the 10 best matches get the big circles
-  const bigIds = useMemo(() => bigIdsOf(internList), [internList])
+  const bigIds = useMemo(() => bigIdsOf(eligible), [eligible])
 
   const interns: Placed[] = useMemo(
     () =>
-      internList.map((i) => ({
+      eligible.map((i) => ({
         ...i,
         name: nameCase(i.name), // every name shown on the page starts with capitals
         initials: i.initials.toUpperCase(),
         ...(positions[i.id] ?? { x: 50, y: 50 }),
-        shared: i.interests.filter((x) => myInterests.includes(x)),
+        shared: i.interests.filter((x) => mineLower.has(x.toLowerCase())),
         big: bigIds.has(i.id),
       })),
-    [internList, myInterests, positions, bigIds],
+    [eligible, mineLower, positions, bigIds],
   )
   const matches = interns.filter((i) => i.match !== undefined).sort((a, b) => (b.match ?? 0) - (a.match ?? 0))
   const topMatches = matches.filter((m) => m.big)
@@ -404,19 +454,19 @@ export default function MatchesPage() {
 
   // meetup ideas: your own interests first, then whatever is popular in the city, so the card is always full
   const meetups = useMemo(() => {
-    const withIdea = (list: string[]) => list.filter((x) => MEETUP_IDEAS[x])
-    const mine = withIdea(myInterests)
-    const city = withIdea(popular.map(([i]) => i)).filter((i) => !mine.includes(i))
+    const ideaOf = (interest: string) => IDEAS_BY_LOWER[interest.toLowerCase()]
+    const mine = myInterests.filter((x) => ideaOf(x))
+    const city = popular.map(([i]) => i).filter((i) => ideaOf(i) && !mineLower.has(i.toLowerCase()))
     // people who like it, matches first
     const peopleFor = (interest: string) => {
-      const all = interns.filter((i) => i.interests.includes(interest))
+      const all = interns.filter((i) => i.interests.some((x) => x.toLowerCase() === interest.toLowerCase()))
       return [...all.filter((i) => i.match !== undefined), ...all.filter((i) => i.match === undefined)]
     }
     const list = [...mine.map((interest) => ({ interest, mine: true })), ...city.map((interest) => ({ interest, mine: false }))]
-      .map((m) => ({ ...m, idea: MEETUP_IDEAS[m.interest], people: peopleFor(m.interest) }))
+      .map((m) => ({ ...m, idea: ideaOf(m.interest), people: peopleFor(m.interest) }))
       .filter((m) => m.people.length > 0)
     return list.sort((a, b) => Number(b.mine) - Number(a.mine) || b.people.length - a.people.length).slice(0, 4)
-  }, [interns, myInterests, popular])
+  }, [interns, myInterests, mineLower, popular])
 
   // Send a connection request. It is saved in the connections table, so it shows up under "Sent" on your
   // profile and under "Requests" on theirs. If they had already asked you, this accepts their request instead.
@@ -527,7 +577,16 @@ export default function MatchesPage() {
                 </div>
 
                 {!loaded && <p className="absolute inset-x-0 top-[calc(50%+56px)] text-center text-sm text-[#4A5A75]">Loading matches…</p>}
-                {loaded && internList.length === 0 && (
+                {loaded && needsQuiz && (
+                  <p className="absolute inset-x-0 top-[calc(50%+56px)] px-6 text-center text-sm text-[#4A5A75]">
+                    Pick your interests in the{' '}
+                    <Link href="/questionnaire" className="font-semibold text-[#1E2B44] underline underline-offset-2">
+                      questionnaire
+                    </Link>{' '}
+                    to see your matches.
+                  </p>
+                )}
+                {loaded && !needsQuiz && eligible.length === 0 && (
                   <p className="absolute inset-x-0 top-[calc(50%+56px)] text-center text-sm text-[#4A5A75]">No matches yet. Check back soon.</p>
                 )}
 
@@ -650,7 +709,7 @@ export default function MatchesPage() {
               <p className="mb-5 mt-1 text-sm text-[#4A5A75]">What interns in your city are into. Yours are in navy.</p>
               <div className="grid gap-3.5">
                 {popular.map(([interest, count]) => {
-                  const mine = myInterests.includes(interest)
+                  const mine = mineLower.has(interest.toLowerCase())
                   return (
                     <div key={interest}>
                       <div className="mb-1 flex justify-between text-sm font-semibold">

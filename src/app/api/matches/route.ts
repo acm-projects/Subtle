@@ -1,84 +1,10 @@
 import { NextResponse } from 'next/server'
 import { dbListingToMatchListing, type Listing as MatchListing, type MatchContext, SAMPLE_CONTEXT, SAMPLE_LISTINGS } from '../../../components/matches/listings'
+import { estimateCommuteMinutes, geocodeAddress, haversineDistanceKm, pickOptimalCommuteMode } from '../../../lib/geocoding'
 import { getListings } from '../../../lib/listings'
+import { runPythonVectorMatcher } from '../../../lib/python-matcher'
 import { supabase } from '../../../lib/supabase'
-
-function parseMaxBudget(budgetStr: string | null | undefined): number | null {
-  if (!budgetStr) return null
-  const s = budgetStr.toLowerCase()
-  if (s.includes('under') && s.includes('1,500')) return 1500
-  if (s.includes('1,500') && s.includes('2,000')) return 2000
-  if (s.includes('2,000') && s.includes('2,500')) return 2500
-  if (s.includes('2,500+')) return 5000
-  return null
-}
-
-function scoreListingForUser(listing: MatchListing, userProfile: Record<string, any> | null): MatchListing {
-  if (!userProfile) return listing
-
-  let score = listing.score || 85
-  const reasons: string[] = []
-
-  // 1. Budget match
-  const maxBudget = parseMaxBudget(userProfile.monthly_budget)
-  if (maxBudget !== null) {
-    if (listing.price <= maxBudget) {
-      score += 5
-      reasons.push(`Within your ${userProfile.monthly_budget} monthly budget ($${listing.price}/mo)`)
-    } else {
-      const overBy = listing.price - maxBudget
-      score -= Math.min(18, Math.round(overBy / 50))
-    }
-  }
-
-  // 2. Housing style match
-  const prefStyle = (userProfile.housing_style ?? '').toString().toLowerCase()
-  if (prefStyle && prefStyle !== 'any' && prefStyle !== 'no preference') {
-    if (listing.homeType.toLowerCase() === prefStyle) {
-      score += 4
-      reasons.push(`Matches your preferred housing style (${listing.homeType})`)
-    } else {
-      score -= 4
-    }
-  }
-
-  // 3. Roommates match
-  if (userProfile.wants_roommates === false && listing.roomType === 'Entire place') {
-    score += 4
-    reasons.push('Private entire place — no roommates')
-  } else if (userProfile.wants_roommates === true && listing.roomType !== 'Entire place') {
-    score += 3
-    reasons.push(`${listing.roomType} with fellow summer interns`)
-  }
-
-  // 4. Commute time match
-  const targetCommute = typeof userProfile.commute_time === 'number' ? userProfile.commute_time : null
-  if (targetCommute !== null) {
-    if (listing.commuteMinutes <= targetCommute) {
-      score += 3
-      reasons.push(`${listing.commuteMinutes} min commute is within your ${targetCommute} min target`)
-    } else {
-      score -= Math.min(10, Math.round((listing.commuteMinutes - targetCommute) / 3))
-    }
-  }
-
-  // 5. Accommodations match (e.g., Pets Allowed)
-  const accs: string[] = Array.isArray(userProfile.user_accommodations) ? userProfile.user_accommodations : []
-  if (accs.some((a) => a.toLowerCase().includes('pet'))) {
-    const hasPets = [...listing.tags, ...listing.amenities].some((t) => t.toLowerCase().includes('pet'))
-    if (hasPets) {
-      score += 4
-      reasons.push('Pet-friendly verified sublet')
-    }
-  }
-
-  const clampedScore = Math.max(50, Math.min(99, score))
-  return {
-    ...listing,
-    score: clampedScore,
-    whyScore: reasons.length > 0 ? reasons : listing.whyScore,
-  }
-}
+import { computeSubtleScore } from '../../../lib/vector-matching'
 
 /**
  * GET /api/matches
@@ -104,11 +30,17 @@ export async function GET(request: Request) {
     }
   }
 
+  const officeAddress = userProfile?.office_address || SAMPLE_CONTEXT.office
+  const preferredMode = userProfile?.user_transportation || 'Public Transit'
+
   const context: MatchContext = {
     company: userProfile?.company_name || SAMPLE_CONTEXT.company,
-    office: userProfile?.office_address || SAMPLE_CONTEXT.office,
-    city: userProfile?.user_city || (userProfile?.office_address ? userProfile.office_address.split(',').slice(-2).join(', ').trim() : SAMPLE_CONTEXT.city),
+    office: officeAddress,
+    city: userProfile?.user_city || (officeAddress ? officeAddress.split(',').slice(-2).join(', ').trim() : SAMPLE_CONTEXT.city),
   }
+
+  // 1. Geocode the user's workplace address with Nominatim
+  const workplaceCoords = await geocodeAddress(officeAddress)
 
   let dbMatched: MatchListing[] = []
   try {
@@ -120,8 +52,62 @@ export async function GET(request: Request) {
     console.error('Error loading DB listings in /api/matches:', err)
   }
 
-  const combined = includeSamples ? [...dbMatched, ...SAMPLE_LISTINGS] : dbMatched
-  const scored = combined.map((l) => scoreListingForUser(l, userProfile))
+  const rawCombined = includeSamples ? [...dbMatched, ...SAMPLE_LISTINGS] : dbMatched
+
+  // 2. Geocode listings and compute approximate commute duration based on real coordinates
+  const combined: MatchListing[] = await Promise.all(
+    rawCombined.map(async (l) => {
+      // If we don't have workplace coords, preserve listing defaults
+      if (!workplaceCoords) return l
+
+      // Determine listing coordinates: check explicit lat/lon, or geocode address/neighborhood
+      let listingCoords = l.latitude && l.longitude ? { lat: l.latitude, lon: l.longitude } : null
+      if (!listingCoords) {
+        const query = l.address || `${l.neighborhood}, ${context.city}`
+        listingCoords = await geocodeAddress(query)
+      }
+
+      if (listingCoords) {
+        const distKm = haversineDistanceKm(listingCoords, workplaceCoords)
+        const optimalMode = pickOptimalCommuteMode(distKm, preferredMode)
+        const commuteMinutes = estimateCommuteMinutes(distKm, optimalMode)
+
+        return {
+          ...l,
+          commuteMinutes,
+          commuteMode: optimalMode,
+          latitude: listingCoords.lat,
+          longitude: listingCoords.lon,
+        }
+      }
+
+      return l
+    }),
+  )
+
+  // 3. Primary: Run Python Machine Learning & Vector Matching Engine (ml/vector_matcher.py)
+  let scored: MatchListing[] = []
+  let mlAnalytics: any[] = []
+  let engine = 'python'
+
+  const pythonResult = await runPythonVectorMatcher(combined, userProfile)
+  if (pythonResult?.scored?.length) {
+    scored = pythonResult.scored
+    mlAnalytics = pythonResult.mlAnalytics
+  } else {
+    // 4. High-performance fallback: In-process JS Vector Matching Engine
+    engine = 'typescript-fallback'
+    const fallbackResults = combined.map((l) => computeSubtleScore(l, userProfile))
+    scored = fallbackResults.map((r) => r.listing)
+    mlAnalytics = fallbackResults.map((r) => ({
+      id: r.listing.id,
+      title: r.listing.title,
+      finalScore: r.finalScore,
+      vectorSimilarity: r.vectorSimilarity,
+      budgetFit: r.budgetFit,
+      commuteFit: r.commuteFit,
+    }))
+  }
 
   scored.sort((a, b) => {
     if (sort === 'price') return a.price - b.price
@@ -132,8 +118,10 @@ export async function GET(request: Request) {
   return NextResponse.json({
     context,
     userProfile,
+    engine,
+    geocodedWorkplace: workplaceCoords,
     total: scored.length,
     matches: scored,
+    mlAnalytics,
   })
 }
-
