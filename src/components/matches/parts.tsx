@@ -12,7 +12,20 @@ export function scoreColor(score: number) {
   return '#A35F33'
 }
 
-export function ScoreBadge({ score, size = 48 }: { score: number; size?: number }) {
+/** Pass `listing` too and a home that's far from the user's office shows a dash instead of a score. */
+export function ScoreBadge({ score, size = 48, listing }: { score: number; size?: number; listing?: Listing }) {
+  if (listing?.nearWork === false) {
+    return (
+      <span
+        className="flex shrink-0 items-center justify-center rounded-full border-2 border-dashed border-[#A9C7E8] bg-white font-bold text-[#4A5A75]"
+        style={{ width: size, height: size, fontSize: size * 0.34 }}
+        aria-label="No Subtle score: this home is far from your office"
+        title="Far from your office, so it isn't scored"
+      >
+        –
+      </span>
+    )
+  }
   return (
     <span
       className="flex shrink-0 items-center justify-center rounded-full font-bold text-white shadow-[0_8px_18px_-8px_rgba(30,43,68,0.6)]"
@@ -72,7 +85,9 @@ export function ListingPhoto({ listing, seed, className = 'min-h-[220px]' }: { l
 }
 
 export const commuteText = (l: Listing) =>
-  l.commuteMode === 'walk'
+  l.nearWork === false
+    ? `Far from your office${l.city ? ` · in ${l.city}` : ''}`
+    : l.commuteMode === 'walk'
     ? `${l.commuteMinutes} min walk to the office`
     : l.commuteMode === 'transit'
       ? `${l.commuteMinutes} min by transit`

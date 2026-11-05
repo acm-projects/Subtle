@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useScoredListing } from './useScored'
+import { useMatchContext, useScoredListing } from './useScored'
+import { supabase } from '../../lib/supabase'
 import { useEffect, useRef, useState } from 'react'
 import AppNavbar from '../AppNavbar'
-import { SAMPLE_CONTEXT, type Listing, type MatchContext } from './listings'
+import { SAMPLE_CONTEXT, SAMPLE_LISTINGS, type Listing, type MatchContext } from './listings'
 import { commuteIcon, Icon, ListingPhoto, ScoreBadge, scoreColor } from './parts'
 import { loadSaved, toggleSavedId } from './activity'
 
@@ -15,7 +16,7 @@ const commuteTo = (l: Listing, office: string) => {
 
 // Fallbacks so the page still reads well if the backend only sends the basic fields.
 const subtitleFor = (l: Listing) =>
-  l.subtitle ?? (l.roomType === 'Entire place' ? `Entire ${l.homeType.toLowerCase()}` : `${l.roomType} in a ${l.homeType.toLowerCase()}`)
+  l.subtitle ?? (l.roomType === 'Entire place' ? `Entire ${l.homeType.toLowerCase()}` : `${l.roomType} in ${l.homeType === 'Apartment' ? 'an' : 'a'} ${l.homeType.toLowerCase()}`)
 const whyFor = (l: Listing) =>
   l.whyScore ?? [
     `${l.commuteMode === 'walk' ? 'Walk' : 'Commute'} to the office · ${l.commuteMinutes} minutes`,
@@ -33,26 +34,17 @@ export default function ListingDetail({ listing: loadedListing, context: initial
   // same score, commute and safety as the Matches page and dashboard
   const listing = useScoredListing(loadedListing)
   const [saved, setSaved] = useState(false)
-  const [context, setContext] = useState<MatchContext>(initialContext)
-
+  // the user's company and office come from users_table via /api/matches
+  const context = useMatchContext(initialContext)
+  const far = listing.nearWork === false
+  const isSample = SAMPLE_LISTINGS.some((s) => s.id === listing.id)
+  const place = listing.city || listing.neighborhood
+  // only the person who posted a listing can edit it
+  const [isHost, setIsHost] = useState(false)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('subtle-quiz-v1')
-      if (raw) {
-        const q = JSON.parse(raw)
-        if (q.company || q.address) {
-          const addr = (q.address as string | undefined)?.trim() || initialContext.office
-          const parts = addr.split(',').map((s) => s.trim()).filter(Boolean)
-          const city = parts.length >= 2 ? parts.slice(-2).join(', ') : initialContext.city
-          setContext({
-            company: (q.company as string | undefined)?.trim() || initialContext.company,
-            office: addr,
-            city,
-          })
-        }
-      }
-    } catch {}
-  }, [initialContext])
+    if (!listing.hostId) return setIsHost(false)
+    supabase.auth.getUser().then(({ data }) => setIsHost(data.user?.id === listing.hostId)).catch(() => setIsHost(false))
+  }, [listing.hostId])
 
   // saved homes live in activity.ts (TODO(backend) there)
   useEffect(() => setSaved(loadSaved().includes(listing.id)), [listing.id])
@@ -67,7 +59,7 @@ export default function ListingDetail({ listing: loadedListing, context: initial
 
   const facts = [
     { icon: 'dollar', label: 'Rent', value: `$${listing.price.toLocaleString()} / month` },
-    { icon: commuteIcon(listing), label: 'Commute', value: commuteTo(listing, context.office) },
+    { icon: commuteIcon(listing), label: 'Commute', value: far ? `Far from ${context.office}` : commuteTo(listing, context.office) },
     { icon: 'calendar', label: 'Available', value: `${listing.availableFrom} – ${listing.availableTo}` },
   ]
 
@@ -98,7 +90,7 @@ export default function ListingDetail({ listing: loadedListing, context: initial
                 </svg>
               </button>
               <span className="inline-flex items-center gap-2 rounded-full border border-white bg-white/80 px-4 py-2 text-sm font-semibold">
-                <Icon name="pin" size={15} /> {context.city} · {context.company}
+                <Icon name="pin" size={15} /> {place}
               </span>
             </div>
           </header>
@@ -110,7 +102,7 @@ export default function ListingDetail({ listing: loadedListing, context: initial
               <div className="group relative">
                 <ListingPhoto listing={listing} seed={0} className="min-h-[300px] md:min-h-[440px]" />
                 <span className="absolute bottom-4 left-4 inline-flex items-center gap-3 rounded-full border border-white bg-white/85 py-1.5 pl-1.5 pr-5 shadow-[0_12px_30px_-14px_rgba(30,43,68,0.5)] backdrop-blur">
-                  <ScoreBadge score={listing.score} size={44} />
+                  <ScoreBadge score={listing.score} size={44} listing={listing} />
                   <span className="text-[15px] font-semibold">Subtle score</span>
                 </span>
               </div>
@@ -137,12 +129,12 @@ export default function ListingDetail({ listing: loadedListing, context: initial
                   Why This Score
                 </h2>
                 <ul className="mt-4 space-y-3">
-                  {whyFor(listing).map((reason) => (
+                  {(far ? [`This home is more than about 40 miles from ${context.office}, so it isn't scored for you.`] : whyFor(listing)).map((reason) => (
                     <li key={reason} className="flex items-start gap-3 text-[15px]">
                       <span
                         aria-hidden="true"
                         className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white"
-                        style={{ backgroundColor: scoreColor(listing.score) }}
+                        style={{ backgroundColor: far ? '#4A5A75' : scoreColor(listing.score) }}
                       >
                         <Icon name="check" size={13} />
                       </span>
@@ -184,16 +176,18 @@ export default function ListingDetail({ listing: loadedListing, context: initial
                     Contact
                   </Link>
                 </div>
+                {isHost && (
                 <Link
                   href={`/my-listings/${listing.id}/edit`}
                   className="flex min-h-10 items-center justify-center rounded-full border border-dashed border-[#A9C7E8] bg-white/70 text-xs font-semibold text-[#1E2B44] transition hover:bg-white"
                 >
                   Edit this listing
                 </Link>
+                )}
               </div>
             </div>
           </div>
-          <p className="mt-6 text-[13px] text-[#4A5A75]">Sample listing for design only. Real listings will come from verified hosts.</p>
+          {isSample && <p className="mt-6 text-[13px] text-[#4A5A75]">Sample listing for design only. Real listings will come from verified hosts.</p>}
         </article>
         <p className="mt-8 text-center text-[13px] text-[#4A5A75]">&copy; 2026 Subtle Technologies, Inc. All rights reserved.</p>
       </section>

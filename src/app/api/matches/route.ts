@@ -17,6 +17,8 @@ import { computeSubtleScore } from '../../../lib/vector-matching'
  */
 // ~40 miles: about as far as an intern would commute every day
 const NEARBY_KM = 65
+// longest one-way commute we'll show
+const MAX_COMMUTE_MIN = 90
 
 /**
  * "Houston, TX" from an office address like "315 Capitol St Unit 205, Houston, TX 77002".
@@ -126,7 +128,7 @@ export async function GET(request: Request) {
   const combined: MatchListing[] = workplaceCoords
     ? located.filter((x) => x.distKm != null && x.distKm <= NEARBY_KM).map((x) => x.listing)
     : located.map((x) => x.listing)
-  const filteredOut = rawCombined.length - combined.length
+  let filteredOut = rawCombined.length - combined.length
 
   // 2b. Replace the estimate with real Google Maps travel times wherever Google has a route.
   //     Listings are grouped by travel mode so each mode is one request (in batches).
@@ -152,6 +154,13 @@ export async function GET(request: Request) {
       })
     }
   }
+
+  // 2c. Drop homes Google says are more than MAX_COMMUTE_MIN away by the user's travel mode
+  //     (inside the radius but across a bay or with no good transit, e.g. Mountain View to SF).
+  const reachable = combined.filter((l) => !(l.commuteSource === 'google' && l.commuteMinutes > MAX_COMMUTE_MIN))
+  filteredOut += combined.length - reachable.length
+  googleCount -= combined.filter((l) => l.commuteSource === 'google' && l.commuteMinutes > MAX_COMMUTE_MIN).length
+  combined.splice(0, combined.length, ...reachable)
 
   // 3. Primary: Run Python Machine Learning & Vector Matching Engine (ml/vector_matcher.py)
   let scored: MatchListing[] = []

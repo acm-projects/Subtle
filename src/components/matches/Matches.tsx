@@ -60,7 +60,9 @@ export default function Matches({
     return list.sort((a, b) => (sort === 'score' ? b.score - a.score : sort === 'price' ? a.price - b.price : a.commuteMinutes - b.commuteMinutes))
   }, [listings, saved, savedOnly, sort])
 
-  const toggleSaved = (id: string) => setSaved((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+  // hearts are kept in activity.ts, the same list the dashboard and listing page use
+  useEffect(() => setSaved(loadSaved()), [])
+  const toggleSaved = (id: string) => setSaved(toggleSavedId(id))
   return (
     <>
       <AppNavbar firstName="" />

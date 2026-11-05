@@ -196,7 +196,7 @@ export default function Dashboard() {
                             ${l.price.toLocaleString()} / month · {commuteText(l)}
                           </span>
                         </span>
-                        <ScoreBadge score={l.score} size={38} />
+                        <ScoreBadge score={l.score} size={38} listing={l} />
                       </Link>
                     </li>
                   ))}

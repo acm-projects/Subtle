@@ -26,6 +26,8 @@ export type Listing = {
   hostReplyTime?: string // e.g. "Replies within a day"
   address?: string
   city?: string // the listing's own city (listing_table.city); used to place it on the map
+  nearWork?: boolean // false when /api/matches left it out for being too far from the user's office
+  hostId?: string | null // listing_table.user_id: who posted it (only they can edit it)
   latitude?: number | null
   longitude?: number | null
 }
@@ -43,7 +45,7 @@ export const SAMPLE_CONTEXT: MatchContext = {
   office: '500 Howard St',
 }
 
-export const SAMPLE_LISTINGS: Listing[] = [
+export const SAMPLE_LISTINGS: Listing[] = ([
   {
     id: 'soma-loft',
     title: 'SoMa loft',
@@ -135,7 +137,7 @@ export const SAMPLE_LISTINGS: Listing[] = [
     amenities: ['Backyard', 'Washer and dryer', 'Wi-Fi'],
     hostName: 'Sam',
   },
-]
+] as Listing[]).map((l) => ({ ...l, city: 'San Francisco' })) // every sample is in San Francisco
 
 // Fetch listing by id from Supabase DB, falling back to sample listings
 export function getListing(id: string, listings: Listing[] = SAMPLE_LISTINGS) {
@@ -180,11 +182,12 @@ export function dbListingToMatchListing(db: any): Listing {
     hostName: 'Student Host',
     hostVerified: true,
     hostReplyTime: 'Replies within a few hours',
-    subtitle: `${roomType} in a ${homeType.toLowerCase()}`,
+    subtitle: `${roomType} in ${homeType === 'Apartment' ? 'an' : 'a'} ${homeType.toLowerCase()}`,
     features: [homeType, roomType, ...(db.amenities || [])],
     imageUrl: coverImage,
     address: db.address || undefined,
     city: db.city || undefined,
+    hostId: db.user_id ?? null,
     latitude: db.latitude || null,
     longitude: db.longitude || null,
   }

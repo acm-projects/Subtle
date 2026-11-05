@@ -139,12 +139,12 @@ export function useDashboardData(): DashboardData {
       for (const id of loadSaved().slice(0, 4)) {
         const sample = SAMPLE_LISTINGS.find((l) => l.id === id)
         if (sample) {
-          savedHomes.push(withScore(sample, scoredById.get(sample.id)))
+          savedHomes.push(withScore(sample, scoredById.get(sample.id), scored !== null))
           continue
         }
         try {
           const db = await getDbListing(id)
-          if (db) savedHomes.push(withScore(dbListingToMatchListing(db), scoredById.get(db.id)))
+          if (db) savedHomes.push(withScore(dbListingToMatchListing(db), scoredById.get(db.id), scored !== null))
         } catch {}
       }
       let myEmail: string | null = null

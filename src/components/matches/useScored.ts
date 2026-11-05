@@ -61,11 +61,15 @@ export async function fetchScoredMatches(): Promise<Listing[] | null> {
   return payload ? payload.matches : null
 }
 
-/** The score-related fields from /api/matches laid over a listing we already have. */
-export function withScore(listing: Listing, scored: Listing | undefined): Listing {
-  if (!scored) return listing
+/**
+ * The score-related fields from /api/matches laid over a listing we already have.
+ * `listKnown`: we have the user's matches and this listing isn't in them, so it's far from their office.
+ */
+export function withScore(listing: Listing, scored: Listing | undefined, listKnown = false): Listing {
+  if (!scored) return listKnown ? { ...listing, nearWork: false } : listing
   return {
     ...listing,
+    nearWork: true,
     score: scored.score,
     commuteMinutes: scored.commuteMinutes,
     commuteMode: scored.commuteMode,
@@ -82,11 +86,26 @@ export function useScoredListing(listing: Listing): Listing {
     let alive = true
     setCurrent(listing)
     fetchScoredMatches().then((all) => {
-      if (alive && all) setCurrent(withScore(listing, all.find((m) => m.id === listing.id)))
+      if (alive && all) setCurrent(withScore(listing, all.find((m) => m.id === listing.id), true))
     })
     return () => {
       alive = false
     }
   }, [listing])
   return current
+}
+
+/** The user's company, office and city as /api/matches saw them (from users_table); `fallback` until it loads. */
+export function useMatchContext(fallback: MatchContext): MatchContext {
+  const [context, setContext] = useState(fallback)
+  useEffect(() => {
+    let alive = true
+    fetchMatchesPayload().then((p) => {
+      if (alive && p?.context) setContext(p.context)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+  return context
 }

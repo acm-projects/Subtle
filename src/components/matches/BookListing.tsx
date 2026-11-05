@@ -71,7 +71,7 @@ export default function BookListing({ listing: loadedListing, context = SAMPLE_C
     setSent(true)
   }
 
-  const commute = `${listing.commuteMinutes} min ${listing.commuteMode === 'walk' ? 'walk' : listing.commuteMode === 'transit' ? 'by transit' : listing.commuteMode === 'bike' ? 'bike' : 'drive'}`
+  const commute = listing.nearWork === false ? 'far from your office' : `${listing.commuteMinutes} min ${listing.commuteMode === 'walk' ? 'walk' : listing.commuteMode === 'transit' ? 'by transit' : listing.commuteMode === 'bike' ? 'bike' : 'drive'}`
 
   return (
     <FlowShell listing={listing} context={context} caption={`${listing.roomType} · ${listing.tags[0] ?? listing.homeType} · From ${listing.availableFrom}`}>
@@ -95,7 +95,7 @@ export default function BookListing({ listing: loadedListing, context = SAMPLE_C
         <>
           <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Book the {listing.title}</h1>
           <p className="mt-2 text-[17px] text-[#4A5A75]">
-            {listing.score} Subtle score · ${listing.price.toLocaleString()} / month · {commute}
+            {listing.nearWork === false ? 'Not scored' : `${listing.score} Subtle score`} · ${listing.price.toLocaleString()} / month · {commute}
           </p>
 
           <ol className="mt-6 space-y-2.5">
