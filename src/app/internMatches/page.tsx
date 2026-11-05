@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { authFetch } from '../../lib/auth-fetch'
 import AppNavbar from '../../components/AppNavbar'
 import { supabase } from '../../lib/supabase'
 import { NEARBY_MILES } from '../../components/matches/listings'
@@ -309,7 +310,7 @@ export default function MatchesPage() {
 
       // everything comes from users_table (interests, office) through /api/intern-matches
       try {
-        const res = await fetch(`/api/intern-matches?email=${encodeURIComponent(email)}`, { cache: 'no-store' })
+        const res = await authFetch('/api/intern-matches', { cache: 'no-store' })
         if (!res.ok) return setStatus('error')
         const json = await res.json()
         setMyInterests(Array.isArray(json.myInterests) ? json.myInterests : [])

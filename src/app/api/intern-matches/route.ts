@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../lib/supabase'
+import { admin, callerFrom } from '../../../lib/supabase-admin'
 import { geocodeAddress, haversineDistanceKm, type Coordinates } from '../../../lib/geocoding'
 import { NEARBY_MILES } from '../../../components/matches/listings'
 
@@ -98,11 +98,14 @@ function scoreInternMatch(userInterests: string[], candidateInterests: string[])
  *   - interests: optional comma-separated list of interests to override or supplement
  */
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const email = (searchParams.get('email') ?? '').trim().toLowerCase()
+  // the signed-in caller (login token); nobody can ask on someone else's behalf
+  const caller = await callerFrom(request)
+  if (!caller) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+  const email = (caller.email ?? '').toLowerCase()
 
   // 1. Everyone in users_table (latest row per email). Interests, company and office come from the quiz.
-  const { data: rows } = await supabase.from('users_table').select('*')
+  //    Read with the server key; only names, schools, companies and interests go back to the browser.
+  const { data: rows } = await admin().from('users_table').select('id, student_email, first_name, last_name, company_name, office_address, user_interests, university')
   const byEmail = new Map<string, Record<string, any>>()
   for (const r of rows ?? []) {
     if (r.student_email) byEmail.set(String(r.student_email).toLowerCase(), r)

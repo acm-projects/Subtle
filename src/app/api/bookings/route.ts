@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseForRequest } from '../../../lib/supabase-server'
+import { admin } from '../../../lib/supabase-admin'
 
 // Booking requests live in public.bookings. Every call runs as the signed-in caller, and the table's
 // access rules decide what they see: the guest sees their own requests, the host sees requests for
@@ -73,7 +74,8 @@ export async function GET(request: Request) {
   const emails = new Map<string, string>()
   const guestIds = Array.from(new Set(rows.map((r) => r.guest_id)))
   if (guestIds.length) {
-    const { data: people } = await client.from('users_table').select('id, student_email').in('id', guestIds)
+    // the host can't read other users' rows directly; the server key looks up just these guests' emails
+    const { data: people } = await admin().from('users_table').select('id, student_email').in('id', guestIds)
     for (const p of people ?? []) if (p.student_email) emails.set(p.id, p.student_email)
   }
   const bookings = rows.map((r) => toBooking(r, emails))

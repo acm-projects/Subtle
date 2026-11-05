@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { authFetch } from '../../lib/auth-fetch'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import AppNavbar from '../AppNavbar'
@@ -57,7 +58,7 @@ export default function Questionnaire() {
         
         // Fetch saved quiz answers from Supabase users_table
         try {
-          const res = await fetch(`/api/users?email=${encodeURIComponent(mail)}`, { cache: 'no-store' })
+          const res = await authFetch('/api/users', { cache: 'no-store' })
           if (res.ok) {
             const dbUser = await res.json()
             if (dbUser && (dbUser.company_name || dbUser.office_address || dbUser.monthly_budget)) {

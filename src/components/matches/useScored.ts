@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { authFetch } from '../../lib/auth-fetch'
 import { supabase } from '../../lib/supabase'
 import type { Listing, MatchContext } from './listings'
 
@@ -44,8 +45,8 @@ export async function fetchMatchesPayload(): Promise<MatchesPayload | null> {
   const email = await currentEmail()
   if (cached && cached.email === email && Date.now() - cached.at < 60_000) return cached.promise
 
-  const url = email ? `/api/matches?email=${encodeURIComponent(email)}` : '/api/matches'
-  const promise = fetch(url, { cache: 'no-store' })
+  // personalized by the login token (the server works out who's asking)
+  const promise = authFetch('/api/matches', { cache: 'no-store' })
     .then((r) => (r.ok ? r.json() : null))
     .then((j) => (j && Array.isArray(j.matches) ? (j as MatchesPayload) : null))
     .catch(() => null)

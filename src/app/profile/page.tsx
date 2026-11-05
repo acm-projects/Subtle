@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { authFetch } from "../../lib/auth-fetch";
 import ThemeSetting from "../../components/ThemeToggle";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
@@ -145,12 +146,10 @@ export default function ProfilePage() {
     if (!rows?.length) return setConnections([]);
 
     const otherIds = rows.map((r) => (r.requester_id === userId ? r.addressee_id : r.requester_id));
-    // names and interests live in users_table (there is no profiles table)
-    const { data: people } = await supabase
-      .from("users_table")
-      .select("id, first_name, last_name, user_interests")
-      .in("id", otherIds);
-    const byId = new Map((people ?? []).map((p) => [p.id, p]));
+    // names and interests of the people you're connected with (the server only shares those)
+    const res = await authFetch(`/api/users?ids=${encodeURIComponent(otherIds.join(","))}`, { cache: "no-store" });
+    const people: { id: string; first_name: string | null; last_name: string | null; user_interests: string[] | null }[] = res.ok ? await res.json() : [];
+    const byId = new Map(people.map((p) => [p.id, p]));
 
     setConnections(
       rows.map((r) => {
@@ -270,7 +269,7 @@ try {
       }
 
       // Update public.users_table
-      await fetch("/api/users", {
+      await authFetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

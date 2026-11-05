@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { authFetch } from '../../lib/auth-fetch'
 import { supabase } from '../../lib/supabase'
 import { getListing as getDbListing, getListings } from '../../lib/listings'
 import { loadMyBookings, syncSaved, type Booking } from '../matches/activity'
@@ -79,7 +80,7 @@ export function useDashboardData(): DashboardData {
         let rowFirst = ''
         if (email) {
           try {
-            const res = await fetch(`/api/users?email=${encodeURIComponent(email)}`, { cache: 'no-store' })
+            const res = await authFetch('/api/users', { cache: 'no-store' })
             if (res.ok) {
               const dbUser = await res.json()
               rowFirst = String(dbUser?.first_name ?? '').trim()

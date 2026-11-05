@@ -5,13 +5,13 @@ import { googleCommuteMinutes, hasGoogleMapsKey } from '../../../lib/google-maps
 import { safetyFit, safetyForMany, safetyReason, type SafetyInfo } from '../../../lib/safety'
 import { getListings } from '../../../lib/listings'
 import { runPythonVectorMatcher } from '../../../lib/python-matcher'
-import { supabase } from '../../../lib/supabase'
+import { admin, callerFrom } from '../../../lib/supabase-admin'
 import { computeSubtleScore } from '../../../lib/vector-matching'
 
 /**
  * GET /api/matches
  * Query params:
- *   - email: optional student_email to personalize scores using their public.users_table profile
+ *   (personalized for the signed-in caller: send their login token, see lib/auth-fetch.ts)
  *   - sort: 'score' | 'price' | 'commute' (default 'score')
  */
 // NEARBY_MILES (listings.ts) in km
@@ -43,18 +43,14 @@ const addDays = (d: Date, n: number) => new Date(d.getTime() + n * 86_400_000)
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const email = searchParams.get('email')
   const sort = searchParams.get('sort') ?? 'score'
 
+  // the signed-in caller (login token); nobody can ask for someone else's matches
+  const me = await callerFrom(request)
   let userProfile: Record<string, any> | null = null
-  if (email) {
-    const { data: rows } = await supabase
-      .from('users_table')
-      .select('*')
-      .eq('student_email', email)
-    if (rows && rows.length > 0) {
-      userProfile = rows[rows.length - 1]
-    }
+  if (me) {
+    const { data } = await admin().from('users_table').select('*').eq('id', me.id).maybeSingle()
+    userProfile = data ?? null
   }
 
   // whatever company and office address the user typed in the quiz / preferences (free text)
