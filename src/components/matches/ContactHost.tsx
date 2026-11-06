@@ -31,13 +31,29 @@ export default function ContactHost({ listing: loadedListing, context = SAMPLE_C
   const [conversationId, setConversationId] = useState<string | null>(null)
 
   // Saves through the messages store (TODO(backend) lives in src/components/messages/store.ts)
+  const [error, setError] = useState<string | null>(null)
   const sendMessage = async () => {
-    setSending(true)
-    const id = await startConversation({ id: listing.id, title: listing.title, score: listing.score, hostName: listing.hostName }, message.trim())
-    setConversationId(id)
-    setSending(false)
-    setSent(true)
+  if (!listing.hostId) {
+    setError('This listing has no host to message.')
+    return
   }
+  setSending(true)
+  setError(null)
+  try {
+    const id = await startConversation(
+      { id: listing.id, title: listing.title, score: listing.score, hostName: listing.hostName, hostId: listing.hostId },
+      message.trim(),
+    )
+    setConversationId(id)
+    setSent(true)
+
+    
+  } catch (e: any) {
+    setError(e?.message ?? "Couldn't send your message. Please try again.")
+  } finally {
+    setSending(false)
+  }
+}
 
   const commute = `${listing.commuteMinutes} min ${listing.commuteMode === 'walk' ? 'walk' : listing.commuteMode === 'transit' ? 'by transit' : listing.commuteMode === 'bike' ? 'bike' : 'drive'}`
   const hostMeta = [listing.hostVerified ? 'Verified .edu sub-leaser' : 'Sub-leaser', listing.hostReplyTime].filter(Boolean).join(' · ')
@@ -101,7 +117,11 @@ export default function ContactHost({ listing: loadedListing, context = SAMPLE_C
             onChange={(e) => setMessage(e.target.value)}
             className="mt-1.5 w-full resize-none rounded-2xl border border-[#D5DFEA] bg-white p-4 text-[15px] leading-relaxed outline-none focus:border-[#2F4161] focus:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]"
           />
-
+          {error && (
+            <p role="alert" className="mt-4 rounded-2xl border border-[#E8C4BC] bg-[#FBEDEA] px-4 py-3 text-sm font-semibold text-[#8A3A2A]">
+            {error}
+            </p>
+          )}
           <div className="mt-6 grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 lg:mt-auto lg:pt-6">
             <Link
               href={`/matches/${listing.id}`}
