@@ -46,6 +46,8 @@ export default function ContactHost({ listing: loadedListing, context = SAMPLE_C
     )
     setConversationId(id)
     setSent(true)
+
+    
   } catch (e: any) {
     setError(e?.message ?? "Couldn't send your message. Please try again.")
   } finally {
@@ -115,7 +117,11 @@ export default function ContactHost({ listing: loadedListing, context = SAMPLE_C
             onChange={(e) => setMessage(e.target.value)}
             className="mt-1.5 w-full resize-none rounded-2xl border border-[#D5DFEA] bg-white p-4 text-[15px] leading-relaxed outline-none focus:border-[#2F4161] focus:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]"
           />
-
+          {error && (
+            <p role="alert" className="mt-4 rounded-2xl border border-[#E8C4BC] bg-[#FBEDEA] px-4 py-3 text-sm font-semibold text-[#8A3A2A]">
+            {error}
+            </p>
+          )}
           <div className="mt-6 grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 lg:mt-auto lg:pt-6">
             <Link
               href={`/matches/${listing.id}`}
