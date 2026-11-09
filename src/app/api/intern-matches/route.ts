@@ -18,6 +18,8 @@ export type InternProfile = {
 
 const DEFAULT_INTERESTS = ['Hiking', 'Cooking', 'Film', 'Photography', 'Basketball', 'Live music']
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 // Semantic interest clusters for soft-cosine affinity matching
 const INTEREST_CLUSTERS: Record<string, string[]> = {
   outdoors: ['hiking', 'camping', 'running', 'nature', 'surfing', 'climbing', 'outdoors'],
@@ -115,11 +117,13 @@ function scoreInternMatch(userInterests: string[], candidateInterests: string[])
  * GET /api/intern-matches
  * Query params:
  *   - email: optional student_email of current user
+ *   - uid: optional auth user id of current user (used to leave them out of their own results)
  *   - interests: optional comma-separated list of interests to override or supplement
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const email = searchParams.get('email')
+  const uid = searchParams.get('uid')
   const interestsParam = searchParams.get('interests')
 
   // 1. Resolve current user's interests
@@ -134,7 +138,7 @@ export async function GET(request: Request) {
   const byEmail = new Map<string, Record<string, any>>()
   for (const r of rows ?? []) {
     if (r.student_email) {
-      byEmail.set(r.student_email.toLowerCase(), r)
+      byEmail.set(String(r.student_email).toLowerCase(), r)
     }
   }
 
@@ -146,56 +150,107 @@ export async function GET(request: Request) {
     }
   }
 
+  // Load profiles once: used for the user's own interests and for the candidate list
+  let allProfiles: Record<string, any>[] = []
+  try {
+    const { data } = await supabase.from('profiles').select('*')
+    allProfiles = data ?? []
+  } catch {}
+
   // Also check profiles table
-  if (myInterests.length === 0 && email) {
-    try {
-      const { data: profileRows } = await supabase.from('profiles').select('*')
-      const matchedProfile = (profileRows ?? []).find((p: any) =>
-        (p.email && p.email.toLowerCase() === email.toLowerCase()) || (p.student_email && p.student_email.toLowerCase() === email.toLowerCase())
-      )
-      if (Array.isArray(matchedProfile?.interests) && matchedProfile.interests.length > 0) {
-        myInterests = matchedProfile.interests
-      }
-    } catch {}
+  if (myInterests.length === 0 && (uid || email)) {
+    const matchedProfile = allProfiles.find(
+      (p) =>
+        (uid && p.id === uid) ||
+        (email &&
+          ((p.email && String(p.email).toLowerCase() === email.toLowerCase()) ||
+            (p.student_email && String(p.student_email).toLowerCase() === email.toLowerCase()))),
+    )
+    if (Array.isArray(matchedProfile?.interests) && matchedProfile.interests.length > 0) {
+      myInterests = matchedProfile.interests
+    }
   }
 
   if (myInterests.length === 0) {
     myInterests = DEFAULT_INTERESTS
   }
 
-  // 2. Build Candidate Interns from Supabase Database
+  // 2. Build candidate interns. The id is always the auth user id (a valid UUID),
+  // so connection requests can actually reach the person.
+  // Every users_table row with a valid user_id is included, merged with its profiles row.
+  type Candidate = {
+    id: string
+    email?: string
+    firstName?: string
+    lastName?: string
+    company?: string
+    interests: string[]
+  }
+  const candidates = new Map<string, Candidate>()
+
+  for (const r of rows ?? []) {
+    const id = String(r.user_id ?? '')
+    if (!UUID.test(id)) continue // no valid user_id: they can't receive requests
+    candidates.set(id, {
+      id,
+      email: r.student_email ? String(r.student_email).toLowerCase() : undefined,
+      firstName: r.first_name ?? undefined,
+      lastName: r.last_name ?? undefined,
+      company: r.company_name ?? undefined,
+      interests: Array.isArray(r.user_interests) ? r.user_interests : [],
+    })
+  }
+
+  // profiles fill in anyone missing, and any gaps (interests, names) for people already added
+  for (const p of allProfiles) {
+    const id = String(p.id ?? '')
+    if (!UUID.test(id)) continue
+    const pEmail = String(p.email ?? p.student_email ?? '').toLowerCase() || undefined
+    const u = pEmail ? byEmail.get(pEmail) : undefined
+    const existing = candidates.get(id)
+    const profileInterests: string[] = Array.isArray(p.interests) ? p.interests : []
+
+    candidates.set(id, {
+      id,
+      email: existing?.email ?? pEmail,
+      firstName: existing?.firstName ?? p.first_name ?? u?.first_name ?? undefined,
+      lastName: existing?.lastName ?? p.last_name ?? u?.last_name ?? undefined,
+      company: existing?.company ?? u?.company_name ?? undefined,
+      interests: existing?.interests.length ? existing.interests : profileInterests,
+    })
+  }
+
   const dbInterns: InternProfile[] = []
-  for (const [userEmail, u] of byEmail.entries()) {
-    if (email && userEmail === email.toLowerCase()) continue
-    const interests: string[] = Array.isArray(u.user_interests) && u.user_interests.length > 0
-      ? u.user_interests
-      : ['Cooking', 'Hiking', 'Music']
+  for (const c of candidates.values()) {
+    if (c.id === uid) continue // skip yourself
+    if (email && c.email && c.email === email.toLowerCase()) continue // skip yourself (by email)
 
-    const { score, shared } = scoreInternMatch(myInterests, interests)
+    const { score, shared } = scoreInternMatch(myInterests, c.interests)
 
-    const fullName = `${u.first_name ?? 'Intern'} ${u.last_name ?? ''}`.trim()
-    const initials = fullName
-      .split(' ')
-      .map((p) => p[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase()
+    const fullName = `${c.firstName ?? 'Intern'} ${c.lastName ?? ''}`.trim()
+    const initials =
+      fullName
+        .split(' ')
+        .map((s) => s[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || 'IN'
 
     dbInterns.push({
-      id: `db-${userEmail}`,
+      id: c.id,
       name: fullName,
-      initials: initials || 'IN',
-      email: u.student_email,
-      role: u.company_name ? `Intern at ${u.company_name}` : 'Summer Intern',
-      company: u.company_name ?? undefined,
-      school: schoolFromEmail(u.student_email),
-      interests,
+      initials,
+      email: c.email,
+      role: c.company ? `Intern at ${c.company}` : 'Summer Intern',
+      company: c.company,
+      school: c.email ? schoolFromEmail(c.email) : 'University Student',
+      interests: c.interests,
       shared,
       match: score,
     })
   }
 
-  // 3. Build Candidate Interns from Seed Pool with Dynamic Matching
+  // 3. Build candidate interns from the seed pool with dynamic matching
   const seedInterns: InternProfile[] = BASE_SEED_INTERNS.map((seed) => {
     const { score, shared } = scoreInternMatch(myInterests, seed.interests)
     return {
@@ -205,9 +260,9 @@ export async function GET(request: Request) {
     }
   })
 
-  // 4. Combine and Rank by Match Score (descending)
-  // Only include interns who have at least one shared interest with the user
-  const allInterns = [...dbInterns, ...seedInterns].filter((i) => (i.shared?.length ?? 0) > 0)
+  // 4. Combine and rank by match score (descending). Interns with no score go last,
+  // so people who don't match still come back and show as small dots on the map.
+  const allInterns = [...dbInterns, ...seedInterns]
   allInterns.sort((a, b) => {
     const scoreA = a.match ?? 0
     const scoreB = b.match ?? 0

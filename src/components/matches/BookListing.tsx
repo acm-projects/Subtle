@@ -109,7 +109,7 @@ export default function BookListing({ listing: loadedListing, context = SAMPLE_C
           <HouseMascot label="Subtle's house mascot waving" className="-ml-2 h-32 w-32" />
           <h1 className="mt-3 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Request sent.</h1>
           <p className="mt-3 text-[17px] text-[#4A5A75]">
-            {host} usually confirms within a day. You won&apos;t be charged until they accept.
+            {host} usually confirms within a day.
           </p>
           <div className="mt-8 grid grid-cols-2 gap-3">
             <Link href={`/matches/${listing.id}`} className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white font-semibold transition hover:-translate-y-0.5">

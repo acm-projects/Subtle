@@ -103,7 +103,10 @@ function LoginForm() {
         try {
           await fetch('/api/users', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+                        headers: {
+              'Content-Type': 'application/json',
+              ...(data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {}),
+            },
             body: JSON.stringify({
               id: data.user?.id ?? null,
               firstName: firstName.trim(),
@@ -153,15 +156,44 @@ function LoginForm() {
     handleAuth(isSignUpMode)
   }
 
-  const handleGoogle = () => {
-    if (needsConsent) {
-      setIsError(true)
-      setMessage(CONSENT_ERROR)
-      return
-    }
-    // TODO: supabase.auth.signInWithOAuth({ provider: 'google' })
-    // Google sign-ups skip the name fields, so record the consent for them after they return.
+  const handleGoogle = async () => {
+  if (needsConsent) {
+    setIsError(true)
+    setMessage(CONSENT_ERROR)
+    return
   }
+
+  setLoading(true)
+  setMessage('')
+  setIsError(false)
+
+  // Google sign-ups leave the page, so stash the consent to record it when they return.
+  try {
+    if (isSignUpMode) {
+      localStorage.setItem(
+        'subtle-pending-consent',
+        JSON.stringify({ at: new Date().toISOString() }),
+      )
+    } else {
+      localStorage.removeItem('subtle-pending-consent')
+    }
+  } catch {}
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback/complete`,
+      queryParams: { prompt: 'select_account' },
+    },
+  })
+
+  if (error) {
+    setIsError(true)
+    setMessage(error.message)
+    setLoading(false)
+  }
+  // On success the browser is redirected to Google, so there's nothing else to do here.
+}
 
   return (
     <div className="sb-auth">

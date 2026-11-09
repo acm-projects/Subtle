@@ -7,6 +7,7 @@ import AppNavbar from '../AppNavbar'
 import { SAMPLE_CONTEXT, type Listing, type MatchContext } from './listings'
 import { commuteIcon, Icon, ListingPhoto, ScoreBadge, scoreColor } from './parts'
 import { loadSaved, toggleSavedId } from './activity'
+import { supabase } from '../../lib/supabase'
 
 const commuteTo = (l: Listing, office: string) => {
   const how = l.commuteMode === 'walk' ? 'walk' : l.commuteMode === 'transit' ? 'by transit' : l.commuteMode === 'bike' ? 'bike ride' : 'drive'
@@ -34,6 +35,25 @@ export default function ListingDetail({ listing: loadedListing, context: initial
   const listing = useScoredListing(loadedListing)
   const [saved, setSaved] = useState(false)
   const [context, setContext] = useState<MatchContext>(initialContext)
+  // only the user who posted the listing can see the edit link
+const [isOwner, setIsOwner] = useState(false)
+const ownerId = (() => {
+  const l = listing as unknown as Record<string, unknown>
+  const id = l.hostId ?? l.host_id ?? l.userId ?? l.user_id ?? l.ownerId ?? l.owner_id
+  return typeof id === 'string' ? id : ''
+})()
+
+useEffect(() => {
+  let cancelled = false
+  setIsOwner(false)
+  if (!ownerId) return
+  supabase.auth.getUser().then(({ data }) => {
+    if (!cancelled) setIsOwner(data.user?.id === ownerId)
+  })
+  return () => {
+    cancelled = true
+  }
+}, [ownerId])
 
   useEffect(() => {
     try {
@@ -97,7 +117,7 @@ export default function ListingDetail({ listing: loadedListing, context: initial
                   <path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z" />
                 </svg>
               </button>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white bg-white/80 px-4 py-2 text-sm font-semibold">
+              <span className="inline-flex items-right gap-2 rounded-full border border-white bg-white/80 px-4 py-2 text-sm font-semibold">
                 <Icon name="pin" size={15} /> {context.city} · {context.company}
               </span>
             </div>
@@ -184,12 +204,14 @@ export default function ListingDetail({ listing: loadedListing, context: initial
                     Contact
                   </Link>
                 </div>
-                <Link
-                  href={`/my-listings/${listing.id}/edit`}
-                  className="flex min-h-10 items-center justify-center rounded-full border border-dashed border-[#A9C7E8] bg-white/70 text-xs font-semibold text-[#1E2B44] transition hover:bg-white"
-                >
-                  Edit this listing
-                </Link>
+                {isOwner && (
+                  <Link
+                    href={`/my-listings/${listing.id}/edit`}
+                    className="flex min-h-10 items-center justify-center rounded-full border border-dashed border-[#A9C7E8] bg-white/70 text-xs font-semibold text-[#1E2B44] transition hover:bg-white"
+                  >
+                    Edit this listing
+                  </Link>
+                )}
               </div>
             </div>
           </div>
