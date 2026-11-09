@@ -26,6 +26,14 @@ const READ_KEY = 'subtle-read-v1' // { [conversationId]: ISO time last opened } 
 const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString()
 
+
+// Compare timestamps as numbers (Supabase sends "+00:00", JS sends "Z", so strings can compare wrongly)
+const time = (iso?: string | null) => {
+  const t = iso ? Date.parse(iso) : NaN
+  return Number.isNaN(t) ? 0 : t
+}
+
+
 // Demo threads use ids like "c-soma-loft"; real conversations use Supabase UUIDs
 const isDemo = (id: string) => id.startsWith('c-')
 
@@ -55,6 +63,9 @@ function readReadMarkers(): Record<string, string> {
 function setReadMarker(conversationId: string) {
   try {
     localStorage.setItem(READ_KEY, JSON.stringify({ ...readReadMarkers(), [conversationId]: new Date().toISOString() }))
+  } catch {}
+  try {
+    window.dispatchEvent(new Event('messages-read'))
   } catch {}
 }
 
@@ -180,6 +191,43 @@ export async function startConversation(
   writeLocal([{ id, listingId: listing.id, listingTitle: listing.title, listingScore: listing.score, hostName: listing.hostName, messages: [msg] }, ...list])
   return id
 }
+
+// How many real conversations have an unread message. Cheap: uses only the inbox list.
+// Same rule as the inbox: their latest message is newer than the last time you opened the thread.
+export async function loadUnreadCount(): Promise<number> {
+  const res = await apiFetch('/api/conversations', { cache: 'no-store' })
+  if (res.status === 401 || res.status === 403) return 0 // logged out
+  if (!res.ok) throw new Error('Could not check messages')
+
+  const rows: any[] = await res.json()
+  const markers = readReadMarkers()
+
+  return rows.filter((r) => {
+    const last = r.last_message
+    if (!last || last.sender_id !== r.other_user_id) return false
+    const readAt = Math.max(time(r.last_read_at), time(markers[r.conversation_id]))
+    return time(last.created_at) > readAt
+  }).length
+}
+
+// Called right after a booking request is sent: opens (or reuses) the thread with the host
+// and posts a short summary of the request as the first message.
+// Returns the conversation id, or null for sample listings (no real host to message).
+export async function startBookingConversation(
+  listing: { id: string; title: string; score?: number; hostName: string; hostId?: string },
+  details: { moveIn?: string; moveOut?: string; note?: string },
+): Promise<string | null> {
+  if (!listing.hostId) return null
+
+  const host = listing.hostName.split(' ')[0] || 'there'
+  const dates = [details.moveIn, details.moveOut].filter(Boolean).join(' – ')
+  const lines = [`Hi ${host}, I just requested to book ${listing.title}${dates ? ` for ${dates}` : ''}.`]
+  const note = details.note?.trim()
+  if (note) lines.push(`Note from me: ${note.slice(0, 1500)}`)
+
+  return startConversation(listing, lines.join('\n\n').slice(0, 2000))
+}
+
 
 // ---------- Display helpers ----------
 

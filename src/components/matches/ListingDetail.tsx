@@ -38,12 +38,25 @@ export default function ListingDetail({ listing: loadedListing, context: initial
   const context = useMatchContext(initialContext)
   const far = listing.nearWork === false
   const place = listing.city || listing.neighborhood
-  // only the person who posted a listing can edit it
-  const [isHost, setIsHost] = useState(false)
+  // only the user who posted the listing can see the edit link
+  const [isOwner, setIsOwner] = useState(false)
+  const ownerId = (() => {
+    const l = listing as unknown as Record<string, unknown>
+    const id = l.hostId ?? l.host_id ?? l.userId ?? l.user_id ?? l.ownerId ?? l.owner_id
+    return typeof id === 'string' ? id : ''
+  })()
+
   useEffect(() => {
-    if (!listing.hostId) return setIsHost(false)
-    supabase.auth.getUser().then(({ data }) => setIsHost(data.user?.id === listing.hostId)).catch(() => setIsHost(false))
-  }, [listing.hostId])
+    let cancelled = false
+    setIsOwner(false)
+    if (!ownerId) return
+    supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled) setIsOwner(data.user?.id === ownerId)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [ownerId])
 
   // saved homes live in activity.ts (TODO(backend) there)
   useEffect(() => {
@@ -178,13 +191,13 @@ export default function ListingDetail({ listing: loadedListing, context: initial
                     Contact
                   </Link>
                 </div>
-                {isHost && (
-                <Link
-                  href={`/my-listings/${listing.id}/edit`}
-                  className="flex min-h-10 items-center justify-center rounded-full border border-dashed border-[#A9C7E8] bg-white/70 text-xs font-semibold text-[#1E2B44] transition hover:bg-white"
-                >
-                  Edit this listing
-                </Link>
+                {isOwner && (
+                  <Link
+                    href={`/my-listings/${listing.id}/edit`}
+                    className="flex min-h-10 items-center justify-center rounded-full border border-dashed border-[#A9C7E8] bg-white/70 text-xs font-semibold text-[#1E2B44] transition hover:bg-white"
+                  >
+                    Edit this listing
+                  </Link>
                 )}
               </div>
             </div>

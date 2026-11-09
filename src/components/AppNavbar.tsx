@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
+import { loadUnreadCount } from './messages/store'
 
 // Navbar for logged-in pages: logo (back to the dashboard), Messages, Post a listing, Listings, and Log out (light/dark mode lives in Profile > Appearance) (with a confirm step).
 export default function AppNavbar({ firstName }: { firstName: string }) {
@@ -17,6 +18,7 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
   const [leaving, setLeaving] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [initials, setInitials] = useState('')
+  const [unread, setUnread] = useState(0)
   const stayRef = useRef<HTMLButtonElement>(null)
 
   // load the signed-in user's profile picture; refresh when they change it on the profile page
@@ -74,6 +76,29 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [confirming])
 
+
+  // unread dot: check on load, every 30s, when the tab regains focus, and when a thread is opened
+useEffect(() => {
+  let active = true
+  const check = async () => {
+    if (document.hidden) return
+    try {
+      const n = await loadUnreadCount()
+      if (active) setUnread(n)
+    } catch {}
+  }
+  check()
+  const timer = window.setInterval(check, 30_000)
+  window.addEventListener('messages-read', check)
+  window.addEventListener('focus', check)
+  return () => {
+    active = false
+    window.clearInterval(timer)
+    window.removeEventListener('messages-read', check)
+    window.removeEventListener('focus', check)
+  }
+}, [pathname])
+
   const logOut = async () => {
     setLeaving(true)
     await supabase.auth.signOut()
@@ -95,11 +120,17 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
               messaging ? 'bg-[#1E2B44] text-white' : 'hover:bg-[#1E2B44]/[0.06]'
             }`}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 5h16v11H9l-5 4z" />
-            </svg>
+            <span className="relative">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 5h16v11H9l-5 4z" />
+              </svg>
+              {unread > 0 && (
+                <span aria-hidden="true" className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[#C27A4A] ring-2 ring-white" />
+              )}
+            </span>
             <span className="hidden sm:inline">Messages</span>
             <span className="sr-only sm:hidden">Messages</span>
+            {unread > 0 && <span className="sr-only">, {unread} unread</span>}
           </Link>
           <Link
             href="/internMatches"

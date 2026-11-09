@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useRef, useState } from 'react'
 import { useScoredListing } from './useScored'
-import { useState } from 'react'
 import FlowShell from './FlowShell'
 import { EMPTY_CONTEXT, stayMonths, type Listing, type MatchContext } from './listings'
 import { Icon } from './parts'
@@ -10,6 +11,8 @@ import { addBookingRequest } from './activity'
 import { authFetch } from '../../lib/auth-fetch'
 import HouseMascot from '../HouseMascot'
 import { supabase } from '../../lib/supabase'
+import { apiFetch } from '../../lib/apiFetch'
+import { startBookingConversation } from '../messages/store'
 
 const STEPS = ['Choose dates', 'Review the total', 'Send a request']
 
@@ -21,15 +24,22 @@ const STEPS = ['Choose dates', 'Review the total', 'Send a request']
 export default function BookListing({ listing: loadedListing, context = EMPTY_CONTEXT }: { listing: Listing; context?: MatchContext }) {
   // same score, commute and safety as the Matches page and dashboard
   const listing = useScoredListing(loadedListing)
+  const router = useRouter()
   const [note, setNote] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const sendingRef = useRef(false)
   const months = stayMonths(listing.availableFrom, listing.availableTo)
   const host = listing.hostName.split(' ')[0]
 
-  // POST the booking request to /api/bookings
+  // POST the booking request to /api/bookings, then open a thread with the host
   const requestBooking = async () => {
+    if (sendingRef.current) return
+    sendingRef.current = true
     setSending(true)
+    setError(null)
     try {
       let guestEmail = 'intern@subtle.edu'
       let guestName = 'Summer Intern'
@@ -50,9 +60,8 @@ export default function BookListing({ listing: loadedListing, context = EMPTY_CO
         if (fn) guestName = `${fn} ${ln}`.trim()
       } catch {}
 
-      await authFetch('/api/bookings', {
+      const res = await authFetch('/api/bookings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           listingId: listing.id,
           listingTitle: listing.title,
@@ -65,11 +74,31 @@ export default function BookListing({ listing: loadedListing, context = EMPTY_CO
           guestName,
         }),
       })
+      if (!res.ok) throw new Error('Could not send your request. Please try again.')
+
+      // booking saved: open a thread with the host and go straight to it
+      // (a failure here must not undo the booking)
+      let threadId: string | null = null
+      try {
+        threadId = await startBookingConversation(
+          { id: listing.id, title: listing.title, score: listing.score, hostName: listing.hostName, hostId: listing.hostId },
+          { moveIn: listing.availableFrom, moveOut: listing.availableTo, note },
+        )
+      } catch {}
+
+      if (threadId) {
+        setRedirecting(true)
+        router.push(`/messages?c=${threadId}`)
+        return
+      }
+      setSent(true) // no thread (sample listing, logged out): show the normal confirmation
     } catch (e) {
       console.error('Error submitting booking:', e)
+      setError(e instanceof Error ? e.message : 'Could not send your request. Please try again.')
+    } finally {
+      sendingRef.current = false
+      setSending(false)
     }
-    setSending(false)
-    setSent(true)
   }
 
   const commute = listing.nearWork === false ? 'far from your office' : `${listing.commuteMinutes} min ${listing.commuteMode === 'walk' ? 'walk' : listing.commuteMode === 'transit' ? 'by transit' : listing.commuteMode === 'bike' ? 'bike' : 'drive'}`
@@ -81,7 +110,7 @@ export default function BookListing({ listing: loadedListing, context = EMPTY_CO
           <HouseMascot label="Subtle's house mascot waving" className="-ml-2 h-32 w-32" />
           <h1 className="mt-3 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Request sent.</h1>
           <p className="mt-3 text-[17px] text-[#4A5A75]">
-            {host} usually confirms within a day. You won&apos;t be charged until they accept. (Demo only for now.)
+            {host} usually confirms within a day.
           </p>
           <div className="mt-8 grid grid-cols-2 gap-3">
             <Link href={`/matches/${listing.id}`} className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white font-semibold transition hover:-translate-y-0.5">
@@ -133,6 +162,7 @@ export default function BookListing({ listing: loadedListing, context = EMPTY_CO
           <textarea
             id="book-note"
             rows={2}
+            maxLength={1500}
             value={note}
             onChange={(e) => setNote(e.target.value)}
             className="mt-1.5 w-full resize-none rounded-2xl border border-[#D5DFEA] bg-white p-3 text-[15px] outline-none focus:border-[#2F4161] focus:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]"
@@ -151,6 +181,12 @@ export default function BookListing({ listing: loadedListing, context = EMPTY_CO
             )}
           </div>
 
+          {error && (
+            <p role="alert" className="mt-4 text-sm font-semibold text-[#8A3A2A]">
+              {error}
+            </p>
+          )}
+
           <div className="mt-6 grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 lg:mt-auto lg:pt-6">
             <Link
               href={`/matches/${listing.id}`}
@@ -161,10 +197,10 @@ export default function BookListing({ listing: loadedListing, context = EMPTY_CO
             <button
               type="button"
               onClick={requestBooking}
-              disabled={sending}
+              disabled={sending || redirecting}
               className="min-h-12 rounded-full bg-[#1E2B44] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161] disabled:opacity-60"
             >
-              {sending ? 'Sending…' : 'Request to book'}
+              {sending || redirecting ? 'Sending…' : 'Request to book'}
             </button>
           </div>
         </>

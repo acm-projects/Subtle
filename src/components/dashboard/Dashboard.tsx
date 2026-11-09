@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import HouseMascot from '../HouseMascot'
+import ConnectionsCard from '../connections/ConnectionsCard'
 import { commuteIcon, commuteText, Icon, ListingPhoto, ScoreBadge } from '../matches/parts'
 import { BOOKING_STEPS } from '../matches/activity'
 import { useDashboardData } from './useDashboardData'
@@ -156,26 +157,27 @@ export default function Dashboard() {
             )}
           </section>
 
-          {(d.quizStatus === 'done' || d.bookings.length > 0 || d.savedHomes.length > 0) && (
+          {/* saved homes | connections | booking requests
+              always visible so pending connection requests are never hidden */}
           <div className="mt-6 grid gap-6 lg:grid-cols-12">
             {/* saved homes */}
-            <section className={`${glass} animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.05)_both] p-7 [animation-delay:120ms] md:p-8 lg:col-span-7`}>
+            <section className={`${glass} animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.05)_both] p-6 [animation-delay:120ms] md:p-7 lg:col-span-4`}>
               <div className="flex items-center justify-between gap-3">
                 <h2 className={`${serif} text-3xl font-medium`}>Saved Homes</h2>
                 {d.savedHomes.length > 0 && (
                   <Link href="/matches" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold hover:underline hover:underline-offset-4">
-                    All matches <Icon name="arrowR" size={16} />
+                    All <Icon name="arrowR" size={16} />
                   </Link>
                 )}
               </div>
               {d.loading ? (
                 <div className="mt-5 space-y-3">
-                  <Skeleton className="h-20" />
-                  <Skeleton className="h-20" />
+                  <Skeleton className="h-16" />
+                  <Skeleton className="h-16" />
                 </div>
               ) : d.savedHomes.length === 0 ? (
-                <div className="mt-5 flex items-start gap-4">
-                  <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#EEF3F8] text-[#A35F33]">
+                <div className="mt-5 flex items-start gap-3">
+                  <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#EEF3F8] text-[#A35F33]">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z" />
                     </svg>
@@ -186,18 +188,17 @@ export default function Dashboard() {
                   </div>
                 </div>
               ) : (
-                <ul className="mt-4 space-y-2.5">
+                <ul className="mt-4 space-y-2">
                   {d.savedHomes.map((l, i) => (
                     <li key={l.id}>
-                      <Link href={`/matches/${l.id}`} className="flex items-center gap-4 rounded-[22px] border border-white bg-white/80 p-2.5 pr-4 transition hover:-translate-y-0.5 hover:bg-white">
-                        <ListingPhoto listing={l} seed={i + 1} className="h-16 w-24 shrink-0 [&>span]:hidden" />
+                      <Link href={`/matches/${l.id}`} className="flex items-center gap-3 rounded-[20px] border border-white bg-white/80 p-2 pr-3 transition hover:-translate-y-0.5 hover:bg-white">
+                        <ListingPhoto listing={l} seed={i + 1} className="h-12 w-16 shrink-0 [&>span]:hidden" />
                         <span className="min-w-0 flex-1">
-                          <span className={`${serif} block truncate text-lg font-medium`}>{l.title}</span>
-                          <span className="text-sm text-[#4A5A75]">
-                            ${l.price.toLocaleString()} / month · {commuteText(l)}
-                          </span>
+                          <span className={`${serif} block truncate text-base font-medium`}>{l.title}</span>
+                          <span className="block truncate text-xs text-[#4A5A75]">${l.price.toLocaleString()} / month</span>
+                          <span className="block truncate text-xs text-[#4A5A75]">{commuteText(l)}</span>
                         </span>
-                        <ScoreBadge score={l.score} size={38} listing={l} />
+                        <ScoreBadge score={l.score} size={34} listing={l} />
                       </Link>
                     </li>
                   ))}
@@ -205,8 +206,13 @@ export default function Dashboard() {
               )}
             </section>
 
+            {/* connections */}
+            <div className="lg:col-span-4">
+              <ConnectionsCard />
+            </div>
+
             {/* booking requests */}
-            <section className={`${glass} animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.05)_both] p-7 [animation-delay:180ms] md:p-8 lg:col-span-5`}>
+            <section className={`${glass} animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.05)_both] p-6 [animation-delay:180ms] md:p-7 lg:col-span-4`}>
               <h2 className={`${serif} text-3xl font-medium`}>Booking Requests</h2>
               {d.loading ? (
                 <Skeleton className="mt-5 h-28" />
@@ -221,11 +227,11 @@ export default function Dashboard() {
                     const at = BOOKING_STEPS.findIndex((s) => s.id === b.status)
                     return (
                       <li key={b.id ?? b.listingId} className="rounded-[22px] border border-white bg-white/80 p-4">
-                        <div className="flex items-baseline justify-between gap-3">
-                          <Link href={`/matches/${b.listingId}`} className={`${serif} truncate text-xl font-medium hover:underline hover:underline-offset-4`}>
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                          <Link href={`/matches/${b.listingId}`} className={`${serif} min-w-0 truncate text-xl font-medium hover:underline hover:underline-offset-4`}>
                             {b.title}
                           </Link>
-                          <span className="shrink-0 text-sm text-[#4A5A75]">
+                          <span className="shrink-0 text-xs text-[#4A5A75]">
                             {b.availableFrom} – {b.availableTo}
                           </span>
                         </div>
@@ -235,24 +241,24 @@ export default function Dashboard() {
                             {b.hostName.split(' ')[0]} can't host this time. Other matches are still open.
                           </p>
                         ) : (
-                        <ol className="mt-4 flex items-center" aria-label={`Status: ${BOOKING_STEPS[at]?.label}`}>
-                          {BOOKING_STEPS.map((s, i) => (
-                            <li key={s.id} className={`flex items-center ${i < BOOKING_STEPS.length - 1 ? 'flex-1' : ''}`}>
-                              <span className="flex flex-col items-center gap-1.5">
-                                <span
-                                  aria-hidden="true"
-                                  className={`flex h-7 w-7 items-center justify-center rounded-full ${
-                                    i < at ? 'bg-[#1E2B44] text-white' : i === at ? 'bg-[#1E2B44] text-white ring-4 ring-[#C9DBEA]' : 'border-2 border-[#C9DBEA] bg-white'
-                                  }`}
-                                >
-                                  {i <= at && <Icon name="check" size={13} />}
+                          <ol className="mt-4 flex items-center" aria-label={`Status: ${BOOKING_STEPS[at]?.label}`}>
+                            {BOOKING_STEPS.map((s, i) => (
+                              <li key={s.id} className={`flex items-center ${i < BOOKING_STEPS.length - 1 ? 'flex-1' : ''}`}>
+                                <span className="flex flex-col items-center gap-1.5">
+                                  <span
+                                    aria-hidden="true"
+                                    className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                                      i < at ? 'bg-[#1E2B44] text-white' : i === at ? 'bg-[#1E2B44] text-white ring-4 ring-[#C9DBEA]' : 'border-2 border-[#C9DBEA] bg-white'
+                                    }`}
+                                  >
+                                    {i <= at && <Icon name="check" size={13} />}
+                                  </span>
+                                  <span className={`whitespace-nowrap text-xs ${i === at ? 'font-bold' : 'text-[#4A5A75]'}`}>{s.label}</span>
                                 </span>
-                                <span className={`whitespace-nowrap text-sm ${i === at ? 'font-bold' : 'text-[#4A5A75]'}`}>{s.label}</span>
-                              </span>
-                              {i < BOOKING_STEPS.length - 1 && <span aria-hidden="true" className={`mx-2 mb-5 h-0.5 flex-1 rounded ${i < at ? 'bg-[#1E2B44]' : 'bg-[#E4EAF1]'}`} />}
-                            </li>
-                          ))}
-                        </ol>
+                                {i < BOOKING_STEPS.length - 1 && <span aria-hidden="true" className={`mx-1.5 mb-5 h-0.5 flex-1 rounded ${i < at ? 'bg-[#1E2B44]' : 'bg-[#E4EAF1]'}`} />}
+                              </li>
+                            ))}
+                          </ol>
                         )}
                         {b.status === 'booked' && <p className="mt-3 text-sm font-semibold text-[#2E6B45]">Booked with {b.hostName.split(' ')[0]}. Message them to sort out the next steps.</p>}
                         {b.status === 'requested' && <p className="mt-3 text-sm text-[#4A5A75]">Waiting on {b.hostName.split(' ')[0]} to reply.</p>}
@@ -264,33 +270,32 @@ export default function Dashboard() {
             </section>
           </div>
 
-          )}
           {/* post a listing: always visible, since hosting doesn't depend on the quiz */}
-<section
-  aria-label="Post a listing"
-  className={`${glass} mt-6 flex animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.05)_both] flex-wrap items-center justify-between gap-6 p-7 [animation-delay:200ms] md:px-10`}
->
-  <div className="flex items-center gap-5">
-    <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#1E2B44] text-white">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <path d="M12 5v14M5 12h14" />
-      </svg>
-    </span>
-    <div>
-      
-      <h2 className={`${serif} mt-1 text-2xl font-medium`}>Have a spare room this summer?</h2>
-      <p className="text-[15px] text-[#4A5A75]">Post a listing and find a verified intern who fits.</p>
-    </div>
-  </div>
-  <div className="flex flex-wrap items-center gap-3">
-    <Link href="/my-listings" className={btnLight}>
-      My Listings
-    </Link>
-    <Link href="/post" className={btnDark}>
-      Post a listing <Icon name="arrowR" size={16} />
-    </Link>
-  </div>
-</section>
+          <section
+            aria-label="Post a listing"
+            className={`${glass} mt-6 flex animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.05)_both] flex-wrap items-center justify-between gap-6 p-7 [animation-delay:200ms] md:px-10`}
+          >
+            <div className="flex items-center gap-5">
+              <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#1E2B44] text-white">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </span>
+              <div>
+                <h2 className={`${serif} mt-1 text-2xl font-medium`}>Have a spare room this summer?</h2>
+                <p className="text-[15px] text-[#4A5A75]">Post a listing and find a verified intern who fits.</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link href="/my-listings" className={btnLight}>
+                My Listings
+              </Link>
+              <Link href="/post" className={btnDark}>
+                Post a listing <Icon name="arrowR" size={16} />
+              </Link>
+            </div>
+          </section>
+
           {/* intern community: locked until the quiz tells us their city and interests */}
           {d.quizStatus === 'done' ? (
             <section className={`${glass} mt-6 flex animate-[popIn_.5s_cubic-bezier(.2,.8,.3,1.05)_both] flex-wrap items-center justify-between gap-6 p-7 [animation-delay:240ms] md:px-10`}>

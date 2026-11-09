@@ -17,6 +17,9 @@ const card = 'rounded-[32px] border border-white bg-white/65 p-6 shadow-[0_30px_
 const input =
   'min-h-12 w-full rounded-2xl border border-[#D5DFEA] bg-white px-4 text-[15px] outline-none transition placeholder:text-[#5F6E84] focus:border-[#2F4161] focus:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]'
 const label = 'mb-1.5 block text-[15px] font-semibold'
+// accommodation tags; these match the labels the questionnaire saves for users
+const ACCESS_TAGS: string[] = ['Pets Allowed', 'Wheelchair Accessible']
+const AMENITY_OPTIONS: string[] = [...INCLUDED, ...ACCESS_TAGS.filter((t) => !(INCLUDED as readonly string[]).includes(t))]
 
 function Chips({ name, options, selected, onToggle, multi }: { name: string; options: string[]; selected: string[]; onToggle: (o: string) => void; multi?: boolean }) {
   return (
@@ -147,7 +150,7 @@ export default function PostListing() {
         start_date: listing.availableFrom || null,
         end_date: listing.availableTo || null,
         room_type: listing.roomType,
-        amenities: listing.included,
+        amenities: listing.included, // includes 'Pets Allowed' / 'Wheelchair Accessible' when selected
         company_tags: [listing.roomType],
         about: listing.about.trim() || null,
       }
@@ -204,7 +207,13 @@ export default function PostListing() {
           </p>
         </div>
         <ul className="mt-3 flex flex-wrap gap-1.5 text-xs font-medium">
-          {[listing.availableFrom && `From ${shortDate(listing.availableFrom)}`, listing.address.trim() && listing.address.split(',')[0], ...listing.included.slice(0, 3)]
+          {[
+            listing.availableFrom && `From ${shortDate(listing.availableFrom)}`,
+            listing.address.trim() && listing.address.split(',')[0],
+            // accommodation tags always show, so they never get cut off by the slice below
+            ...listing.included.filter((i) => ACCESS_TAGS.includes(i)),
+            ...listing.included.filter((i) => !ACCESS_TAGS.includes(i)).slice(0, 3),
+          ]
             .filter(Boolean)
             .map((t) => (
               <li key={t as string} className="rounded-full border border-[#D5DFEA] bg-white px-2.5 py-1">
@@ -260,7 +269,7 @@ export default function PostListing() {
   return (
     <>
       <AppNavbar firstName={firstName} />
-      <section className="px-4 pb-16 pt-32 md:px-8"> 
+      <section className="px-4 pb-16 pt-32 md:px-8">
         <div className="mx-auto w-full max-w-[1240px]">
           <header className="animate-[fadeIn_.5s_ease-out]">
             <div className="md:pl-10">
@@ -353,7 +362,7 @@ export default function PostListing() {
                 <Chips
                   name="What's included"
                   multi
-                  options={INCLUDED}
+                  options={AMENITY_OPTIONS}
                   selected={listing.included}
                   onToggle={(o) => set('included', listing.included.includes(o) ? listing.included.filter((x) => x !== o) : [...listing.included, o])}
                 />
