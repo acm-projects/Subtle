@@ -18,6 +18,7 @@ type Intern = {
   match?: number // 0-100. Only set for interns who matched with the user.
 }
 
+// fallback sample data, only used if the API call fails
 const INTERNS: Intern[] = [
   //backend Replace with user data
   { id: 'aisha', name: 'Aisha Rahman', initials: 'AR', role: 'Product design intern', school: 'UCLA', interests: ['Hiking', 'Cooking', 'Film', 'Photography', 'Pottery'], match: 96 },
@@ -78,9 +79,9 @@ const btnLight = 'rounded-full border border-[#D5DFEA] bg-white text-sm font-sem
 // Score colors: the stronger the match, the darker the blue.
 // Text on each shade passes 4.5:1 contrast (white on the two dark ones, navy on the two light ones).
 const SCORE_SHADES = [
-  { min: 90, bg: '#22507F', text: '#FFFFFF' },
-  { min: 80, bg: '#3D6D9F', text: '#FFFFFF' },
-  { min: 70, bg: '#8EB2D6', text: '#15203A' },
+  { min: 90, bg: '#589cdc', text: '#FFFFFF' },
+  { min: 80, bg: '#81abd4', text: '#FFFFFF' },
+  { min: 70, bg: '#adc9e6', text: '#15203A' },
   { min: 0, bg: '#C9DBEA', text: '#15203A' },
 ]
 const shadeFor = (score: number) => SCORE_SHADES.find((s) => score >= s.min) ?? SCORE_SHADES[SCORE_SHADES.length - 1]
@@ -287,8 +288,10 @@ export default function MatchesPage() {
   const [toast, setToast] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null)
   const [firstName, setFirstName] = useState('')
   const [matchesOnly, setMatchesOnly] = useState(false)
-  const [myInterests, setMyInterests] = useState<string[]>(MY_INTERESTS)
-  const [internList, setInternList] = useState<Intern[]>(INTERNS)
+  // start empty and only draw the map once the real data is in (no flashing of sample versions)
+  const [myInterests, setMyInterests] = useState<string[]>([])
+  const [internList, setInternList] = useState<Intern[]>([])
+  const [ready, setReady] = useState(false)
 
   const flash = (text: string, tone: 'ok' | 'err' = 'ok') => {
     setToast({ tone, text })
@@ -297,45 +300,46 @@ export default function MatchesPage() {
 
   // AppNavbar takes the user's first name; also fetch live intern matches from /api/intern-matches
   useEffect(() => {
+    let cancelled = false
     supabase.auth.getUser().then(async ({ data }) => {
-      const meta = data.user?.user_metadata
-      const email = data.user?.email ?? ''
-      setFirstName(meta?.first_name ?? email.split('@')[0] ?? '')
-
-      // remember who the user has already connected with or asked
-      if (data.user) {
-        const me = data.user.id
-        setUserId(me)
-        const { data: rows } = await supabase
-          .from('connections')
-          .select('requester_id, addressee_id, status')
-          .or(`requester_id.eq.${me},addressee_id.eq.${me}`)
-        const asked = new Set<string>()
-        const linked = new Set<string>()
-        ;(rows ?? []).forEach((r) => {
-          const other = r.requester_id === me ? r.addressee_id : r.requester_id
-          if (r.status === 'accepted') linked.add(other)
-          else asked.add(other)
-        })
-        setRequested(asked)
-        setConnectedIds(linked)
-      }
-
       let localInterests: string[] = []
       try {
-        const raw = localStorage.getItem('subtle-quiz-v1')
-        if (raw) {
-          const parsed = JSON.parse(raw)
-          if (Array.isArray(parsed.interests) && parsed.interests.length > 0) {
-            localInterests = parsed.interests
-            setMyInterests(parsed.interests)
-          }
-        }
-      } catch {}
+        const meta = data.user?.user_metadata
+        const email = data.user?.email ?? ''
+        setFirstName(meta?.first_name ?? email.split('@')[0] ?? '')
 
-      try {
+        // remember who the user has already connected with or asked
+        if (data.user) {
+          const me = data.user.id
+          setUserId(me)
+          const { data: rows } = await supabase
+            .from('connections')
+            .select('requester_id, addressee_id, status')
+            .or(`requester_id.eq.${me},addressee_id.eq.${me}`)
+          const asked = new Set<string>()
+          const linked = new Set<string>()
+          ;(rows ?? []).forEach((r) => {
+            const other = r.requester_id === me ? r.addressee_id : r.requester_id
+            if (r.status === 'accepted') linked.add(other)
+            else asked.add(other)
+          })
+          setRequested(asked)
+          setConnectedIds(linked)
+        }
+
+        try {
+          const raw = localStorage.getItem('subtle-quiz-v1')
+          if (raw) {
+            const parsed = JSON.parse(raw)
+            if (Array.isArray(parsed.interests) && parsed.interests.length > 0) {
+              localInterests = parsed.interests
+            }
+          }
+        } catch {}
+
         const params = new URLSearchParams()
         if (email) params.set('email', email)
+        if (data.user?.id) params.set('uid', data.user.id) // lets the API leave you out of your own results
         if (localInterests.length > 0) params.set('interests', localInterests.join(','))
         const res = await fetch(`/api/intern-matches?${params.toString()}`)
         if (res.ok) {
@@ -348,9 +352,19 @@ export default function MatchesPage() {
           }
         }
       } catch {
-        // Fallback to static INTERNS on network error
+        // fall through to the sample data below
+      } finally {
+        if (!cancelled) {
+          // nothing came back from the API: use the saved interests and sample interns
+          setInternList((cur) => (cur.length ? cur : INTERNS))
+          setMyInterests((cur) => (cur.length ? cur : localInterests.length ? localInterests : MY_INTERESTS))
+          setReady(true)
+        }
       }
     })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // positions are worked out once for everyone, so dots stay put when you switch filters
@@ -358,25 +372,32 @@ export default function MatchesPage() {
   // the 10 best matches get the big circles
   const bigIds = useMemo(() => bigIdsOf(internList), [internList])
 
+  // everyone in the city: matches get big circles, the rest are small dots
   const interns: Placed[] = useMemo(
     () =>
-      internList
-        .map((i) => {
-          const shared = i.interests.filter((x) => myInterests.some((m) => m.toLowerCase() === x.toLowerCase()))
-          return {
-            ...i,
-            ...(positions[i.id] ?? { x: 50, y: 50 }),
-            shared,
-            big: bigIds.has(i.id),
-          }
-        })
-        // Only show people who share at least 1 interest with you
-        .filter((i) => i.shared.length > 0),
+      internList.map((i) => {
+        const shared = i.interests.filter((x) => myInterests.some((m) => m.toLowerCase() === x.toLowerCase()))
+        return {
+          ...i,
+          ...(positions[i.id] ?? { x: 50, y: 50 }),
+          shared,
+          big: bigIds.has(i.id),
+        }
+      }),
     [internList, myInterests, positions, bigIds],
   )
   const matches = interns.filter((i) => i.match !== undefined).sort((a, b) => (b.match ?? 0) - (a.match ?? 0))
   const topMatches = matches.filter((m) => m.big)
   const visible = matchesOnly ? topMatches : interns
+
+  // the scroll list: matches first (best score first), then everyone else
+  const everyone = useMemo(
+    () =>
+      [...interns].sort(
+        (a, b) => (b.match ?? -1) - (a.match ?? -1) || b.shared.length - a.shared.length || a.name.localeCompare(b.name),
+      ),
+    [interns],
+  )
 
   const stateOf = (id: string): RequestState => (connectedIds.has(id) ? 'connected' : requested.has(id) ? 'sent' : 'none')
 
@@ -399,7 +420,7 @@ export default function MatchesPage() {
     [matches, myInterests],
   )
 
-  // send a connection request to this intern; they accept or decline it from their profile
+  // send a connection request to this intern; they accept or decline it from their dashboard
   const connect = async (id: string) => {
     const intern = interns.find((x) => x.id === id)
     if (!intern || stateOf(id) !== 'none') return
@@ -407,20 +428,28 @@ export default function MatchesPage() {
 
     if (!userId) return flash('Log in to send connection requests.', 'err')
 
+    // only real accounts (ids are auth user ids) can receive a request
+    if (!UUID.test(intern.id)) {
+      console.warn('Intern id is not an auth user id:', intern.id)
+      return flash(`${first} can't receive requests yet.`, 'err')
+    }
+
     // mark it right away so a double-click can't send two requests
     setRequested((prev) => new Set(prev).add(id))
 
-    // sample interns have no account to send to, so only the button changes
-    if (!UUID.test(intern.id)) return flash(`Connection request sent to ${first}.`)
+    const { data, error } = await supabase
+      .from('connections')
+      .insert({
+        requester_id: userId,
+        addressee_id: intern.id,
+        status: 'pending',
+        score: intern.match ?? null,
+      })
+      .select('id')
 
-    const { error } = await supabase.from('connections').insert({
-      requester_id: userId,
-      addressee_id: intern.id,
-      status: 'pending',
-      score: intern.match ?? null,
-    })
-    // 23505 means a request to this person already exists, which is fine
-    if (error && error.code !== '23505') {
+    // 23505 means a request to this person already exists, which is fine.
+    // An empty result with no error usually means a row-level security policy blocked the insert.
+    if ((error && error.code !== '23505') || (!error && !data?.length)) {
       console.error('Could not send the connection request', error)
       // undo the "sent" state so the button works again
       setRequested((prev) => {
@@ -431,6 +460,21 @@ export default function MatchesPage() {
       return flash("Couldn't send the request. Try again.", 'err')
     }
     flash(`Connection request sent to ${first}.`)
+  }
+
+  // placeholder until the real data is in, so the map is only ever drawn once
+  if (!ready) {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_92%_100%,rgba(246,214,180,0.85),transparent_42%),linear-gradient(180deg,#c3d8ec_0%,#dde8f3_38%,#f1eeea_72%,#f7e8d8_100%)] text-[#1E2B44]">
+        <AppNavbar firstName={firstName} />
+        <div className="mx-auto max-w-[1240px] px-3 pt-28 md:px-4">
+          <div className="rounded-[40px] border border-white bg-white/65 p-6 backdrop-blur-xl md:p-9">
+            <h1 className={`${serif} text-[44px] font-medium leading-[1.02] tracking-[-0.02em] md:text-[56px]`}>Intern Matches</h1>
+            <div className="mt-8 aspect-[16/11] min-h-[400px] animate-pulse rounded-[28px] bg-[#E4EAF1]" />
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -577,11 +621,12 @@ export default function MatchesPage() {
                 <div
                   tabIndex={0}
                   role="region"
-                  aria-label="All matches, scrollable"
+                  aria-label="All interns, scrollable"
                   className="max-h-[285px] overflow-y-auto overscroll-contain rounded-xl pr-1 outline-none focus-visible:ring-2 focus-visible:ring-[#1E2B44]/40"
                 >
-                  {matches.map((m) => {
+                  {everyone.map((m) => {
                     const state = stateOf(m.id)
+                    const matched = m.match !== undefined
                     return (
                       <div
                         key={m.id}
@@ -589,12 +634,17 @@ export default function MatchesPage() {
                         onMouseLeave={() => setHoverId(null)}
                         className={`flex h-[57px] items-center gap-3 border-t border-[#E3ECF5] px-1 transition-colors ${hoverId === m.id ? 'bg-[#F4F7FB]' : ''}`}
                       >
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white" style={scoreStyle(m.match ?? 0)}>
-                          {m.match}
+                        <span
+                          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white"
+                          style={matched ? scoreStyle(m.match ?? 0) : { backgroundColor: '#9CB5CE' }}
+                        >
+                          {matched ? m.match : m.initials}
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-semibold">{m.name}</div>
-                          <div className="text-xs text-[#4A5A75]">{m.shared.length} shared interests</div>
+                          <div className="text-xs text-[#4A5A75]">
+                            {m.shared.length} shared {m.shared.length === 1 ? 'interest' : 'interests'}
+                          </div>
                         </div>
                         <button type="button" disabled={state !== 'none'} onClick={() => connect(m.id)} className={`px-3 py-1.5 text-xs ${btnLight}`}>
                           {state === 'connected' ? 'Connected' : state === 'sent' ? 'Sent' : 'Connect'}

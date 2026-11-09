@@ -216,13 +216,14 @@ async function upsertUser(request: Request) {
   }
 
   // If not found by email, try by ID if available from body or token
-  let authUserId: string | null = body.id ?? null
-  if (!authUserId && token) {
+    let authUserId: string | null = null
+  if (token) {
     try {
       const { data: authData } = await client.auth.getUser(token)
       if (authData?.user?.id) authUserId = authData.user.id
     } catch {}
   }
+  if (!authUserId) authUserId = body.id ?? null // fallback for callers without a token
 
   if (!existingUser && authUserId) {
     const { data: byId } = await supabase

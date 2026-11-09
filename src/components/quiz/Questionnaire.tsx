@@ -17,7 +17,6 @@ import {
   EMPTY,
   INTERESTS,
   MIN_INTERESTS,
-  label,
   monthIdFor,
   prettyDate,
   type QuizAnswers,
@@ -41,7 +40,7 @@ export default function Questionnaire() {
       const ln = ((meta.last_name ?? meta.lastName ?? '') as string).trim()
       if (fn) setFirstName(fn)
       if (ln) setLastName(ln)
-      
+
       const mail = data.user?.email?.toLowerCase() ?? null
       if (mail) {
         setUserEmail(mail)
@@ -54,7 +53,7 @@ export default function Questionnaire() {
             setA((prev) => ({ ...prev, ...JSON.parse(savedQuiz) }))
           }
         } catch {}
-        
+
         // Fetch saved quiz answers from Supabase users_table
         try {
           const res = await fetch(`/api/users?email=${encodeURIComponent(mail)}`, { cache: 'no-store' })
@@ -97,7 +96,7 @@ export default function Questionnaire() {
 
   const steps = useMemo(() => buildSteps(a), [a])
   const step = steps[Math.min(index, steps.length - 1)]
-  // the journey panel: one stop per question (roommate extras don't count)
+  // the journey panel: one stop per question
   const journeySteps = steps.filter((s) => s.id !== 'done' && !s.extra)
   const journeyAt = Math.max(0, journeySteps.findIndex((s) => s.id === step.id))
   const set = <K extends keyof QuizAnswers>(key: K, value: QuizAnswers[K]) => setA((prev) => ({ ...prev, [key]: value }))
@@ -113,23 +112,22 @@ export default function Questionnaire() {
       return { ...prev, [key]: list.includes(id) ? list.filter((x) => x !== id) : [...list, id] }
     })
 
-  // numbering inside a section (the roommate extras page isn't counted)
+  // numbering inside a section
   const sectionSteps = steps.filter((s) => s.section === step.section && !s.extra)
   const qNum = sectionSteps.findIndex((s) => s.id === step.id) + 1
-  const progress = step.extra
-    ? ((sectionSteps.findIndex((s) => s.id === 'roommates') + 1) / sectionSteps.length) * 100
-    : (qNum / Math.max(sectionSteps.length, 1)) * 100
+  const progress = (qNum / Math.max(sectionSteps.length, 1)) * 100
 
+  // every StepId needs a key here (Record type); removed questions are never shown, so they just pass
   const canContinue: Record<StepId, boolean> = {
     school: a.university.trim() !== '',
     work: a.company.trim() !== '' && a.address.trim() !== '',
     commute: true,
     budget: a.budget !== null,
-    roommates: a.roommates !== null,
+    roommates: true,
     roommatePrefs: true,
-    housingType: a.housingType !== null,
+    housingType: true,
     accommodations: a.accommodations.length > 0,
-    car: a.car !== null,
+    car: true,
     moveIn: a.moveInDate !== '' && a.moveOutDate !== '',
     transit: true,
     interests: a.interests.length >= MIN_INTERESTS,
@@ -174,6 +172,10 @@ export default function Questionnaire() {
         const res = await fetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          // /api/users only writes a column when its key is present in this body.
+          // The questions that were removed (roommates + roommate prefs, housing type,
+          // commute mode / car, transit importance, free-time hangouts) are intentionally
+          // NOT sent, so their existing values in Supabase are left untouched.
           body: JSON.stringify({
             firstName: fn || 'Intern',
             lastName: ln || 'Student',
@@ -181,25 +183,12 @@ export default function Questionnaire() {
             company: latestAnswers.company,
             address: latestAnswers.address,
             budget: latestAnswers.budget,
-            roommates: latestAnswers.roommates,
             university: latestAnswers.university.trim(), // TODO(backend): add a university column in users_table and map it in /api/users
             interests: allInterests(latestAnswers),
-            housingType: latestAnswers.housingType,
             accommodations: latestAnswers.accommodations,
             moveIn: latestAnswers.moveInDate || latestAnswers.moveIn,
             moveOut: latestAnswers.moveOutDate, // TODO(backend): save the move-out date (users_table has no column yet)
-            commuteMode: latestAnswers.commuteMode,
-            car: latestAnswers.car,
             maxCommute: latestAnswers.maxCommute,
-            transitImportance: latestAnswers.transitImportance,
-            gender: latestAnswers.roommatePrefs.gender,
-            numRoommates: latestAnswers.roommatePrefs.count,
-            noise: latestAnswers.roommatePrefs.noise,
-            cleanliness: latestAnswers.roommatePrefs.cleanliness,
-            guests: latestAnswers.roommatePrefs.guests,
-            sleep: latestAnswers.roommatePrefs.schedule,
-            temperature: latestAnswers.roommatePrefs.temperature,
-            age: latestAnswers.roommatePrefs.age,
           }),
         })
 
@@ -484,7 +473,6 @@ export default function Questionnaire() {
 
   const c = content[step.id]!
   const p = panel[step.id]
-  const wide = step.id === 'roommatePrefs'
   const backClass =
     'flex min-h-14 items-center justify-center gap-2 rounded-full border border-[#D5DFEA] bg-white/70 px-6 text-[15px] font-semibold transition hover:bg-white'
 
@@ -492,11 +480,7 @@ export default function Questionnaire() {
     <>
       <AppNavbar firstName={firstName} />
       <section className="flex min-h-screen flex-col justify-center px-4 pb-10 pt-28 md:px-8">
-        <div
-          className={`mx-auto grid w-full max-w-[1240px] gap-6 rounded-[36px] md:min-h-[680px] border border-white bg-white/60 p-4 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-5 ${
-            wide ? '' : 'md:grid-cols-[1.1fr_1fr]'
-          }`}
-        >
+        <div className="mx-auto grid w-full max-w-[1240px] gap-6 rounded-[36px] md:min-h-[680px] border border-white bg-white/60 p-4 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-5 md:grid-cols-[1.1fr_1fr]">
           <div className="flex flex-col p-3 md:p-7">
             {/* progress */}
             <div
@@ -540,7 +524,7 @@ export default function Questionnaire() {
             </div>
           </div>
 
-          {!wide && <Journey position={journeyAt} total={journeySteps.length} caption={p ? { tag: p.tag, title: p.title, text: p.caption } : undefined} />}
+          <Journey position={journeyAt} total={journeySteps.length} caption={p ? { tag: p.tag, title: p.title, text: p.caption } : undefined} />
         </div>
       </section>
     </>

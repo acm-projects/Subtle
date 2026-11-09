@@ -173,19 +173,27 @@ export default function Messages() {
         <div className="min-w-0 flex-1">
           <p className="truncate font-[family-name:var(--font-serif)] text-2xl font-medium leading-tight">{selected.hostName}</p>
           <p className="truncate text-sm text-[#4A5A75]">
-            Sub-leaser ·{' '}
-            <Link href={`/matches/${selected.listingId}`} className="font-semibold text-[#2F4161] underline-offset-2 hover:underline">
-              {selected.listingTitle}
-            </Link>
+            {selected.listingId ? (
+              <>
+                Sub-leaser ·{' '}
+                <Link href={`/matches/${selected.listingId}`} className="font-semibold text-[#2F4161] underline-offset-2 hover:underline">
+                  {selected.listingTitle}
+                </Link>
+              </>
+            ) : (
+              'Connection'
+            )}
           </p>
         </div>
         {selected.listingScore !== undefined && <ScoreBadge score={selected.listingScore} size={40} />}
-        <Link
-          href={`/matches/${selected.listingId}/book`}
-          className="hidden min-h-11 items-center rounded-full bg-[#1E2B44] px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161] sm:flex"
-        >
-          Book
-        </Link>
+        {selected.listingId && (
+           <Link
+            href={`/matches/${selected.listingId}/book`}
+            className="hidden min-h-11 items-center rounded-full bg-[#1E2B44] px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161] sm:flex"
+          >
+            Book
+          </Link>
+          )}
       </div>
 
       {/* messages */}
@@ -216,6 +224,9 @@ export default function Messages() {
             </div>
           )
         })}
+        {selected.messages.length === 0 && (
+        <p className="py-10 text-center text-sm text-[#4A5A75]">No messages yet. Say hi to {selected.hostName}.</p>
+        )}
         <div ref={endRef} />
       </div>
 
