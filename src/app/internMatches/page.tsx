@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { authFetch } from '../../lib/auth-fetch'
 import AppNavbar from '../../components/AppNavbar'
 import { supabase } from '../../lib/supabase'
-
-//Backend: replace these 
-const MY_INTERESTS = ['Hiking', 'Cooking', 'Film', 'Photography', 'Basketball', 'Live music']
+import { NEARBY_MILES } from '../../components/matches/listings'
+import Link from 'next/link'
 
 // angle and radius from older versions of the API are no longer used: dots are placed by the layout below.
 type Intern = {
@@ -18,38 +18,18 @@ type Intern = {
   match?: number // 0-100. Only set for interns who matched with the user.
 }
 
-// fallback sample data, only used if the API call fails
-const INTERNS: Intern[] = [
-  //backend Replace with user data
-  { id: 'aisha', name: 'Aisha Rahman', initials: 'AR', role: 'Product design intern', school: 'UCLA', interests: ['Hiking', 'Cooking', 'Film', 'Photography', 'Pottery'], match: 96 },
-  { id: 'leo', name: 'Leo Martinez', initials: 'LM', role: 'Software intern', school: 'USC', interests: ['Basketball', 'Live music', 'Cooking', 'Film', 'Gaming'], match: 92 },
-  { id: 'priya', name: 'Priya Shah', initials: 'PS', role: 'Data intern', school: 'Stanford', interests: ['Hiking', 'Photography', 'Live music', 'Chess'], match: 89 },
-  { id: 'marcus', name: 'Marcus Tran', initials: 'MT', role: 'Marketing intern', school: 'UC Berkeley', interests: ['Cooking', 'Hiking', 'Basketball', 'Soccer'], match: 86 },
-  { id: 'sofia', name: 'Sofia Lopez', initials: 'SL', role: 'Finance intern', school: 'NYU', interests: ['Film', 'Live music', 'Yoga', 'Travel'], match: 82 },
-  { id: 'daniel', name: 'Daniel Kim', initials: 'DK', role: 'Research intern', school: 'Michigan', interests: ['Photography', 'Basketball', 'Reading', 'Chess'], match: 78 },
-  // also in the city, not matched
-  { id: 'emma', name: 'Emma Walsh', initials: 'EW', role: 'Design intern', school: 'Brown', interests: ['Painting', 'Yoga', 'Thrifting'] },
-  { id: 'jon', name: 'Jon Park', initials: 'JP', role: 'Software intern', school: 'UCSD', interests: ['Gaming', 'Anime', 'Running'] },
-  { id: 'nia', name: 'Nia Brooks', initials: 'NB', role: 'Policy intern', school: 'Howard', interests: ['Debate', 'Dance', 'Reading'] },
-  { id: 'omar', name: 'Omar Haddad', initials: 'OH', role: 'Software intern', school: 'UT Austin', interests: ['Soccer', 'Coding', 'Coffee'] },
-  { id: 'chloe', name: 'Chloe Evans', initials: 'CE', role: 'Media intern', school: 'Northwestern', interests: ['Writing', 'Theatre', 'Baking'] },
-  { id: 'ravi', name: 'Ravi Patel', initials: 'RP', role: 'Data intern', school: 'Georgia Tech', interests: ['Cricket', 'Chess', 'Travel'] },
-  { id: 'zoe', name: 'Zoe Chen', initials: 'ZC', role: 'Product intern', school: 'Columbia', interests: ['Surfing', 'Pottery', 'Fashion'] },
-  { id: 'sam', name: 'Sam Okafor', initials: 'SO', role: 'Finance intern', school: 'Duke', interests: ['Golf', 'Podcasts', 'Cars'] },
-  { id: 'lily', name: 'Lily Nguyen', initials: 'LN', role: 'Design intern', school: 'RISD', interests: ['Illustration', 'Anime', 'Baking'] },
-  { id: 'ben', name: 'Ben Carter', initials: 'BC', role: 'Software intern', school: 'MIT', interests: ['Robotics', 'Climbing', 'Gaming'] },
-  { id: 'maya', name: 'Maya Singh', initials: 'MS', role: 'Policy intern', school: 'Yale', interests: ['Volunteering', 'Reading', 'Yoga'] },
-  { id: 'theo', name: 'Theo Grant', initials: 'TG', role: 'Data intern', school: 'Rice', interests: ['Running', 'Board games', 'Coffee'] },
-]
 
-// sample meetup ideas by interest (replace with real events later)
+// meetup ideas by interest (generic, so they work in any city)
 const MEETUP_IDEAS: Record<string, string> = {
-  Hiking: 'Sunrise hike at Griffith Park',
-  Cooking: 'Potluck dinner in Silver Lake',
-  Film: 'Outdoor movie night downtown',
+  Hiking: 'Sunrise hike on a nearby trail',
+  Cooking: 'Potluck dinner at someone’s place',
+  Film: 'Movie night downtown',
   Photography: 'Golden hour photo walk',
   Basketball: 'Pickup game at the park',
-  'Live music': 'Live music night in Echo Park',
+  'Live music': 'Live music night',
+  Nightlife: 'Night out downtown',
+  Art: 'Museum afternoon',
+  Volunteering: 'Volunteer shift together',
   Gaming: 'LAN party or arcade night',
   Anime: 'Anime screening & boba meetup',
   Soccer: 'Pickup soccer match at the turf',
@@ -280,6 +260,10 @@ function Tooltip({
   )
 }
 
+// interests are stored as e.g. "Live Music", the ideas use "Live music": match case-insensitively
+const ideaFor = (interest: string) =>
+  Object.entries(MEETUP_IDEAS).find(([k]) => k.toLowerCase() === interest.toLowerCase())?.[1]
+
 export default function MatchesPage() {
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
@@ -288,10 +272,12 @@ export default function MatchesPage() {
   const [toast, setToast] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null)
   const [firstName, setFirstName] = useState('')
   const [matchesOnly, setMatchesOnly] = useState(false)
-  // start empty and only draw the map once the real data is in (no flashing of sample versions)
   const [myInterests, setMyInterests] = useState<string[]>([])
   const [internList, setInternList] = useState<Intern[]>([])
-  const [ready, setReady] = useState(false)
+  const [city, setCity] = useState('')
+  const [status, setStatus] = useState<'loading' | 'ready' | 'needsOffice' | 'error'>('loading')
+  // only draw the map once the real data is in
+  const ready = status !== 'loading'
 
   const flash = (text: string, tone: 'ok' | 'err' = 'ok') => {
     setToast({ tone, text })
@@ -302,64 +288,40 @@ export default function MatchesPage() {
   useEffect(() => {
     let cancelled = false
     supabase.auth.getUser().then(async ({ data }) => {
-      let localInterests: string[] = []
+      const meta = data.user?.user_metadata
+      const email = data.user?.email ?? ''
+      setFirstName(meta?.first_name ?? email.split('@')[0] ?? '')
+
+      // remember who the user has already connected with or asked
+      if (data.user) {
+        const me = data.user.id
+        setUserId(me)
+        const { data: rows } = await supabase
+          .from('connections')
+          .select('requester_id, addressee_id, status')
+          .or(`requester_id.eq.${me},addressee_id.eq.${me}`)
+        const asked = new Set<string>()
+        const linked = new Set<string>()
+        ;(rows ?? []).forEach((r) => {
+          const other = r.requester_id === me ? r.addressee_id : r.requester_id
+          if (r.status === 'accepted') linked.add(other)
+          else asked.add(other)
+        })
+        setRequested(asked)
+        setConnectedIds(linked)
+      }
+
+      // everything comes from users_table (interests, office) through /api/intern-matches
       try {
-        const meta = data.user?.user_metadata
-        const email = data.user?.email ?? ''
-        setFirstName(meta?.first_name ?? email.split('@')[0] ?? '')
-
-        // remember who the user has already connected with or asked
-        if (data.user) {
-          const me = data.user.id
-          setUserId(me)
-          const { data: rows } = await supabase
-            .from('connections')
-            .select('requester_id, addressee_id, status')
-            .or(`requester_id.eq.${me},addressee_id.eq.${me}`)
-          const asked = new Set<string>()
-          const linked = new Set<string>()
-          ;(rows ?? []).forEach((r) => {
-            const other = r.requester_id === me ? r.addressee_id : r.requester_id
-            if (r.status === 'accepted') linked.add(other)
-            else asked.add(other)
-          })
-          setRequested(asked)
-          setConnectedIds(linked)
-        }
-
-        try {
-          const raw = localStorage.getItem('subtle-quiz-v1')
-          if (raw) {
-            const parsed = JSON.parse(raw)
-            if (Array.isArray(parsed.interests) && parsed.interests.length > 0) {
-              localInterests = parsed.interests
-            }
-          }
-        } catch {}
-
-        const params = new URLSearchParams()
-        if (email) params.set('email', email)
-        if (data.user?.id) params.set('uid', data.user.id) // lets the API leave you out of your own results
-        if (localInterests.length > 0) params.set('interests', localInterests.join(','))
-        const res = await fetch(`/api/intern-matches?${params.toString()}`)
-        if (res.ok) {
-          const json = await res.json()
-          if (Array.isArray(json.myInterests) && json.myInterests.length > 0) {
-            setMyInterests(json.myInterests)
-          }
-          if (Array.isArray(json.interns) && json.interns.length > 0) {
-            setInternList(json.interns)
-          }
-        }
+        const res = await authFetch('/api/intern-matches', { cache: 'no-store' })
+        if (!res.ok) return setStatus('error')
+        const json = await res.json()
+        setMyInterests(Array.isArray(json.myInterests) ? json.myInterests : [])
+        setInternList(Array.isArray(json.interns) ? json.interns : [])
+        setCity(json.city ?? '')
+        setStatus(json.needsOffice ? 'needsOffice' : 'ready')
       } catch {
-        // fall through to the sample data below
-      } finally {
-        if (!cancelled) {
-          // nothing came back from the API: use the saved interests and sample interns
-          setInternList((cur) => (cur.length ? cur : INTERNS))
-          setMyInterests((cur) => (cur.length ? cur : localInterests.length ? localInterests : MY_INTERESTS))
-          setReady(true)
-        }
+        setStatus('error')
       }
     })
     return () => {
@@ -412,8 +374,8 @@ export default function MatchesPage() {
   // meetup ideas for the interests you share with your matches
   const meetups = useMemo(
     () =>
-      myInterests.filter((x) => MEETUP_IDEAS[x])
-        .map((interest) => ({ interest, idea: MEETUP_IDEAS[interest], people: matches.filter((m) => m.shared.some((s) => s.toLowerCase() === interest.toLowerCase())) }))
+      myInterests.filter((x) => ideaFor(x))
+        .map((interest) => ({ interest, idea: ideaFor(interest) as string, people: matches.filter((m) => m.shared.some((s) => s.toLowerCase() === interest.toLowerCase())) }))
         .filter((m) => m.people.length > 0)
         .sort((a, b) => b.people.length - a.people.length)
         .slice(0, 4),
@@ -488,7 +450,9 @@ export default function MatchesPage() {
           <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
             <div>
               <h1 className={`${serif} text-[44px] font-medium leading-[1.02] tracking-[-0.02em] md:text-[56px]`}>Intern Matches</h1>
-              <p className="mt-2 text-[15px] text-[#4A5A75]">Interns living in Los Angeles this summer with shared interests.</p>
+              <p className="mt-2 text-[15px] text-[#4A5A75]">
+                {city ? `Interns working within ${NEARBY_MILES} miles of you in ${city} with shared interests.` : 'Interns working near you with shared interests.'}
+              </p>
             </div>
 
             <div className="max-w-[460px]">
@@ -503,6 +467,32 @@ export default function MatchesPage() {
             </div>
           </header>
 
+          {status !== 'ready' || interns.length === 0 ? (
+            <div className="mt-6 rounded-[28px] border border-dashed border-[#C9DBEA] bg-white/60 p-8 text-center">
+              <p className={`${serif} text-3xl`}>
+                {status === 'needsOffice'
+                  ? 'Add your work address to meet interns near you.'
+                  : status === 'error'
+                    ? "Couldn't load intern matches."
+                    : city
+                      ? `No interns near ${city} share your interests yet.`
+                      : 'No interns near you share your interests yet.'}
+              </p>
+              <p className="mx-auto mt-2 max-w-md text-[15px] text-[#4A5A75]">
+                {status === 'error'
+                  ? 'Refresh the page to try again.'
+                  : `We match you with interns whose office is within ${NEARBY_MILES} miles of yours and who picked at least one of the same interests.`}
+              </p>
+              {status !== 'error' && (
+                <Link href="/questionnaire" className={`mt-5 inline-flex px-6 py-3 ${btnDark}`}>
+                  {status === 'needsOffice' ? 'Add my work address' : 'Edit my interests'}
+                </Link>
+              )}
+            </div>
+          ) : null}
+
+{interns.length > 0 && (
+          <>
           {/* filters */}
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <div className="flex gap-2">
@@ -514,7 +504,7 @@ export default function MatchesPage() {
               </button>
             </div>
             <span className="text-xs text-[#4A5A75]">
-              {topMatches.length} of {matches.length} matches on the map · sample interns
+              {`${topMatches.length} of ${matches.length} matches on the map`}
             </span>
           </div>
 
@@ -605,7 +595,7 @@ export default function MatchesPage() {
                   </span>
                   Weaker
                 </span>
-                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#9CB5CE]" />Also in LA</span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-full bg-[#9CB5CE]" />{city ? `Also near ${city.split(',')[0]}` : 'Also nearby'}</span>
               </div>
               <div className="absolute right-3.5 top-3.5 z-10 rounded-full border border-white bg-white/85 px-3.5 py-1.5 text-[11px] font-semibold shadow-sm backdrop-blur">Hover a dot to see who they are</div>
             </div>
@@ -671,7 +661,7 @@ export default function MatchesPage() {
           {/* popular interests + meetup ideas */}
           <div className="mt-5 grid gap-5 lg:grid-cols-2">
             <div className={card}>
-              <h2 className={`${serif} text-2xl font-medium`}>Popular in Los Angeles</h2>
+              <h2 className={`${serif} text-2xl font-medium`}>{city ? `Popular near ${city.split(',')[0]}` : 'Popular nearby'}</h2>
               <p className="mb-5 mt-1 text-sm text-[#4A5A75]">What interns in the city are into. Shared ones are in navy.</p>
               <div className="grid gap-3.5">
                 {popular.map(([interest, count]) => {
@@ -693,7 +683,7 @@ export default function MatchesPage() {
 
             <div className={card}>
               <h2 className={`${serif} text-2xl font-medium`}>Ways to Meet Up</h2>
-              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">Ideas based on shared interests. Sample ideas.</p>
+              <p className="mb-5 mt-1 text-sm text-[#4A5A75]">Ideas based on shared interests.</p>
               <div className="grid gap-3">
                 {meetups.map((m) => (
                   // fixed first column so every idea title starts at the same x position
@@ -711,6 +701,8 @@ export default function MatchesPage() {
               </div>
             </div>
           </div>
+          </>
+          )}
         </div>
 
         <p className="mt-6 text-center text-xs text-[#4A5A75]">© 2026 Subtle Technologies, Inc. All rights reserved.</p>

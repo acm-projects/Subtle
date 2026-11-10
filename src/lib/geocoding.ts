@@ -18,26 +18,40 @@ export type CommuteMode = 'walk' | 'transit' | 'bike' | 'drive'
 // In-memory cache to prevent repeated calls to Nominatim
 const GEO_CACHE = new Map<string, Coordinates | null>()
 
-// Known coordinates for default sample neighborhoods / addresses
-const KNOWN_PLACES: Record<string, Coordinates> = {
-  soma: { lat: 37.7785, lon: -122.3998, displayName: 'SoMa, San Francisco, CA' },
-  'hayes valley': { lat: 37.7758, lon: -122.4243, displayName: 'Hayes Valley, San Francisco, CA' },
-  mission: { lat: 37.7599, lon: -122.4148, displayName: 'Mission District, San Francisco, CA' },
-  'nob hill': { lat: 37.7932, lon: -122.4145, displayName: 'Nob Hill, San Francisco, CA' },
-  'potrero hill': { lat: 37.7573, lon: -122.3995, displayName: 'Potrero Hill, San Francisco, CA' },
-  '500 howard st': { lat: 37.7885, lon: -122.3967, displayName: '500 Howard St, San Francisco, CA' },
-  'one apple park way': { lat: 37.3350, lon: -122.0131, displayName: 'One Apple Park Way, Cupertino, CA' },
-  '1600 amphitheatre pkwy': { lat: 37.4220, lon: -122.0841, displayName: 'Googleplex, Mountain View, CA' },
-  '2801 rutford ave': { lat: 32.9902, lon: -96.7513, displayName: '2801 Rutford Ave, Richardson, TX' },
-  '800 w campbell rd': { lat: 32.9857, lon: -96.7501, displayName: 'UT Dallas, Richardson, TX' },
-  '123 sunset blvd': { lat: 34.0417, lon: -118.5540, displayName: 'Sunset Blvd, Los Angeles, CA' },
-}
+// Shortcuts for addresses we already know. Format: 'lowercase name': { lat, lon }.
+const KNOWN_PLACES: Record<string, Coordinates> = {}
 
 /**
  * Geocodes an address string using Nominatim OpenStreetMap API.
  * Includes local known place resolution and caching.
  */
 export async function geocodeAddress(address: string): Promise<Coordinates | null> {
+  // Nominatim often can't find an address with a unit number ("Unit 205", "Apt 3B") or a typo in
+  // the street, so try the full address, then without the unit, then just "City, ST 12345".
+  const full = (address || '').trim()
+  if (!full) return null
+  const candidates = [full]
+  const noUnit = full
+    .replace(/[,\s]*\b(unit|apt|apartment|suite|ste|room|rm|fl|floor)\b\.?\s*#?\s*[\w-]+/gi, '')
+    .replace(/[,\s]*#\s*[\w-]+/g, '')
+    .replace(/\s+,/g, ',')
+    .trim()
+  if (noUnit && noUnit !== full) candidates.push(noUnit)
+  const parts = full.split(',').map((s) => s.trim()).filter(Boolean)
+  // "1600 Amphitheatre Parkway in Mountain View, California" -> "..., Mountain View, California"
+  if (/\s+in\s+/i.test(full)) candidates.push(full.replace(/\s+in\s+/gi, ', '))
+  if (parts.length >= 3) candidates.push(parts.slice(-2).join(', '))
+  // last resort: just the city and state
+  const cityState = full.split(/,|\s+in\s+/i).map((s) => s.trim()).filter(Boolean).slice(-2).join(', ')
+  if (cityState && !candidates.includes(cityState)) candidates.push(cityState)
+  for (const q of candidates) {
+    const hit = await geocodeOnce(q)
+    if (hit) return hit
+  }
+  return null
+}
+
+async function geocodeOnce(address: string): Promise<Coordinates | null> {
   const clean = (address || '').trim()
   if (!clean) return null
 
@@ -48,7 +62,9 @@ export async function geocodeAddress(address: string): Promise<Coordinates | nul
 
   // Check known shortcut / neighborhood table
   for (const [name, coords] of Object.entries(KNOWN_PLACES)) {
-    if (key.includes(name) || name.includes(key)) {
+    // exact name, or the name followed by a city ("SoMa, San Francisco"); a looser match sent
+    // places like "Mission Bend, Houston" to San Francisco's Mission District
+    if (key === name || key.startsWith(`${name},`)) {
       GEO_CACHE.set(key, coords)
       return coords
     }

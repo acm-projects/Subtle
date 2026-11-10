@@ -37,57 +37,13 @@ const time = (iso?: string | null) => {
 // Demo threads use ids like "c-soma-loft"; real conversations use Supabase UUIDs
 const isDemo = (id: string) => id.startsWith('c-')
 
-function sampleConversations(): Conversation[] {
-  return [
-    {
-      id: 'c-soma-loft',
-      listingId: 'soma-loft',
-      listingTitle: 'SoMa loft',
-      listingScore: 96,
-      hostName: 'Maya',
-      unread: true,
-      sample: true,
-      messages: [
-        { id: uid(), from: 'me', body: "Hi Maya, I'm interning at Stripe this summer and I'm interested in the SoMa loft.", sentAt: ago(60 * 26) },
-        { id: uid(), from: 'them', body: 'Hi! Thanks for reaching out. The room is open from June 1. Want to set up a video tour?', sentAt: ago(60 * 25) },
-        { id: uid(), from: 'me', body: 'That would be great. Does Thursday evening work?', sentAt: ago(60 * 3) },
-        { id: uid(), from: 'them', body: 'Thursday at 6 works. I will send a link here.', sentAt: ago(12) },
-      ],
-    },
-    {
-      id: 'c-hayes-valley-studio',
-      listingId: 'hayes-valley-studio',
-      listingTitle: 'Hayes Valley studio',
-      listingScore: 87,
-      hostName: 'Daniel',
-      sample: true,
-      messages: [
-        { id: uid(), from: 'me', body: 'Hi Daniel, is the studio still available for the summer?', sentAt: ago(60 * 50) },
-        { id: uid(), from: 'them', body: 'It is! Utilities are included. Let me know if you have questions.', sentAt: ago(60 * 48) },
-      ],
-    },
-    {
-      id: 'c-mission-apartment',
-      listingId: 'mission-apartment',
-      listingTitle: 'Mission apartment',
-      listingScore: 73,
-      hostName: 'Priya',
-      sample: true,
-      messages: [{ id: uid(), from: 'me', body: 'Hi Priya, are the other two roommates interns too?', sentAt: ago(60 * 24 * 4) }],
-    },
-  ]
-}
-
-// ---------- localStorage helpers (demo threads + read markers) ----------
-
 function readLocal(): Conversation[] {
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) return JSON.parse(raw)
+    // only real conversations (skip any marked sample)
+    if (raw) return (JSON.parse(raw) as Conversation[]).filter((c) => !c.sample)
   } catch {}
-  const seeded = sampleConversations()
-  writeLocal(seeded)
-  return seeded
+  return []
 }
 
 function writeLocal(list: Conversation[]) {

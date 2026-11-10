@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { authFetch } from '../../lib/auth-fetch'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import AppNavbar from '../AppNavbar'
@@ -56,7 +57,7 @@ export default function Questionnaire() {
 
         // Fetch saved quiz answers from Supabase users_table
         try {
-          const res = await fetch(`/api/users?email=${encodeURIComponent(mail)}`, { cache: 'no-store' })
+          const res = await authFetch('/api/users', { cache: 'no-store' })
           if (res.ok) {
             const dbUser = await res.json()
             if (dbUser && (dbUser.company_name || dbUser.office_address || dbUser.monthly_budget)) {
@@ -183,11 +184,11 @@ export default function Questionnaire() {
             company: latestAnswers.company,
             address: latestAnswers.address,
             budget: latestAnswers.budget,
-            university: latestAnswers.university.trim(), // TODO(backend): add a university column in users_table and map it in /api/users
+            university: latestAnswers.university.trim(),
             interests: allInterests(latestAnswers),
             accommodations: latestAnswers.accommodations,
             moveIn: latestAnswers.moveInDate || latestAnswers.moveIn,
-            moveOut: latestAnswers.moveOutDate, // TODO(backend): save the move-out date (users_table has no column yet)
+            moveOut: latestAnswers.moveOutDate,
             maxCommute: latestAnswers.maxCommute,
           }),
         })

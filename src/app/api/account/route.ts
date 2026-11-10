@@ -25,10 +25,23 @@ export async function DELETE(req: Request) {
     await supabase.storage.from('avatars').remove(files.map((f) => `${id}/${f.name}`))
   }
 
-  // connections are removed by the profiles foreign key (on delete cascade)
-  // TODO: also delete this user's rows in other tables here (listings, users_table, messages, bookings)
-  const { error: profileError } = await supabase.from('profiles').delete().eq('id', id)
-  if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 })
+  // everything that points at this account goes first (the tables reference auth.users)
+  const { data: listings } = await supabase.from('listing_table').select('id').eq('user_id', id)
+  for (const l of listings ?? []) {
+    const { data: photos } = await supabase.storage.from('listing-images').list(`${id}/${l.id}`)
+    if (photos?.length) await supabase.storage.from('listing-images').remove(photos.map((f) => `${id}/${l.id}/${f.name}`))
+  }
+  const steps = [
+    supabase.from('connections').delete().or(`requester_id.eq.${id},addressee_id.eq.${id}`),
+    supabase.from('messages').delete().eq('sender_id', id),
+    supabase.from('conversation_participants').delete().eq('user_id', id),
+    supabase.from('listing_table').delete().eq('user_id', id),
+    supabase.from('users_table').delete().eq('id', id),
+  ]
+  for (const step of steps) {
+    const { error } = await step
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   const { error: deleteError } = await supabase.auth.admin.deleteUser(id)
   if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })

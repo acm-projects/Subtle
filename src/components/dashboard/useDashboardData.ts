@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { authFetch } from '../../lib/auth-fetch'
 import { supabase } from '../../lib/supabase'
 import { getListing as getDbListing, getListings } from '../../lib/listings'
-import { loadMyBookings, loadSaved, type Booking } from '../matches/activity'
-import { dbListingToMatchListing, SAMPLE_LISTINGS, type Listing } from '../matches/listings'
+import { loadMyBookings, syncSaved, type Booking } from '../matches/activity'
+import { dbListingToMatchListing, type Listing } from '../matches/listings'
 import { EMPTY, type QuizAnswers } from '../quiz/options'
 import { userRowToQuizAnswers } from '../../lib/quiz-sync'
-import { fetchScoredMatches, withScore } from '../matches/useScored'
+import { fetchMatchesPayload, fetchScoredMatches, withScore } from '../matches/useScored'
 
 export type QuizStatus = 'none' | 'started' | 'done'
 
@@ -17,6 +18,7 @@ export type DashboardData = {
   quiz: QuizAnswers
   quizStatus: QuizStatus
   topMatches: Listing[]
+  nearCity: string // the city /api/matches searched around, for the "No listings near ..." message
   savedHomes: Listing[]
   bookings: Booking[]
 }
@@ -35,7 +37,7 @@ function quizStatusOf(q: QuizAnswers): QuizStatus {
   Everything the dashboard shows, in one place for backend:
   - name: Supabase user metadata, then the copy the login page saves
   - quiz: answers the questionnaire saves in this browser
-  - topMatches: real listings from Supabase plus sample listings, ranked purely by Subtle score
+  - topMatches: /api/matches listings near the user's workplace, ranked by Subtle score (real listings only)
   - savedHomes / bookings: matches/activity.ts
 */
 export function useDashboardData(): DashboardData {
@@ -45,6 +47,7 @@ export function useDashboardData(): DashboardData {
     quiz: EMPTY,
     quizStatus: 'none',
     topMatches: [],
+    nearCity: '',
     savedHomes: [],
     bookings: [],
   })
@@ -77,7 +80,7 @@ export function useDashboardData(): DashboardData {
         let rowFirst = ''
         if (email) {
           try {
-            const res = await fetch(`/api/users?email=${encodeURIComponent(email)}`, { cache: 'no-store' })
+            const res = await authFetch('/api/users', { cache: 'no-store' })
             if (res.ok) {
               const dbUser = await res.json()
               rowFirst = String(dbUser?.first_name ?? '').trim()
@@ -100,7 +103,7 @@ export function useDashboardData(): DashboardData {
         firstName = ((meta.first_name ?? meta.firstName ?? '') as string).trim()
         if (!firstName && auth.user) {
           try {
-            const { data: prof } = await supabase.from('profiles').select('first_name').eq('id', auth.user.id).single()
+            const { data: prof } = await supabase.from('users_table').select('first_name').eq('id', auth.user.id).maybeSingle()
             firstName = ((prof?.first_name ?? '') as string).trim()
           } catch {}
         }
@@ -115,30 +118,29 @@ export function useDashboardData(): DashboardData {
 
       // scores come from /api/matches so they match the Matches page (commute + safety included)
       const scored = await fetchScoredMatches()
-      const scoredById = new Map(scored.map((l) => [l.id, l]))
+      const scoredById = new Map((scored ?? []).map((l) => [l.id, l]))
 
+      // Homes near their workplace, best score first. Empty means nothing is posted near them yet
+      // (the dashboard shows that); only if /api/matches is down do we fall back to unscored listings.
       let topMatches: Listing[] = []
-      if (quizStatus === 'done' && scored.length) {
+      let nearCity = ''
+      if (quizStatus === 'done' && scored) {
         topMatches = [...scored].sort((a, b) => b.score - a.score).slice(0, 12)
+        nearCity = (await fetchMatchesPayload())?.context.city ?? ''
       } else if (quizStatus === 'done') {
         let real: Listing[] = []
         try {
           const { listings } = await getListings({ pageSize: 20 })
           real = (listings ?? []).map(dbListingToMatchListing)
         } catch {}
-        topMatches = [...real, ...SAMPLE_LISTINGS].sort((a, b) => b.score - a.score).slice(0, 12)
+        topMatches = real.slice(0, 12)
       }
 
       const savedHomes: Listing[] = []
-      for (const id of loadSaved().slice(0, 4)) {
-        const sample = SAMPLE_LISTINGS.find((l) => l.id === id)
-        if (sample) {
-          savedHomes.push(withScore(sample, scoredById.get(sample.id)))
-          continue
-        }
+      for (const id of (await syncSaved()).slice(0, 4)) {
         try {
           const db = await getDbListing(id)
-          if (db) savedHomes.push(withScore(dbListingToMatchListing(db), scoredById.get(db.id)))
+          if (db) savedHomes.push(withScore(dbListingToMatchListing(db), scoredById.get(db.id), scored !== null))
         } catch {}
       }
       let myEmail: string | null = null
@@ -149,7 +151,7 @@ export function useDashboardData(): DashboardData {
       } catch {}
       const bookings = await loadMyBookings(myEmail)
 
-      if (alive) setData({ loading: false, firstName, quiz, quizStatus, topMatches, savedHomes, bookings })
+      if (alive) setData({ loading: false, firstName, quiz, quizStatus, topMatches, nearCity, savedHomes, bookings })
     }
     load()
     // refresh when you come back to the tab (and every 20s), so new requests and host replies show up

@@ -1,10 +1,15 @@
-// Saved homes and booking requests, kept in this browser for now.
-// Backend: swap the bodies of these functions for Supabase calls; the pages only use these.
+// Saved homes and booking requests.
+// Saved homes: public.saved_homes in Supabase, with a copy in this browser so pages can read it instantly.
+// Booking requests: public.bookings through /api/bookings.
 
 import type { Listing } from './listings'
+import { supabase } from '../../lib/supabase'
+import { authFetch } from '../../lib/auth-fetch'
 
 const SAVED_KEY = 'subtle-saved-v1'
 const BOOKINGS_KEY = 'subtle-bookings-v1'
+// listing ids that aren't real listings; ignored if they show up in this browser's saved data
+const OLD_SAMPLE_IDS = new Set(['soma-loft', 'hayes-valley-studio', 'mission-apartment', 'nob-hill-room', 'potrero-house'])
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -23,16 +28,51 @@ function write(key: string, value: unknown) {
 
 // ---- saved homes ----
 
-// TODO(backend): load the ids of homes this user saved
+// The ids of homes this user saved, from this browser's copy (instant). Call syncSaved() to refresh it.
 export function loadSaved(): string[] {
-  return read<string[]>(SAVED_KEY, [])
+  return read<string[]>(SAVED_KEY, []).filter((id) => !OLD_SAMPLE_IDS.has(id))
 }
 
-// TODO(backend): save or unsave this listing for the user
+// Pull the signed-in user's saved homes from Supabase into this browser's copy. Returns the ids.
+// Hearts saved in this browser before saved homes moved to Supabase are uploaded once.
+export async function syncSaved(): Promise<string[]> {
+  const local = loadSaved()
+  try {
+    const { data: auth } = await supabase.auth.getUser()
+    if (!auth.user) return local
+    const { data, error } = await supabase.from('saved_homes').select('listing_id').order('created_at', { ascending: false })
+    if (error) return local
+    const remote = (data ?? []).map((r) => r.listing_id as string)
+    const missing = local.filter((id) => !remote.includes(id))
+    if (missing.length) {
+      // only real listings can be saved (the database rejects ids that aren't listings)
+      await Promise.all(missing.map((listing_id) => supabase.from('saved_homes').insert({ listing_id })))
+      const { data: again } = await supabase.from('saved_homes').select('listing_id').order('created_at', { ascending: false })
+      const ids = (again ?? []).map((r) => r.listing_id as string)
+      write(SAVED_KEY, ids)
+      return ids
+    }
+    write(SAVED_KEY, remote)
+    return remote
+  } catch {
+    return local
+  }
+}
+
+// Save or unsave a home: updates this browser's copy right away and Supabase in the background.
 export function toggleSavedId(id: string): string[] {
   const now = loadSaved()
-  const next = now.includes(id) ? now.filter((x) => x !== id) : [id, ...now]
+  const saving = !now.includes(id)
+  const next = saving ? [id, ...now] : now.filter((x) => x !== id)
   write(SAVED_KEY, next)
+  void (async () => {
+    try {
+      const { data: auth } = await supabase.auth.getUser()
+      if (!auth.user) return
+      if (saving) await supabase.from('saved_homes').upsert({ listing_id: id }, { onConflict: 'user_id,listing_id' })
+      else await supabase.from('saved_homes').delete().eq('listing_id', id)
+    } catch {}
+  })()
   return next
 }
 
@@ -59,7 +99,7 @@ export const BOOKING_STEPS: { id: BookingStatus; label: string }[] = [
 
 // TODO(backend): load this user's booking requests with their current status
 export function loadBookings(): Booking[] {
-  return read<Booking[]>(BOOKINGS_KEY, [])
+  return read<Booking[]>(BOOKINGS_KEY, []).filter((b) => !OLD_SAMPLE_IDS.has(b.listingId))
 }
 
 // TODO(backend): create the booking request
@@ -84,9 +124,11 @@ export async function loadMyBookings(email: string | null): Promise<Booking[]> {
   const local = loadBookings()
   if (!email) return local
   let server: Booking[] = []
+  let reached = false
   try {
-    const res = await fetch(`/api/bookings?email=${encodeURIComponent(email)}`, { cache: 'no-store' })
+    const res = await authFetch('/api/bookings', { cache: 'no-store' })
     if (res.ok) {
+      reached = true
       const json = await res.json()
       server = (Array.isArray(json.bookings) ? json.bookings : []).map(
         (b: { id: string; listingId: string; listingTitle: string; hostName: string; moveIn: string; moveOut: string; monthlyRent: number; status: string; createdAt: string }) => ({
@@ -103,6 +145,8 @@ export async function loadMyBookings(email: string | null): Promise<Booking[]> {
       )
     }
   } catch {}
-  const seen = new Set(server.map((b) => b.listingId))
-  return [...server, ...local.filter((b) => !seen.has(b.listingId))].sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
+  server = server.filter((b) => !OLD_SAMPLE_IDS.has(b.listingId))
+  // requests live in Supabase now; this browser's old copies are only shown if the server can't be reached
+  if (reached) return server.sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
+  return local
 }

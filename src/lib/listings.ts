@@ -14,7 +14,8 @@ export type Listing = {
   address: string | null
   neighborhood: string | null
   city: string | null
-  start_date: string | null // 'YYYY-MM-DD'
+  start_date?: string | null // older name; the column is move_in
+  move_in: string | null // 'YYYY-MM-DD' (listing_table column)
   end_date: string | null   // 'YYYY-MM-DD'
   beds: number
   baths: number | null
@@ -251,7 +252,7 @@ export async function getListings(filters: ListingFilters = {}): Promise<Listing
   if (filters.buildingType) query = query.eq('building_type', filters.buildingType)
   if (filters.minRent != null) query = query.gte('monthly_rent', filters.minRent)
   if (filters.maxRent != null) query = query.lte('monthly_rent', filters.maxRent)
-  if (filters.moveIn) query = query.lte('start_date', filters.moveIn)
+  if (filters.moveIn) query = query.lte('move_in', filters.moveIn)
   if (filters.moveOut) query = query.gte('end_date', filters.moveOut)
   if (filters.minBeds != null) query = query.gte('beds', filters.minBeds)
   if (filters.minBaths != null) query = query.gte('baths', filters.minBaths)
@@ -266,7 +267,7 @@ export async function getListings(filters: ListingFilters = {}): Promise<Listing
       query = query.order('monthly_rent', { ascending: false, nullsFirst: false })
       break
     case 'soonest':
-      query = query.order('start_date', { ascending: true, nullsFirst: false })
+      query = query.order('move_in', { ascending: true, nullsFirst: false })
       break
     default:
       query = query.order('created_at', { ascending: false })

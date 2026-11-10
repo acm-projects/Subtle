@@ -1,48 +1,71 @@
 import { NextResponse } from 'next/server'
-import { dbListingToMatchListing, type Listing as MatchListing, type MatchContext, SAMPLE_CONTEXT, SAMPLE_LISTINGS } from '../../../components/matches/listings'
+import { dbListingToMatchListing, type Listing as MatchListing, type MatchContext, NEARBY_MILES } from '../../../components/matches/listings'
 import { type CommuteMode, estimateCommuteMinutes, geocodeAddress, haversineDistanceKm, pickOptimalCommuteMode } from '../../../lib/geocoding'
 import { googleCommuteMinutes, hasGoogleMapsKey } from '../../../lib/google-maps'
 import { safetyFit, safetyForMany, safetyReason, type SafetyInfo } from '../../../lib/safety'
 import { getListings } from '../../../lib/listings'
 import { runPythonVectorMatcher } from '../../../lib/python-matcher'
-import { supabase } from '../../../lib/supabase'
+import { admin, callerFrom } from '../../../lib/supabase-admin'
 import { computeSubtleScore } from '../../../lib/vector-matching'
 
 /**
  * GET /api/matches
  * Query params:
- *   - email: optional student_email to personalize scores using their public.users_table profile
+ *   (personalized for the signed-in caller: send their login token, see lib/auth-fetch.ts)
  *   - sort: 'score' | 'price' | 'commute' (default 'score')
- *   - includeSamples: 'true' | 'false' (default 'true')
  */
+// NEARBY_MILES (listings.ts) in km
+const NEARBY_KM = NEARBY_MILES * 1.609
+// longest one-way commute we'll show
+const MAX_COMMUTE_MIN = 90
+
+/**
+ * "Houston, TX" from an office address like "315 Capitol St Unit 205, Houston, TX 77002".
+ * The office address wins over users_table.user_city, which the quiz doesn't update.
+ */
+function cityLabel(userCity?: string | null, office?: string | null): string {
+  const parts = (office ?? '').split(/,|\s+in\s+/i).map((s) => s.trim()).filter(Boolean)
+  if (parts.length >= 2) {
+    const last = parts[parts.length - 1]
+    const state = last.match(/^([A-Za-z]{2})(?:\s+\d{5}(?:-\d{4})?)?$/)
+    if (state) return `${parts[parts.length - 2]}, ${state[1].toUpperCase()}`
+    return parts.slice(-2).join(', ').replace(/\s*\d{5}(-\d{4})?$/, '')
+  }
+  return userCity?.trim() ?? ''
+}
+
+/** 'YYYY-MM-DD' (or anything starting with it) -> Date at UTC midnight; null for 'Flexible' / empty / junk */
+function parseDay(v: unknown): Date | null {
+  const m = typeof v === 'string' ? v.match(/^(\d{4})-(\d{2})-(\d{2})/) : null
+  return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null
+}
+const addDays = (d: Date, n: number) => new Date(d.getTime() + n * 86_400_000)
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const email = searchParams.get('email')
   const sort = searchParams.get('sort') ?? 'score'
-  const includeSamples = searchParams.get('includeSamples') !== 'false'
 
+  // the signed-in caller (login token); nobody can ask for someone else's matches
+  const me = await callerFrom(request)
   let userProfile: Record<string, any> | null = null
-  if (email) {
-    const { data: rows } = await supabase
-      .from('users_table')
-      .select('*')
-      .eq('student_email', email)
-    if (rows && rows.length > 0) {
-      userProfile = rows[rows.length - 1]
-    }
+  if (me) {
+    const { data } = await admin().from('users_table').select('*').eq('id', me.id).maybeSingle()
+    userProfile = data ?? null
   }
 
-  const officeAddress = userProfile?.office_address || SAMPLE_CONTEXT.office
+  // whatever company and office address the user typed in the quiz / preferences (free text)
+  const officeAddress: string = (userProfile?.office_address ?? '').trim()
+
   const preferredMode = userProfile?.user_transportation || 'Public Transit'
 
   const context: MatchContext = {
-    company: userProfile?.company_name || SAMPLE_CONTEXT.company,
+    company: (userProfile?.company_name ?? '').trim(),
     office: officeAddress,
-    city: userProfile?.user_city || (officeAddress ? officeAddress.split(',').slice(-2).join(', ').trim() : SAMPLE_CONTEXT.city),
+    city: cityLabel(userProfile?.user_city, officeAddress),
   }
 
   // 1. Geocode the user's workplace address with Nominatim
-  const workplaceCoords = await geocodeAddress(officeAddress)
+  const workplaceCoords = officeAddress ? await geocodeAddress(officeAddress) : null
 
   let dbMatched: MatchListing[] = []
   try {
@@ -54,19 +77,28 @@ export async function GET(request: Request) {
     console.error('Error loading DB listings in /api/matches:', err)
   }
 
-  const rawCombined = includeSamples ? [...dbMatched, ...SAMPLE_LISTINGS] : dbMatched
+  const rawCombined = dbMatched
 
   // 2. Geocode listings and compute approximate commute duration based on real coordinates
-  const combined: MatchListing[] = await Promise.all(
+  const located: { listing: MatchListing; distKm: number | null }[] = await Promise.all(
     rawCombined.map(async (l) => {
       // If we don't have workplace coords, preserve listing defaults
-      if (!workplaceCoords) return l
+      if (!workplaceCoords) return { listing: l, distKm: null }
 
-      // Determine listing coordinates: check explicit lat/lon, or geocode address/neighborhood
+      // Listing coordinates: explicit lat/lon, else its address, else its neighborhood + its own city.
+      // Never the user's city: a listing with no location of its own would look "nearby" everywhere.
       let listingCoords = l.latitude && l.longitude ? { lat: l.latitude, lon: l.longitude } : null
       if (!listingCoords) {
-        const query = l.address || `${l.neighborhood}, ${context.city}`
-        listingCoords = await geocodeAddress(query)
+        const address = l.address?.trim()
+        const city = l.city?.trim()
+        const query = address
+          ? city && !address.toLowerCase().includes(city.toLowerCase())
+            ? `${address}, ${city}`
+            : address
+          : city
+          ? `${l.neighborhood}, ${city}`
+          : ''
+        listingCoords = query ? await geocodeAddress(query) : null
       }
 
       if (listingCoords) {
@@ -75,18 +107,52 @@ export async function GET(request: Request) {
         const commuteMinutes = estimateCommuteMinutes(distKm, optimalMode)
 
         return {
-          ...l,
-          commuteMinutes,
-          commuteMode: optimalMode,
-          commuteSource: 'estimate' as const,
-          latitude: listingCoords.lat,
-          longitude: listingCoords.lon,
+          listing: {
+            ...l,
+            commuteMinutes,
+            commuteMode: optimalMode,
+            commuteSource: 'estimate' as const,
+            latitude: listingCoords.lat,
+            longitude: listingCoords.lon,
+          },
+          distKm,
         }
       }
 
-      return l
+      return { listing: l, distKm: null }
     }),
   )
+
+  // 2a. Only homes within NEARBY_KM of the workplace. A listing we couldn't place on the map is left out,
+  //     since we can't tell if it's near. If the workplace itself couldn't be found, nothing is filtered.
+  const nearbyOnes = workplaceCoords
+    ? located.filter((x) => x.distKm != null && x.distKm <= NEARBY_KM).map((x) => x.listing)
+    : located.map((x) => x.listing)
+
+  // 2a'. Dates: drop homes that aren't free around the user's move-in day. A home counts if it opens no
+  //      more than 3 weeks after they arrive and is still free 4 weeks after. Homes or users with no
+  //      dates ("Flexible") are kept.
+  const moveIn = parseDay(userProfile?.move_in_date)
+  const fitsDates = (l: MatchListing) => {
+    if (!moveIn) return true
+    const from = parseDay(l.startDate)
+    const to = parseDay(l.endDate)
+    if (from && from > addDays(moveIn, 21)) return false
+    if (to && to < addDays(moveIn, 28)) return false
+    return true
+  }
+  const combined: MatchListing[] = nearbyOnes.filter(fitsDates)
+  const wrongDates = nearbyOnes.length - combined.length
+  let filteredOut = rawCombined.length - combined.length
+
+  // 2a''. If nothing is nearby, the closest few within 3x the radius (with the right dates), so the page isn't a dead end
+  const nearest: MatchListing[] = workplaceCoords
+    ? located
+        .filter((x) => x.distKm != null && x.distKm > NEARBY_KM && x.distKm <= NEARBY_KM * 3 && fitsDates(x.listing))
+        .sort((a, b) => (a.distKm as number) - (b.distKm as number))
+        .slice(0, 3)
+        .map((x) => ({ ...x.listing, nearWork: false, distanceMiles: Math.round((x.distKm as number) / 1.609) }))
+    : []
 
   // 2b. Replace the estimate with real Google Maps travel times wherever Google has a route.
   //     Listings are grouped by travel mode so each mode is one request (in batches).
@@ -112,6 +178,13 @@ export async function GET(request: Request) {
       })
     }
   }
+
+  // 2c. Drop homes Google says are more than MAX_COMMUTE_MIN away by the user's travel mode
+  //     (inside the radius but across a bay or with no good transit, e.g. Mountain View to SF).
+  const reachable = combined.filter((l) => !(l.commuteSource === 'google' && l.commuteMinutes > MAX_COMMUTE_MIN))
+  filteredOut += combined.length - reachable.length
+  googleCount -= combined.filter((l) => l.commuteSource === 'google' && l.commuteMinutes > MAX_COMMUTE_MIN).length
+  combined.splice(0, combined.length, ...reachable)
 
   // 3. Primary: Run Python Machine Learning & Vector Matching Engine (ml/vector_matcher.py)
   let scored: MatchListing[] = []
@@ -166,11 +239,17 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     context,
-    userProfile,
     engine,
     geocodedWorkplace: workplaceCoords,
     // how many commute times came from Google Maps vs. the distance estimate
     commuteSources: { google: googleCount, estimate: combined.length - googleCount },
+    // homes within NEARBY_MILES of the workplace, and how many were left out for being too far or unplaceable
+    nearby: combined.length,
+    filteredOut,
+    wrongDates, // nearby homes left out because they aren't free around the user's move-in day
+    moveIn: moveIn ? moveIn.toISOString().slice(0, 10) : null,
+    nearest: combined.length === 0 ? nearest : [],
+    radiusKm: workplaceCoords ? NEARBY_KM : null,
     safetyCoverage: { withData: safetyById.size, without: combined.length - safetyById.size },
     total: scored.length,
     matches: scored,
