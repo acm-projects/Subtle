@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
 import { admin, callerFrom } from '../../../lib/supabase-admin'
-import { connectedIds, inviteToGroup, namesFor } from '../../../lib/groups'
+import { connectedIds, ensureCompanyInvite, inviteToGroup, namesFor } from '../../../lib/groups'
 
 // GET: people I can add to a group (my accepted connections) and group invites waiting for my yes / no
 export async function GET(request: Request) {
   const caller = await callerFrom(request)
   if (!caller) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+
+  // ask about their company's group chat if they haven't been asked yet
+  await ensureCompanyInvite(caller.id).catch((err) => console.warn('[Groups] company invite:', err))
 
   const friends = [...(await connectedIds(caller.id))]
   const { data: pending } = await admin()
@@ -28,7 +31,9 @@ export async function GET(request: Request) {
       id: p.id,
       conversationId: p.conversation_id,
       title: (convos ?? []).find((c) => c.id === p.conversation_id)?.title ?? 'Group chat',
-      invitedBy: names.get(p.invited_by) ?? 'Someone',
+      // invited by themselves = the automatic company group, sent by Subtle
+      company: p.invited_by === caller.id,
+      invitedBy: p.invited_by === caller.id ? 'Subtle' : names.get(p.invited_by) ?? 'Someone',
       members: (members ?? []).filter((m) => m.conversation_id === p.conversation_id).map((m) => names.get(m.user_id) ?? 'Subtle intern'),
       createdAt: p.created_at,
     })),

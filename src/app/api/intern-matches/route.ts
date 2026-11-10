@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { admin, callerFrom } from '../../../lib/supabase-admin'
 import { geocodeAddress, haversineDistanceKm, type Coordinates } from '../../../lib/geocoding'
 import { NEARBY_MILES } from '../../../components/matches/listings'
+import { normCompany } from '../../../lib/groups'
 
 export type InternProfile = {
   id: string
@@ -30,16 +31,6 @@ const INTEREST_CLUSTERS: Record<string, string[]> = {
   social_culture: ['live music', 'music', 'concerts', 'podcasts', 'travel', 'reading', 'volunteering', 'debate', 'dance'],
 }
 
-
-/** "Google LLC", "google" and "Google, Inc." all become "google" */
-function normCompany(name: unknown): string {
-  return String(name ?? '')
-    .toLowerCase()
-    .replace(/[.,]/g, ' ')
-    .replace(/\b(inc|llc|ltd|corp|corporation|co|company)\b/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
 
 function schoolFromEmail(email: string): string {
   const domain = email.split('@')[1]?.toLowerCase() ?? ''

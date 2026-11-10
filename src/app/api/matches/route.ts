@@ -84,9 +84,6 @@ export async function GET(request: Request) {
   // 2. Geocode listings and compute approximate commute duration based on real coordinates
   const located: { listing: MatchListing; distKm: number | null }[] = await Promise.all(
     rawCombined.map(async (l) => {
-      // If we don't have workplace coords, preserve listing defaults
-      if (!workplaceCoords) return { listing: l, distKm: null }
-
       // Listing coordinates: explicit lat/lon, else its address, else its neighborhood + its own city.
       // Never the user's city: a listing with no location of its own would look "nearby" everywhere.
       let listingCoords = l.latitude && l.longitude ? { lat: l.latitude, lon: l.longitude } : null
@@ -103,7 +100,12 @@ export async function GET(request: Request) {
         listingCoords = query ? await geocodeAddress(query) : null
       }
 
-      if (listingCoords) {
+      // no office yet: still place the home on the map (safety and neighborhood need it), but no commute
+      if (listingCoords && !workplaceCoords) {
+        return { listing: { ...l, latitude: listingCoords.lat, longitude: listingCoords.lon }, distKm: null }
+      }
+
+      if (listingCoords && workplaceCoords) {
         const distKm = haversineDistanceKm(listingCoords, workplaceCoords)
         const optimalMode = pickOptimalCommuteMode(distKm, preferredMode)
         const commuteMinutes = estimateCommuteMinutes(distKm, optimalMode)

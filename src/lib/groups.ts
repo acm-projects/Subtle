@@ -45,3 +45,61 @@ export async function inviteToGroup(conversationId: string, inviterId: string, u
   if (error) return { error: error.message }
   return { invited: rows.length }
 }
+
+/** "Google LLC", "google" and "Google, Inc." all become "google" */
+export function normCompany(name: unknown): string {
+  return String(name ?? '')
+    .toLowerCase()
+    .replace(/[.,]/g, ' ')
+    .replace(/\b(inc|llc|ltd|corp|corporation|co|company)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const COMPANY_PREFIX = 'Interns at '
+
+/**
+ * Company group chats: one per company, made by Subtle (created_by is empty), titled "Interns at <company>".
+ * When an intern opens Messages and someone else on Subtle works at the same company, they get one invite
+ * to that company's group. Yes adds them; no closes it and they aren't asked again.
+ * (A company invite has invited_by = the person themselves, which the app shows as "Subtle".)
+ */
+export async function ensureCompanyInvite(userId: string): Promise<void> {
+  const db = admin()
+  const { data: me } = await db.from('users_table').select('company_name').eq('id', userId).maybeSingle()
+  const companyName = String(me?.company_name ?? '').trim()
+  const key = normCompany(companyName)
+  if (!key) return
+
+  // only worth it if at least one other intern on Subtle is at the same company
+  const { data: everyone } = await db.from('users_table').select('id, company_name').neq('id', userId).not('company_name', 'is', null)
+  if (!(everyone ?? []).some((u) => normCompany(u.company_name) === key)) return
+
+  // find this company's group (oldest one wins), or make it
+  const { data: groups } = await db
+    .from('conversations')
+    .select('id, title, created_at')
+    .eq('is_group', true)
+    .is('created_by', null)
+    .like('title', `${COMPANY_PREFIX}%`)
+    .order('created_at', { ascending: true })
+  let groupId = (groups ?? []).find((g) => normCompany(String(g.title).slice(COMPANY_PREFIX.length)) === key)?.id as string | undefined
+  if (!groupId) {
+    const { data: made, error } = await db
+      .from('conversations')
+      .insert({ listing_id: null, is_group: true, title: `${COMPANY_PREFIX}${companyName}`.slice(0, 60), created_by: null })
+      .select('id')
+      .single()
+    if (error || !made) return
+    groupId = made.id as string
+  }
+
+  // already in it, or already asked (yes or no): nothing to do
+  const [{ data: member }, { data: invite }] = await Promise.all([
+    db.from('conversation_participants').select('user_id').eq('conversation_id', groupId).eq('user_id', userId).maybeSingle(),
+    db.from('conversation_invites').select('id').eq('conversation_id', groupId).eq('invited_user_id', userId).maybeSingle(),
+  ])
+  if (member || invite) return
+
+  await db.from('conversation_invites').insert({ conversation_id: groupId, invited_user_id: userId, invited_by: userId, status: 'pending' })
+}

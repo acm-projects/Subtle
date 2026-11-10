@@ -246,7 +246,15 @@ export async function startBookingConversation(
 
 // ---------- Group chats ----------
 
-export type GroupInvite = { id: string; conversationId: string; title: string; invitedBy: string; members: string[]; createdAt: string }
+export type GroupInvite = {
+  id: string
+  conversationId: string
+  title: string
+  company: boolean // the automatic "Interns at <company>" group
+  invitedBy: string
+  members: string[]
+  createdAt: string
+}
 export type Person = { id: string; name: string }
 
 async function json(res: Response) {

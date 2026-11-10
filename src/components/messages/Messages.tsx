@@ -193,12 +193,21 @@ export default function Messages() {
         <ul className="space-y-2 px-4 pb-2" aria-label="Group invites">
           {invites.map((inv) => (
             <li key={inv.id} className="animate-[popIn_.35s_cubic-bezier(.2,.8,.3,1.05)_both] rounded-[20px] border border-[#F3C9A0] bg-[#FFF7EF] p-4">
-              <p className="text-sm text-[#1E2B44]">
-                <span className="font-semibold">{inv.invitedBy}</span> wants to add you to{' '}
-                <span className="font-semibold">{inv.title}</span>
+              {inv.company ? (
+                <p className="text-sm text-[#1E2B44]">
+                  Hey! There&apos;s a group chat with all the interns from{' '}
+                  <span className="font-semibold">{inv.title.replace(/^Interns at /, '')}</span>.
+                </p>
+              ) : (
+                <p className="text-sm text-[#1E2B44]">
+                  <span className="font-semibold">{inv.invitedBy}</span> wants to add you to{' '}
+                  <span className="font-semibold">{inv.title}</span>
+                </p>
+              )}
+              <p className="mt-1 truncate text-xs text-[#4A5A75]">
+                {inv.members.length > 0 ? `In it: ${inv.members.join(', ')}` : 'You’d be the first one in.'}
               </p>
-              {inv.members.length > 0 && <p className="mt-1 truncate text-xs text-[#4A5A75]">With {inv.members.join(', ')}</p>}
-              <p className="mt-2 text-sm font-semibold text-[#1E2B44]">Join this group?</p>
+              <p className="mt-2 text-sm font-semibold text-[#1E2B44]">{inv.company ? 'Want to join?' : 'Join this group?'}</p>
               <div className="mt-2 flex gap-2">
                 <button type="button" onClick={() => respond(inv, true)} className="min-h-10 flex-1 rounded-full bg-[#1E2B44] text-sm font-semibold text-white transition hover:bg-[#2F4161]">
                   Yes
