@@ -206,12 +206,13 @@ def compute_subtle_score(listing: Dict[str, Any], user_profile: Dict[str, Any] =
         else:
             accommodation_fit -= 0.15
 
-    # 5. Composite Score (40% Vector + 30% Budget + 20% Commute + 10% Accommodations)
+    # 5. Base score from Budget 35 / Lifestyle 25 / Commute 15 (re-scaled to add to 1).
+    #    /api/matches adds safety and neighborhood and computes the final score (src/lib/subtle-score.ts).
+    #    Pets / wheelchair needs are a filter there, not a weight.
     composite = (
-        cos_sim * 0.40 +
-        min(1.0, budget_fit) * 0.30 +
-        min(1.0, commute_fit) * 0.20 +
-        min(1.0, accommodation_fit) * 0.10
+        min(1.0, budget_fit) * (35 / 75) +
+        cos_sim * (25 / 75) +
+        min(1.0, commute_fit) * (15 / 75)
     )
 
     raw_score = round(55 + composite * 44)

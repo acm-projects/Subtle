@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server'
 import { dbListingToMatchListing, type Listing as MatchListing, type MatchContext, NEARBY_MILES } from '../../../components/matches/listings'
 import { type CommuteMode, estimateCommuteMinutes, geocodeAddress, haversineDistanceKm, pickOptimalCommuteMode } from '../../../lib/geocoding'
 import { googleCommuteMinutes, hasGoogleMapsKey } from '../../../lib/google-maps'
-import { safetyFit, safetyForMany, safetyReason, type SafetyInfo } from '../../../lib/safety'
+import { safetyForMany, safetyReason, type SafetyInfo } from '../../../lib/safety'
+import { neighborhoodFit, neighborhoodForMany, neighborhoodReason, type NeighborhoodInfo } from '../../../lib/neighborhood'
+import { safetyFitFromRatio, subtleScore, type ScoreParts } from '../../../lib/subtle-score'
 import { getListings } from '../../../lib/listings'
 import { runPythonVectorMatcher } from '../../../lib/python-matcher'
 import { admin, callerFrom } from '../../../lib/supabase-admin'
@@ -223,25 +225,39 @@ export async function GET(request: Request) {
     }))
   }
 
-  // 5. Safety: nudge each score by real reported incidents near the listing (San Francisco only;
-  //    anywhere else there is no data, so the score is left as is).
+  // 5. Safety (SF only) and neighborhood access (everywhere), fetched side by side
+  const coordsList = combined.map((l) => (l.latitude != null && l.longitude != null ? { lat: l.latitude, lon: l.longitude } : null))
+  const [safetyList, nearbyList] = await Promise.all([safetyForMany(coordsList), neighborhoodForMany(coordsList)])
   const safetyById = new Map<string, SafetyInfo>()
-  const safetyList = await safetyForMany(
-    combined.map((l) => (l.latitude != null && l.longitude != null ? { lat: l.latitude, lon: l.longitude } : null)),
-  )
+  const nearbyById = new Map<string, NeighborhoodInfo>()
   combined.forEach((l, i) => {
-    const info = safetyList[i]
-    if (info) safetyById.set(l.id, info)
+    if (safetyList[i]) safetyById.set(l.id, safetyList[i] as SafetyInfo)
+    if (nearbyList[i]) nearbyById.set(l.id, nearbyList[i] as NeighborhoodInfo)
   })
+
+  // 6. Final Subtle score: Budget 35%, Lifestyle 25%, Commute 15%, Safety 15%, Neighborhood 10%
+  //    (see lib/subtle-score.ts). Parts with no real data are left out and the rest re-weighted.
+  const fitsById = new Map<string, any>(mlAnalytics.map((m) => [m.id, m]))
   scored = scored.map((l) => {
-    const info = safetyById.get(l.id)
-    if (!info) return l
-    return {
-      ...l,
-      score: Math.max(58, Math.min(99, Math.round(l.score * safetyFit(info)))),
-      safety: info,
-      whyScore: [...(l.whyScore ?? []), safetyReason(info)],
+    const fits = fitsById.get(l.id)
+    const safety = safetyById.get(l.id)
+    const nearby = nearbyById.get(l.id)
+    const parts: ScoreParts = {}
+    if (fits) {
+      parts.budget = Math.min(1, Number(fits.budgetFit))
+      parts.lifestyle = Number(fits.vectorSimilarity)
+      if (workplaceCoords) parts.commute = Math.min(1, Number(fits.commuteFit))
     }
+    if (safety) parts.safety = safetyFitFromRatio(safety.ratio)
+    if (nearby) parts.neighborhood = neighborhoodFit(nearby)
+    if (!fits) return { ...l, safety, nearby }
+    const { score, weightsUsed } = subtleScore(parts)
+    const round = (n: number) => Math.round(n * 100) / 100
+    const scoreParts = Object.fromEntries(Object.entries(parts).map(([k, v]) => [k, round(v as number)])) as ScoreParts
+    const reasons = [...(l.whyScore ?? [])]
+    if (safety) reasons.push(safetyReason(safety))
+    if (nearby) reasons.push(neighborhoodReason(nearby))
+    return { ...l, score, scoreParts, scoreWeights: weightsUsed, safety, nearby, whyScore: reasons }
   })
 
   // Real host names and the .edu "verified host" check (same as the listing page)
@@ -285,6 +301,7 @@ export async function GET(request: Request) {
     nearest: combined.length === 0 ? nearest : [],
     radiusKm: workplaceCoords ? NEARBY_KM : null,
     safetyCoverage: { withData: safetyById.size, without: combined.length - safetyById.size },
+    neighborhoodCoverage: { withData: nearbyById.size, without: combined.length - nearbyById.size },
     total: scored.length,
     matches: scored,
     mlAnalytics,

@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase'
 export type Message = {
   id: string
   from: 'me' | 'them'
+  senderName?: string // who sent it (shown in group chats)
   body: string
   sentAt: string // ISO timestamp
 }
@@ -18,6 +19,8 @@ export type Conversation = {
   listingScore?: number
   hostName: string // the other person in the conversation
   iAmHost?: boolean // true when the listing is mine, so the other person is the guest
+  isGroup?: boolean // group chat: hostName is the group's name
+  members?: { id: string; name: string }[] // everyone else in the chat
   messages: Message[]
   unread?: boolean
   sample?: boolean // true for the made-up starter conversations
@@ -96,9 +99,12 @@ export async function loadConversations(): Promise<Conversation[]> {
           const raw: any[] = msgRes.ok ? await msgRes.json() : []
           const listingData = listingRes?.ok ? await listingRes.json() : null
 
+          const members: { id: string; name: string }[] = r.members ?? []
+          const nameOf = new Map(members.map((p) => [p.id, p.name]))
           const messages: Message[] = raw.map((m) => ({
             id: m.id,
-            from: m.sender_id === r.other_user_id ? 'them' : 'me',
+            from: m.sender_id === r.my_user_id ? 'me' : 'them',
+            senderName: m.sender_id === r.my_user_id ? undefined : nameOf.get(m.sender_id) ?? 'Former member',
             body: m.body,
             sentAt: m.created_at,
           }))
@@ -106,14 +112,16 @@ export async function loadConversations(): Promise<Conversation[]> {
           // Unread = their latest message is newer than the last time this thread was opened
           const last = r.last_message
           const readAt = [r.last_read_at, markers[r.conversation_id]].filter(Boolean).sort().pop() as string | undefined
-          const unread = !!last && last.sender_id === r.other_user_id && (!readAt || last.created_at > readAt)
+          const unread = !!last && last.sender_id !== r.my_user_id && (!readAt || time(last.created_at) > time(readAt))
 
           return {
             id: r.conversation_id,
             listingId: r.listing_id ?? '',
-            listingTitle: listingData?.listing?.title ?? 'Direct message',
+            listingTitle: r.is_group ? `Group · ${members.length + 1} people` : listingData?.listing?.title ?? 'Direct message',
             iAmHost: !!myId && listingData?.listing?.user_id === myId,
-            hostName: r.other_user_name,
+            hostName: r.is_group ? r.title ?? 'Group chat' : r.other_user_name,
+            isGroup: !!r.is_group,
+            members,
             messages,
             unread,
           }
@@ -206,10 +214,12 @@ export async function loadUnreadCount(): Promise<number> {
 
   const rows: any[] = await res.json()
   const markers = readReadMarkers()
+  // group invites waiting for a yes / no count as new too
+  const invites = await loadGroupStuff().then((g) => g.invites.length).catch(() => 0)
 
-  return rows.filter((r) => {
+  return invites + rows.filter((r) => {
     const last = r.last_message
-    if (!last || last.sender_id !== r.other_user_id) return false
+    if (!last || last.sender_id === r.my_user_id) return false
     const readAt = Math.max(time(r.last_read_at), time(markers[r.conversation_id]))
     return time(last.created_at) > readAt
   }).length
@@ -231,6 +241,42 @@ export async function startBookingConversation(
   if (note) lines.push(`Note from me: ${note.slice(0, 1500)}`)
 
   return startConversation(listing, lines.join('\n\n').slice(0, 2000))
+}
+
+
+// ---------- Group chats ----------
+
+export type GroupInvite = { id: string; conversationId: string; title: string; invitedBy: string; members: string[]; createdAt: string }
+export type Person = { id: string; name: string }
+
+async function json(res: Response) {
+  const data = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(data?.error ?? 'Something went wrong')
+  return data
+}
+
+// My accepted connections (who I can add to a group) and the group invites waiting for my answer
+export async function loadGroupStuff(): Promise<{ connections: Person[]; invites: GroupInvite[] }> {
+  const res = await apiFetch('/api/groups', { cache: 'no-store' })
+  if (!res.ok) return { connections: [], invites: [] }
+  return res.json()
+}
+
+// Start a group: I'm in right away, the others get a yes / no invite in Messages
+export async function createGroup(title: string, userIds: string[]): Promise<string> {
+  const data = await json(await apiFetch('/api/groups', { method: 'POST', body: JSON.stringify({ title, userIds }) }))
+  return data.id as string
+}
+
+export async function inviteToGroup(conversationId: string, userIds: string[]): Promise<number> {
+  const data = await json(await apiFetch(`/api/groups/${conversationId}/invite`, { method: 'POST', body: JSON.stringify({ userIds }) }))
+  return data.invited as number
+}
+
+// Yes joins the chat (returns its id); no just closes the invite
+export async function answerInvite(inviteId: string, accept: boolean): Promise<string | null> {
+  const data = await json(await apiFetch(`/api/groups/invites/${inviteId}`, { method: 'POST', body: JSON.stringify({ accept }) }))
+  return data.conversationId ?? null
 }
 
 
