@@ -253,12 +253,13 @@ export function computeSubtleScore(
   }
 
   // 5. Blended Neural/Feature Scoring Formula (Scale: 0 - 99%)
-  // Weights: 40% Vector Cosine Similarity + 30% Budget + 20% Commute + 10% Accommodations
+  // Base score from Budget 35 / Lifestyle 25 / Commute 15 (re-scaled to add to 1). /api/matches adds
+  // safety and neighborhood and computes the final score with lib/subtle-score.ts.
+  void accommodationFit // pets / wheelchair needs are a filter in /api/matches, not a weight
   const weightedComposite =
-    vectorSimilarity * 0.40 +
-    Math.min(1.0, budgetFit) * 0.30 +
-    Math.min(1.0, commuteFit) * 0.20 +
-    Math.min(1.0, accommodationFit) * 0.10
+    Math.min(1.0, budgetFit) * (35 / 75) +
+    vectorSimilarity * (25 / 75) +
+    Math.min(1.0, commuteFit) * (15 / 75)
 
   // Map into realistic 60% - 99% Subtle match score range
   const rawScore = Math.round(55 + weightedComposite * 44)

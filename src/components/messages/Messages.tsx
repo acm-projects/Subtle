@@ -5,7 +5,21 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { ScoreBadge } from '../matches/parts'
-import { dayLabel, initials, loadConversations, markRead, sendMessage, shortTime, type Conversation } from './store'
+import {
+  answerInvite,
+  createGroup,
+  dayLabel,
+  initials,
+  inviteToGroup,
+  loadConversations,
+  loadGroupStuff,
+  markRead,
+  sendMessage,
+  shortTime,
+  type Conversation,
+  type GroupInvite,
+  type Person,
+} from './store'
 
 const AVATAR = [
   'bg-[#C9DBEA] text-[#1E2B44]',
@@ -39,9 +53,24 @@ export default function Messages() {
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => {
+  // group chats: who I can add, invites waiting for my yes / no, and the "new group" / "add people" form
+  const [connections, setConnections] = useState<Person[]>([])
+  const [invites, setInvites] = useState<GroupInvite[]>([])
+  const [groupForm, setGroupForm] = useState<null | 'new' | 'add'>(null)
+  const [groupName, setGroupName] = useState('')
+  const [picked, setPicked] = useState<string[]>([])
+  const [groupBusy, setGroupBusy] = useState(false)
+  const [groupError, setGroupError] = useState('')
+  const [groupNote, setGroupNote] = useState('')
+
+  const refresh = () => {
     loadConversations().then(setConversations)
-  }, [])
+    loadGroupStuff().then((g) => {
+      setConnections(g.connections)
+      setInvites(g.invites)
+    })
+  }
+  useEffect(refresh, [])
 
   const selected = conversations?.find((c) => c.id === selectedId) ?? null
 
@@ -66,6 +95,7 @@ export default function Messages() {
 
   const open = (id: string | null) => {
     setDraft('')
+    setGroupNote('')
     router.replace(id ? `/messages?c=${id}` : '/messages', { scroll: false })
   }
 
@@ -85,7 +115,54 @@ export default function Messages() {
     inputRef.current?.focus()
   }
 
-  const unreadCount = conversations?.filter((c) => c.unread).length ?? 0
+  const unreadCount = (conversations?.filter((c) => c.unread).length ?? 0) + invites.length
+
+  const openGroupForm = (mode: 'new' | 'add') => {
+    setGroupForm(mode)
+    setGroupName('')
+    setPicked([])
+    setGroupError('')
+    setGroupNote('')
+  }
+
+  const submitGroup = async () => {
+    if (groupBusy || !picked.length) return
+    if (groupForm === 'new' && !groupName.trim()) return setGroupError('Give the group a name.')
+    setGroupBusy(true)
+    setGroupError('')
+    try {
+      if (groupForm === 'new') {
+        const id = await createGroup(groupName.trim(), picked)
+        setGroupForm(null)
+        refresh()
+        open(id)
+      } else if (selected) {
+        const n = await inviteToGroup(selected.id, picked)
+        setGroupForm(null)
+        setGroupNote(n ? `Invite sent to ${n} ${n === 1 ? 'person' : 'people'}. They'll join once they say yes.` : 'Everyone you picked is already in the group.')
+      }
+    } catch (e) {
+      setGroupError(e instanceof Error ? e.message : 'Something went wrong')
+    }
+    setGroupBusy(false)
+  }
+
+  const respond = async (invite: GroupInvite, accept: boolean) => {
+    setInvites((list) => list.filter((i) => i.id !== invite.id))
+    try {
+      const id = await answerInvite(invite.id, accept)
+      if (id) {
+        const fresh = await loadConversations()
+        setConversations(fresh)
+        open(id)
+      }
+    } catch {
+      setInvites((list) => [invite, ...list]) // put it back so they can try again
+    }
+  }
+
+  // people shown in the "add people" form: my connections not already in this group
+  const pickable = groupForm === 'add' && selected ? connections.filter((p) => !selected.members?.some((m) => m.id === p.id)) : connections
 
   const list = (
     <div className={`flex min-h-0 flex-col border-[#E4EAF1] md:border-r ${selected ? 'hidden md:flex' : 'flex'}`}>
@@ -100,7 +177,49 @@ export default function Messages() {
           </svg>
           <input id="msg-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search people, places, messages" className="w-full bg-transparent py-2 text-sm outline-none placeholder:text-[#5F6E84]" />
         </div>
+        <button
+          type="button"
+          onClick={() => openGroupForm('new')}
+          className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#D5DFEA] bg-white text-sm font-semibold text-[#1E2B44] transition hover:-translate-y-0.5 hover:border-[#2F4161]"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          New group
+        </button>
       </div>
+
+      {invites.length > 0 && (
+        <ul className="space-y-2 px-4 pb-2" aria-label="Group invites">
+          {invites.map((inv) => (
+            <li key={inv.id} className="animate-[popIn_.35s_cubic-bezier(.2,.8,.3,1.05)_both] rounded-[20px] border border-[#F3C9A0] bg-[#FFF7EF] p-4">
+              {inv.company ? (
+                <p className="text-sm text-[#1E2B44]">
+                  Hey! There&apos;s a group chat with all the interns from{' '}
+                  <span className="font-semibold">{inv.title.replace(/^Interns at /, '')}</span>.
+                </p>
+              ) : (
+                <p className="text-sm text-[#1E2B44]">
+                  <span className="font-semibold">{inv.invitedBy}</span> wants to add you to{' '}
+                  <span className="font-semibold">{inv.title}</span>
+                </p>
+              )}
+              <p className="mt-1 truncate text-xs text-[#4A5A75]">
+                {inv.members.length > 0 ? `In it: ${inv.members.join(', ')}` : 'You’d be the first one in.'}
+              </p>
+              <p className="mt-2 text-sm font-semibold text-[#1E2B44]">{inv.company ? 'Want to join?' : 'Join this group?'}</p>
+              <div className="mt-2 flex gap-2">
+                <button type="button" onClick={() => respond(inv, true)} className="min-h-10 flex-1 rounded-full bg-[#1E2B44] text-sm font-semibold text-white transition hover:bg-[#2F4161]">
+                  Yes
+                </button>
+                <button type="button" onClick={() => respond(inv, false)} className="min-h-10 flex-1 rounded-full border border-[#D5DFEA] bg-white text-sm font-semibold text-[#1E2B44] transition hover:border-[#2F4161]">
+                  No
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <ul className="min-h-0 flex-1 overflow-y-auto px-3 pb-3" aria-label="Conversations">
         {conversations === null &&
@@ -172,7 +291,9 @@ export default function Messages() {
         <div className="min-w-0 flex-1">
           <p className="truncate font-[family-name:var(--font-serif)] text-2xl font-medium leading-tight">{selected.hostName}</p>
           <p className="truncate text-sm text-[#4A5A75]">
-            {selected.listingId ? (
+            {selected.isGroup ? (
+              <>{['You', ...(selected.members ?? []).map((m) => m.name)].join(', ')}</>
+            ) : selected.listingId ? (
               <>
                 {selected.iAmHost ? 'Interested in' : 'Sub-leaser'} ·{' '}
                 <Link href={`/matches/${selected.listingId}`} className="font-semibold text-[#2F4161] underline-offset-2 hover:underline">
@@ -185,7 +306,16 @@ export default function Messages() {
           </p>
         </div>
         {selected.listingScore !== undefined && <ScoreBadge score={selected.listingScore} size={40} />}
-        {selected.listingId && !selected.iAmHost && (
+        {selected.isGroup && (
+          <button
+            type="button"
+            onClick={() => openGroupForm('add')}
+            className="flex min-h-11 items-center rounded-full border border-[#D5DFEA] bg-white px-4 text-sm font-semibold text-[#1E2B44] transition hover:-translate-y-0.5 hover:border-[#2F4161]"
+          >
+            Add people
+          </button>
+        )}
+        {selected.listingId && !selected.isGroup && !selected.iAmHost && (
            <Link
             href={`/matches/${selected.listingId}/book`}
             className="hidden min-h-11 items-center rounded-full bg-[#1E2B44] px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161] sm:flex"
@@ -203,6 +333,7 @@ export default function Messages() {
           const newDay = !prev || dayLabel(prev.sentAt) !== dayLabel(m.sentAt)
           const gapAfter = !next || next.from !== m.from || new Date(next.sentAt).getTime() - new Date(m.sentAt).getTime() > 10 * 60_000
           const mine = m.from === 'me'
+          const showSender = !!selected.isGroup && !mine && (newDay || !prev || prev.from === 'me' || prev.senderName !== m.senderName)
           return (
             <div key={m.id}>
               {newDay && (
@@ -210,6 +341,7 @@ export default function Messages() {
               )}
               <div className={`flex ${mine ? 'justify-end' : 'justify-start'} ${gapAfter ? 'mb-4' : 'mb-1'}`}>
                 <div className={`max-w-[78%] md:max-w-[62%] ${mine ? 'items-end' : 'items-start'} flex flex-col`}>
+                  {showSender && <span className="mb-1 px-1 text-xs font-semibold text-[#2F4161]">{m.senderName}</span>}
                   <p
                     className={`animate-[fadeIn_.3s_ease-out] whitespace-pre-wrap break-words px-4 py-2.5 text-[15px] leading-relaxed shadow-[0_10px_24px_-18px_rgba(30,43,68,0.6)] ${
                       mine ? 'rounded-[22px] rounded-br-md bg-[#1E2B44] text-white' : 'rounded-[22px] rounded-bl-md border border-white bg-white text-[#1E2B44]'
@@ -226,6 +358,7 @@ export default function Messages() {
         {selected.messages.length === 0 && (
         <p className="py-10 text-center text-sm text-[#4A5A75]">No messages yet. Say hi to {selected.hostName}.</p>
         )}
+        {groupNote && <p className="py-2 text-center text-xs font-semibold text-[#2F4161]">{groupNote}</p>}
         <div ref={endRef} />
       </div>
 
@@ -299,6 +432,95 @@ export default function Messages() {
           </div>
         </div>
       </section>
+
+      {groupForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1E2B44]/30 p-4 backdrop-blur-sm" onClick={() => setGroupForm(null)}>
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="group-form-title"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault()
+              submitGroup()
+            }}
+            className="w-full max-w-md animate-[popIn_.3s_cubic-bezier(.2,.8,.3,1.05)_both] rounded-[28px] border border-white bg-white p-6 shadow-[0_30px_70px_-30px_rgba(30,43,68,0.5)]"
+          >
+            <h2 id="group-form-title" className="font-[family-name:var(--font-serif)] text-3xl font-medium">
+              {groupForm === 'new' ? 'New group' : `Add to ${selected?.hostName ?? 'group'}`}
+            </h2>
+            <p className="mt-1 text-sm text-[#4A5A75]">Each person gets a yes / no invite in their Messages and joins only if they say yes.</p>
+
+            {groupForm === 'new' && (
+              <>
+                <label htmlFor="group-name" className="mt-5 block text-sm font-semibold">
+                  Group name
+                </label>
+                <input
+                  id="group-name"
+                  value={groupName}
+                  maxLength={60}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  placeholder="e.g. Summer interns"
+                  className="mt-2 min-h-11 w-full rounded-full border border-[#D5DFEA] bg-white px-4 text-[15px] outline-none focus:border-[#2F4161] focus:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]"
+                />
+              </>
+            )}
+
+            <fieldset className="mt-5">
+              <legend className="text-sm font-semibold">Your connections</legend>
+              <ul className="mt-2 max-h-60 space-y-1 overflow-y-auto">
+                {pickable.map((p) => {
+                  const on = picked.includes(p.id)
+                  return (
+                    <li key={p.id}>
+                      <label className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-[16px] px-3 transition ${on ? 'bg-[#EEF3F8]' : 'hover:bg-[#F4F7FB]'}`}>
+                        <input
+                          type="checkbox"
+                          checked={on}
+                          onChange={() => setPicked((list) => (on ? list.filter((x) => x !== p.id) : [...list, p.id]))}
+                          className="h-4 w-4 accent-[#1E2B44]"
+                        />
+                        <Avatar name={p.name} size={32} />
+                        <span className="text-[15px] font-semibold">{p.name}</span>
+                      </label>
+                    </li>
+                  )
+                })}
+                {pickable.length === 0 && (
+                  <li className="py-4 text-sm text-[#4A5A75]">
+                    {groupForm === 'add' ? 'All your connections are already in this group.' : 'No connections yet. Connect with interns first, then start a group.'}
+                    {groupForm === 'new' && (
+                      <Link href="/internMatches" className="mt-2 block font-semibold text-[#2F4161] underline-offset-2 hover:underline">
+                        Find interns
+                      </Link>
+                    )}
+                  </li>
+                )}
+              </ul>
+            </fieldset>
+
+            {groupError && (
+              <p role="alert" className="mt-3 text-sm font-semibold text-[#9A3B1E]">
+                {groupError}
+              </p>
+            )}
+
+            <div className="mt-6 flex gap-2">
+              <button type="button" onClick={() => setGroupForm(null)} className="min-h-11 flex-1 rounded-full border border-[#D5DFEA] bg-white text-sm font-semibold">
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={groupBusy || !picked.length}
+                className="min-h-11 flex-1 rounded-full bg-[#1E2B44] text-sm font-semibold text-white transition hover:bg-[#2F4161] disabled:opacity-40"
+              >
+                {groupBusy ? 'Sending…' : groupForm === 'new' ? 'Create & invite' : 'Send invites'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </>
   )
 }

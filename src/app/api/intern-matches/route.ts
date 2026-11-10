@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { admin, callerFrom } from '../../../lib/supabase-admin'
 import { geocodeAddress, haversineDistanceKm, type Coordinates } from '../../../lib/geocoding'
 import { NEARBY_MILES } from '../../../components/matches/listings'
+import { normCompany } from '../../../lib/groups'
 
 export type InternProfile = {
   id: string
@@ -12,6 +13,8 @@ export type InternProfile = {
   school: string
   interests: string[]
   shared: string[]
+  sameCompany?: boolean // works at the same company as you
+  sameSchool?: boolean
   angle?: number
   radius?: number
   match?: number
@@ -114,6 +117,7 @@ export async function GET(request: Request) {
 
   const myInterests: string[] = Array.isArray(me?.user_interests) ? me!.user_interests : []
   const mySchool = String(me?.university ?? '').trim().toLowerCase()
+  const myCompany = normCompany(me?.company_name)
   const myOffice = String(me?.office_address ?? '').trim()
   const city = cityLabel(myOffice)
 
@@ -135,10 +139,12 @@ export async function GET(request: Request) {
 
     const interests: string[] = Array.isArray(u.user_interests) ? u.user_interests : []
     const { score: interestScore, shared } = scoreInternMatch(myInterests, interests)
-    // same school ranks a bit higher (the quiz says so)
+    // same company and same school rank higher; a coworker shows up even with no shared interests
     const sameSchool = !!mySchool && String(u.university ?? '').trim().toLowerCase() === mySchool
-    const score = interestScore === undefined ? undefined : Math.min(99, interestScore + (sameSchool ? 5 : 0))
-    if (shared.length === 0) continue
+    const sameCompany = !!myCompany && normCompany(u.company_name) === myCompany
+    if (shared.length === 0 && !sameCompany) continue
+    const base = interestScore ?? 66
+    const score = Math.min(99, base + (sameCompany ? 6 : 0) + (sameSchool ? 5 : 0))
 
     const fullName = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() || 'Subtle intern'
     const initials = fullName
@@ -158,11 +164,15 @@ export async function GET(request: Request) {
       school: String(u.university ?? '').trim() || schoolFromEmail(u.student_email),
       interests,
       shared,
+      sameCompany,
+      sameSchool,
       match: score,
     })
   }
 
-  interns.sort((a, b) => (b.match ?? 0) - (a.match ?? 0) || (b.shared?.length ?? 0) - (a.shared?.length ?? 0))
+  interns.sort(
+    (a, b) => (b.match ?? 0) - (a.match ?? 0) || Number(!!b.sameCompany) - Number(!!a.sameCompany) || (b.shared?.length ?? 0) - (a.shared?.length ?? 0),
+  )
   const topMatches = interns.filter((i) => i.match !== undefined && i.match >= 65)
 
   // no emails in the response: other users' addresses shouldn't reach the browser

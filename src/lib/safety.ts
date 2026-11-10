@@ -7,7 +7,8 @@
  *
  * For each listing we count serious incidents reported within RADIUS_M meters over the last DAYS
  * days, and compare that to the San Francisco average for a circle the same size. Listings outside
- * San Francisco get no safety data (null), and their score is left alone: we never guess.
+ * San Francisco get no safety data (null), and the score leaves safety out: we never guess.
+ * How the ratio becomes part of the score: safetyFitFromRatio in lib/subtle-score.ts.
  */
 
 import type { Coordinates } from './geocoding'
@@ -91,15 +92,6 @@ export async function safetyNear(c: Coordinates): Promise<SafetyInfo | null> {
     days: DAYS,
     source: SAFETY_SOURCE,
   }
-}
-
-/**
- * How much safety moves the Subtle score: a multiplier from 0.85 to 1.05.
- * Half the city average or less: 1.05. Average: 1.0. Three times the average or more: 0.85.
- */
-export function safetyFit(info: SafetyInfo | null): number {
-  if (!info) return 1
-  return Math.max(0.85, Math.min(1.05, 1.05 - 0.1 * (info.ratio - 0.5)))
 }
 
 /** One line for "Why this score", built only from the real numbers. */

@@ -22,10 +22,10 @@ export async function GET(req: Request) {
   // Which listing (if any) each conversation is about
   const { data: convos } = await supabaseAdmin
     .from('conversations')
-    .select('id, listing_id')
+    .select('id, listing_id, is_group, title')
     .in('id', ids)
 
-  // The OTHER person in each conversation
+  // The OTHER people in each conversation (one for a direct chat, several in a group)
   const { data: others } = await supabaseAdmin
     .from('conversation_participants')
     .select('conversation_id, user_id')
@@ -63,15 +63,23 @@ export async function GET(req: Request) {
 
   const result = mine.map((m) => {
     const listingId = convos?.find((c) => c.id === m.conversation_id)?.listing_id ?? null
-    const otherId = others?.find((o) => o.conversation_id === m.conversation_id)?.user_id ?? null
+    const convo = convos?.find((c) => c.id === m.conversation_id)
+    const memberIds = (others ?? []).filter((o) => o.conversation_id === m.conversation_id).map((o) => o.user_id)
+    const otherId = memberIds[0] ?? null
+    const isGroup = !!convo?.is_group
 
     return {
       conversation_id: m.conversation_id,
       listing_id: listingId,
-      kind: listingId ? 'listing' : 'intern',
+      kind: isGroup ? 'group' : listingId ? 'listing' : 'intern',
+      is_group: isGroup,
+      title: convo?.title ?? null,
+      my_user_id: user.id,
       last_read_at: m.last_read_at,
       other_user_id: otherId,
       other_user_name: otherId ? names.get(otherId) ?? 'User' : 'User',
+      // everyone else in the chat, so group messages can show who sent them
+      members: memberIds.map((id) => ({ id, name: names.get(id) ?? 'User' })),
       last_message: latest.find((l) => l.cid === m.conversation_id)?.last ?? null,
     }
   })
@@ -135,7 +143,8 @@ export async function POST(req: Request) {
 
     if (sharedIds.length > 0) {
       // Of the shared conversations, find one for the same listing
-      let query = supabaseAdmin.from('conversations').select('id').in('id', sharedIds)
+      // (group chats don't count: this is the one-on-one thread)
+      let query = supabaseAdmin.from('conversations').select('id').in('id', sharedIds).eq('is_group', false)
       query = listing ? query.eq('listing_id', listing) : query.is('listing_id', null)
       const { data: match } = await query.limit(1)
 

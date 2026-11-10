@@ -9,6 +9,9 @@ export type Listing = {
   commuteMode: 'walk' | 'transit' | 'bike' | 'drive'
   commuteSource?: 'google' | 'estimate' // where commuteMinutes came from (see /api/matches)
   safety?: import('../../lib/safety').SafetyInfo // reported incidents nearby (SF only, see lib/safety.ts)
+  nearby?: import('../../lib/neighborhood').NeighborhoodInfo // groceries / food / transit within a 10 min walk
+  scoreParts?: import('../../lib/subtle-score').ScoreParts // each part of the Subtle score, 0 to 1
+  scoreWeights?: import('../../lib/subtle-score').ScoreParts // the weights actually used for this home
   homeType: 'Apartment' | 'House' | 'Studio'
   roomType: 'Private room' | 'Shared room' | 'Entire place'
   tags: string[]

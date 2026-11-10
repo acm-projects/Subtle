@@ -15,6 +15,8 @@ type Intern = {
   role: string
   school: string
   interests: string[]
+  company?: string
+  sameCompany?: boolean // works at the same company as the user
   match?: number // 0-100. Only set for interns who matched with the user.
 }
 
@@ -250,7 +252,9 @@ function Tooltip({
       </div>
 
       <p className="mt-3 text-xs leading-snug text-[#4A5A75]">
-        {matched ? `Subtle score ${intern.match}. You both like ${joinNames(intern.shared.map(titleCase))}.` : 'Not matched yet.'}
+        {matched
+          ? `Subtle score ${intern.match}.${intern.sameCompany && intern.company ? ` You both work at ${intern.company}.` : ''}${intern.shared.length ? ` You both like ${joinNames(intern.shared.map(titleCase))}.` : ''}`
+          : 'Not matched yet.'}
       </p>
 
       <button type="button" disabled={state !== 'none'} onClick={() => onConnect(intern.id)} className={`mt-3.5 w-full py-2.5 ${state === 'none' ? btnDark : btnLight}`}>
@@ -633,6 +637,7 @@ export default function MatchesPage() {
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-semibold">{m.name}</div>
                           <div className="text-xs text-[#4A5A75]">
+                            {m.sameCompany ? 'Same company · ' : ''}
                             {m.shared.length} shared {m.shared.length === 1 ? 'interest' : 'interests'}
                           </div>
                         </div>
