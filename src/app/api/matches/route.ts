@@ -3,7 +3,7 @@ import { dbListingToMatchListing, type Listing as MatchListing, type MatchContex
 import { type CommuteMode, estimateCommuteMinutes, geocodeAddress, haversineDistanceKm, pickOptimalCommuteMode } from '../../../lib/geocoding'
 import { googleCommuteMinutes, hasGoogleMapsKey } from '../../../lib/google-maps'
 import { safetyForMany, safetyReason, type SafetyInfo } from '../../../lib/safety'
-import { neighborhoodFit, neighborhoodForMany, neighborhoodReason, type NeighborhoodInfo } from '../../../lib/neighborhood'
+import { neighborhoodFit, neighborhoodForMany, neighborhoodProblem, neighborhoodReason, type NeighborhoodInfo } from '../../../lib/neighborhood'
 import { safetyFitFromRatio, subtleScore, type ScoreParts } from '../../../lib/subtle-score'
 import { getListings } from '../../../lib/listings'
 import { runPythonVectorMatcher } from '../../../lib/python-matcher'
@@ -303,7 +303,7 @@ export async function GET(request: Request) {
     nearest: combined.length === 0 ? nearest : [],
     radiusKm: workplaceCoords ? NEARBY_KM : null,
     safetyCoverage: { withData: safetyById.size, without: combined.length - safetyById.size },
-    neighborhoodCoverage: { withData: nearbyById.size, without: combined.length - nearbyById.size },
+    neighborhoodCoverage: { withData: nearbyById.size, without: combined.length - nearbyById.size, problem: neighborhoodProblem() },
     total: scored.length,
     matches: scored,
     mlAnalytics,

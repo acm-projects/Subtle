@@ -32,6 +32,10 @@ export type NeighborhoodInfo = {
   source: 'Google Maps' | 'OpenStreetMap'
 }
 
+// why the last Google lookup failed (shown in /api/matches so it's easy to see what to fix)
+let lastProblem: string | null = null
+export const neighborhoodProblem = () => lastProblem
+
 const CACHE_MS = 24 * 60 * 60 * 1000
 const cache = new Map<string, { value: NeighborhoodInfo | null; at: number }>()
 
@@ -60,16 +64,21 @@ async function placesCount(c: Coordinates, types: string[], key: string): Promis
     cache: 'no-store',
   })
   if (!res.ok) {
-    console.warn(`[Neighborhood] Google Places request failed (${res.status}): ${(await res.text()).slice(0, 200)}`)
+    lastProblem = `Google Places ${res.status}: ${(await res.text()).replace(/\s+/g, ' ').slice(0, 300)}`
+    console.warn(`[Neighborhood] ${lastProblem}`)
     return null
   }
+  lastProblem = null
   const json = (await res.json()) as { places?: unknown[] }
   return json.places?.length ?? 0
 }
 
 async function fromGoogle(c: Coordinates): Promise<NeighborhoodInfo | null> {
   const key = process.env.GOOGLE_MAPS_API_KEY
-  if (!key) return null
+  if (!key) {
+    lastProblem = 'GOOGLE_MAPS_API_KEY is not set'
+    return null
+  }
   try {
     const [groceries, food, transit] = await Promise.all([
       placesCount(c, PLACE_TYPES.groceries, key),
@@ -79,7 +88,8 @@ async function fromGoogle(c: Coordinates): Promise<NeighborhoodInfo | null> {
     if (groceries == null || food == null || transit == null) return null
     return { groceries, food, transit, radiusMeters: WALK_RADIUS_M, source: 'Google Maps' }
   } catch (err) {
-    console.warn('[Neighborhood] Google Places error:', err)
+    lastProblem = `Google Places error: ${String(err).slice(0, 200)}`
+    console.warn(`[Neighborhood] ${lastProblem}`)
     return null
   }
 }
