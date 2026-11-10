@@ -4,10 +4,9 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
-import ThemeToggle from './ThemeToggle'
 import { loadUnreadCount } from './messages/store'
 
-// Navbar for logged-in pages: logo (back to the dashboard), Messages, Post a listing, Listings, a light/dark toggle, and Log out (with a confirm step).
+// Navbar for logged-in pages: logo (back to the dashboard), Messages, Post a listing, Listings, and Log out (light/dark mode lives in Profile > Appearance) (with a confirm step).
 export default function AppNavbar({ firstName }: { firstName: string }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -27,7 +26,11 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
     let active = true
     const load = async () => {
       const { data: auth } = await supabase.auth.getUser()
-      if (!auth.user) return
+      // every page with this navbar is for signed-in users: send everyone else to log in
+      if (!auth.user) {
+        router.replace('/login?mode=login')
+        return
+      }
       const user = auth.user
       const meta = user.user_metadata ?? {}
       let pic = (meta.avatar_url ?? meta.avatarUrl ?? null) as string | null
@@ -45,7 +48,7 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
       let last = String(meta.last_name || meta.lastName || '').trim()
       if (!first || !last) {
         try {
-          const { data } = await supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single()
+          const { data } = await supabase.from('users_table').select('first_name, last_name').eq('id', user.id).maybeSingle()
           first = first || String(data?.first_name ?? '').trim()
           last = last || String(data?.last_name ?? '').trim()
         } catch {}
@@ -144,7 +147,6 @@ useEffect(() => {
             <span className="hidden md:inline">Intern Matches</span>
             <span className="md:hidden">Matches</span>
           </Link>
-          <ThemeToggle className="hover:bg-[#1E2B44]/[0.06]" />
           <button
             type="button"
             onClick={() => setConfirming(true)}

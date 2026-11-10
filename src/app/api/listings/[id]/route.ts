@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { dbListingToMatchListing, getListing as getSampleListing } from '../../../../components/matches/listings'
+import { dbListingToMatchListing } from '../../../../components/matches/listings'
 import { getListing as getDbListing, validateListing } from '../../../../lib/listings'
 import { supabase } from '../../../../lib/supabase'
 
@@ -23,7 +23,7 @@ function getSupabaseForRequest(request: Request) {
 
 /**
  * GET /api/listings/[id]
- * Returns a single listing by ID (checks Supabase listing_table first, then sample listings).
+ * Returns a single listing by ID from Supabase listing_table.
  */
 export async function GET(_request: Request, { params }: Context) {
   const { id } = await params
@@ -50,15 +50,6 @@ export async function GET(_request: Request, { params }: Context) {
     }
   } catch (err) {
     console.error('Error querying listing from DB:', err)
-  }
-
-  const sample = getSampleListing(id)
-  if (sample) {
-    return NextResponse.json({
-      listing: sample,
-      matchView: sample,
-      sample: true,
-    })
   }
 
   return NextResponse.json({ error: `Listing "${id}" not found` }, { status: 404 })

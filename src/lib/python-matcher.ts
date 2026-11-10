@@ -22,10 +22,22 @@ export async function runPythonVectorMatcher(
   listings: MatchListing[],
   userProfile: Record<string, any> | null,
 ): Promise<PythonMatchResponse | null> {
+  // Macs only have `python3` (no `python`), so try that first
+  const first = await runWith('python3', listings, userProfile)
+  if (first !== 'not-found') return first
+  const second = await runWith('python', listings, userProfile)
+  return second === 'not-found' ? null : second
+}
+
+function runWith(
+  command: string,
+  listings: MatchListing[],
+  userProfile: Record<string, any> | null,
+): Promise<PythonMatchResponse | null | 'not-found'> {
   return new Promise((resolve) => {
     try {
       const scriptPath = path.join(process.cwd(), 'ml', 'vector_matcher.py')
-      const pyProcess = spawn('python', [scriptPath])
+      const pyProcess = spawn(command, [scriptPath])
 
       let stdoutData = ''
       let stderrData = ''
@@ -52,12 +64,14 @@ export async function runPythonVectorMatcher(
         }
       })
 
-      pyProcess.on('error', (err) => {
+      pyProcess.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'ENOENT') return resolve('not-found')
         console.warn('Could not launch Python vector matcher:', err.message)
         resolve(null)
       })
 
       const payload = JSON.stringify({ userProfile, listings })
+      pyProcess.stdin.on('error', () => {}) // the process may not exist; 'error' above handles that
       pyProcess.stdin.write(payload)
       pyProcess.stdin.end()
     } catch (e) {

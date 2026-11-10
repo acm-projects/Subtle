@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { authFetch } from "../../lib/auth-fetch";
+import ThemeSetting from "../../components/ThemeToggle";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AppNavbar from "../../components/AppNavbar";
@@ -144,11 +146,10 @@ export default function ProfilePage() {
     if (!rows?.length) return setConnections([]);
 
     const otherIds = rows.map((r) => (r.requester_id === userId ? r.addressee_id : r.requester_id));
-    const { data: people } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name, avatar_url, interests")
-      .in("id", otherIds);
-    const byId = new Map((people ?? []).map((p) => [p.id, p]));
+    // names and interests of the people you're connected with (the server only shares those)
+    const res = await authFetch(`/api/users?ids=${encodeURIComponent(otherIds.join(","))}`, { cache: "no-store" });
+    const people: { id: string; first_name: string | null; last_name: string | null; user_interests: string[] | null }[] = res.ok ? await res.json() : [];
+    const byId = new Map(people.map((p) => [p.id, p]));
 
     setConnections(
       rows.map((r) => {
@@ -158,8 +159,8 @@ export default function ProfilePage() {
           id: r.id,
           otherId,
           name: p ? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "Subtle user" : "Subtle user",
-          avatarUrl: p?.avatar_url ?? null,
-          shared: (p?.interests ?? []).filter((i: string) => mine.includes(i)).length,
+          avatarUrl: null,
+          shared: (p?.user_interests ?? []).filter((i: string) => mine.includes(i)).length,
           score: r.score,
           status: r.status,
           incoming: r.addressee_id === userId,
@@ -210,16 +211,11 @@ try {
         if (stored) localAvatar = stored;
       } catch {}
 
-      // 4. Fetch from public.profiles table
-      let p: Profile | null = null;
+      // 4. Connections
+      const p = null as Profile | null;
       try {
-        const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-        if (data) {
-          p = data as Profile;
-          if (!firstName && p.first_name) firstName = p.first_name;
-          if (!lastName && p.last_name) lastName = p.last_name;
-          await loadConnections(user.id, p.interests ?? []);
-        }
+        const { data: mineRow } = await supabase.from("users_table").select("user_interests").eq("id", user.id).maybeSingle();
+        await loadConnections(user.id, (mineRow?.user_interests as string[] | null) ?? []);
       } catch {}
 
       const finalAvatar = localAvatar || p?.avatar_url || null;
@@ -273,7 +269,7 @@ try {
       }
 
       // Update public.users_table
-      await fetch("/api/users", {
+      await authFetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -709,6 +705,11 @@ try {
                   <p className="text-xs text-[#4a5878]">No saved answers on this device yet.</p>
                 )}
               </div>
+            </Card>
+
+            <Card title="Appearance">
+              <p className="mb-5 mt-2.5 text-[15px] text-[#3d4a6b]">Choose light or dark mode. It's saved on this device.</p>
+              <ThemeSetting />
             </Card>
           </div>
         </div>

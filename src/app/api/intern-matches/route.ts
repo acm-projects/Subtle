@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../lib/supabase'
+import { admin, callerFrom } from '../../../lib/supabase-admin'
+import { geocodeAddress, haversineDistanceKm, type Coordinates } from '../../../lib/geocoding'
+import { NEARBY_MILES } from '../../../components/matches/listings'
 
 export type InternProfile = {
   id: string
   name: string
   initials: string
-  email?: string
   role: string
   company?: string
   school: string
@@ -16,9 +17,6 @@ export type InternProfile = {
   match?: number
 }
 
-const DEFAULT_INTERESTS = ['Hiking', 'Cooking', 'Film', 'Photography', 'Basketball', 'Live music']
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Semantic interest clusters for soft-cosine affinity matching
 const INTEREST_CLUSTERS: Record<string, string[]> = {
@@ -30,26 +28,6 @@ const INTEREST_CLUSTERS: Record<string, string[]> = {
   social_culture: ['live music', 'music', 'concerts', 'podcasts', 'travel', 'reading', 'volunteering', 'debate', 'dance'],
 }
 
-const BASE_SEED_INTERNS = [
-  { id: 'aisha', name: 'Aisha Rahman', initials: 'AR', role: 'Product design intern', school: 'UCLA', interests: ['Hiking', 'Cooking', 'Film', 'Photography', 'Pottery'] },
-  { id: 'leo', name: 'Leo Martinez', initials: 'LM', role: 'Software intern', school: 'USC', interests: ['Basketball', 'Live music', 'Cooking', 'Film', 'Gaming'] },
-  { id: 'priya', name: 'Priya Shah', initials: 'PS', role: 'Data intern', school: 'Stanford', interests: ['Hiking', 'Photography', 'Live music', 'Chess'] },
-  { id: 'marcus', name: 'Marcus Tran', initials: 'MT', role: 'Marketing intern', school: 'UC Berkeley', interests: ['Cooking', 'Hiking', 'Basketball', 'Soccer'] },
-  { id: 'sofia', name: 'Sofia Lopez', initials: 'SL', role: 'Finance intern', school: 'NYU', interests: ['Film', 'Live music', 'Yoga', 'Travel'] },
-  { id: 'daniel', name: 'Daniel Kim', initials: 'DK', role: 'Research intern', school: 'Michigan', interests: ['Photography', 'Basketball', 'Reading', 'Chess'] },
-  { id: 'emma', name: 'Emma Walsh', initials: 'EW', role: 'Design intern', school: 'Brown', interests: ['Painting', 'Yoga', 'Thrifting'] },
-  { id: 'jon', name: 'Jon Park', initials: 'JP', role: 'Software intern', school: 'UCSD', interests: ['Gaming', 'Anime', 'Running', 'Coding'] },
-  { id: 'nia', name: 'Nia Brooks', initials: 'NB', role: 'Policy intern', school: 'Howard', interests: ['Debate', 'Dance', 'Reading', 'Volunteering'] },
-  { id: 'omar', name: 'Omar Haddad', initials: 'OH', role: 'Software intern', school: 'UT Austin', interests: ['Soccer', 'Coding', 'Coffee', 'Gaming'] },
-  { id: 'chloe', name: 'Chloe Evans', initials: 'CE', role: 'Media intern', school: 'Northwestern', interests: ['Writing', 'Theatre', 'Baking', 'Film'] },
-  { id: 'ravi', name: 'Ravi Patel', initials: 'RP', role: 'Data intern', school: 'Georgia Tech', interests: ['Cricket', 'Chess', 'Travel', 'Coding'] },
-  { id: 'zoe', name: 'Zoe Chen', initials: 'ZC', role: 'Product intern', school: 'Columbia', interests: ['Surfing', 'Pottery', 'Fashion', 'Design'] },
-  { id: 'sam', name: 'Sam Okafor', initials: 'SO', role: 'Finance intern', school: 'Duke', interests: ['Golf', 'Podcasts', 'Cars', 'Basketball'] },
-  { id: 'lily', name: 'Lily Nguyen', initials: 'LN', role: 'Design intern', school: 'RISD', interests: ['Illustration', 'Anime', 'Baking', 'Art'] },
-  { id: 'ben', name: 'Ben Carter', initials: 'BC', role: 'Software intern', school: 'MIT', interests: ['Robotics', 'Climbing', 'Gaming', 'Coding'] },
-  { id: 'maya', name: 'Maya Singh', initials: 'MS', role: 'Policy intern', school: 'Yale', interests: ['Volunteering', 'Reading', 'Yoga', 'Travel'] },
-  { id: 'theo', name: 'Theo Grant', initials: 'TG', role: 'Data intern', school: 'Rice', interests: ['Running', 'Board games', 'Coffee', 'Hiking'] },
-]
 
 function schoolFromEmail(email: string): string {
   const domain = email.split('@')[1]?.toLowerCase() ?? ''
@@ -117,166 +95,90 @@ function scoreInternMatch(userInterests: string[], candidateInterests: string[])
  * GET /api/intern-matches
  * Query params:
  *   - email: optional student_email of current user
- *   - uid: optional auth user id of current user (used to leave them out of their own results)
  *   - interests: optional comma-separated list of interests to override or supplement
  */
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const email = searchParams.get('email')
-  const uid = searchParams.get('uid')
-  const interestsParam = searchParams.get('interests')
+  // the signed-in caller (login token); nobody can ask on someone else's behalf
+  const caller = await callerFrom(request)
+  if (!caller) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+  const email = (caller.email ?? '').toLowerCase()
 
-  // 1. Resolve current user's interests
-  let myInterests: string[] = []
-
-  if (interestsParam) {
-    myInterests = interestsParam.split(',').map((s) => s.trim()).filter(Boolean)
-  }
-
-  // Also query users_table
-  const { data: rows } = await supabase.from('users_table').select('*')
+  // 1. Everyone in users_table (latest row per email). Interests, company and office come from the quiz.
+  //    Read with the server key; only names, schools, companies and interests go back to the browser.
+  const { data: rows } = await admin().from('users_table').select('id, student_email, first_name, last_name, company_name, office_address, user_interests, university')
   const byEmail = new Map<string, Record<string, any>>()
   for (const r of rows ?? []) {
-    if (r.student_email) {
-      byEmail.set(String(r.student_email).toLowerCase(), r)
-    }
+    if (r.student_email) byEmail.set(String(r.student_email).toLowerCase(), r)
+  }
+  const me = email ? byEmail.get(email) : undefined
+
+  const myInterests: string[] = Array.isArray(me?.user_interests) ? me!.user_interests : []
+  const myOffice = String(me?.office_address ?? '').trim()
+  const city = cityLabel(myOffice)
+
+  // 2. Where I work. Without an office address there's no "near you", so nobody is shown.
+  const myCoords = myOffice ? await geocodeAddress(myOffice) : null
+  if (!myCoords) {
+    return NextResponse.json({ myInterests, city, needsOffice: !myOffice, totalInterns: 0, matchedCount: 0, interns: [], topMatches: [] })
   }
 
-  // If email was given and no query param interests, pull from users_table
-  if (myInterests.length === 0 && email) {
-    const dbUser = byEmail.get(email.toLowerCase())
-    if (Array.isArray(dbUser?.user_interests) && dbUser.user_interests.length > 0) {
-      myInterests = dbUser.user_interests
-    }
-  }
+  // 3. Other interns whose office is within NEARBY_MILES of mine, scored on shared interests
+  const nearbyKm = NEARBY_MILES * 1.609
+  const interns: InternProfile[] = []
+  for (const [userEmail, u] of byEmail.entries()) {
+    if (userEmail === email || !u.id) continue
+    const office = String(u.office_address ?? '').trim()
+    if (!office) continue
+    const coords: Coordinates | null = await geocodeAddress(office)
+    if (!coords || haversineDistanceKm(coords, myCoords) > nearbyKm) continue
 
-  // Load profiles once: used for the user's own interests and for the candidate list
-  let allProfiles: Record<string, any>[] = []
-  try {
-    const { data } = await supabase.from('profiles').select('*')
-    allProfiles = data ?? []
-  } catch {}
+    const interests: string[] = Array.isArray(u.user_interests) ? u.user_interests : []
+    const { score, shared } = scoreInternMatch(myInterests, interests)
+    if (shared.length === 0) continue
 
-  // Also check profiles table
-  if (myInterests.length === 0 && (uid || email)) {
-    const matchedProfile = allProfiles.find(
-      (p) =>
-        (uid && p.id === uid) ||
-        (email &&
-          ((p.email && String(p.email).toLowerCase() === email.toLowerCase()) ||
-            (p.student_email && String(p.student_email).toLowerCase() === email.toLowerCase()))),
-    )
-    if (Array.isArray(matchedProfile?.interests) && matchedProfile.interests.length > 0) {
-      myInterests = matchedProfile.interests
-    }
-  }
+    const fullName = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() || 'Subtle intern'
+    const initials = fullName
+      .split(' ')
+      .map((p) => p[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase()
 
-  if (myInterests.length === 0) {
-    myInterests = DEFAULT_INTERESTS
-  }
-
-  // 2. Build candidate interns. The id is always the auth user id (a valid UUID),
-  // so connection requests can actually reach the person.
-  // Every users_table row with a valid user_id is included, merged with its profiles row.
-  type Candidate = {
-    id: string
-    email?: string
-    firstName?: string
-    lastName?: string
-    company?: string
-    interests: string[]
-  }
-  const candidates = new Map<string, Candidate>()
-
-  for (const r of rows ?? []) {
-    const id = String(r.user_id ?? '')
-    if (!UUID.test(id)) continue // no valid user_id: they can't receive requests
-    candidates.set(id, {
-      id,
-      email: r.student_email ? String(r.student_email).toLowerCase() : undefined,
-      firstName: r.first_name ?? undefined,
-      lastName: r.last_name ?? undefined,
-      company: r.company_name ?? undefined,
-      interests: Array.isArray(r.user_interests) ? r.user_interests : [],
-    })
-  }
-
-  // profiles fill in anyone missing, and any gaps (interests, names) for people already added
-  for (const p of allProfiles) {
-    const id = String(p.id ?? '')
-    if (!UUID.test(id)) continue
-    const pEmail = String(p.email ?? p.student_email ?? '').toLowerCase() || undefined
-    const u = pEmail ? byEmail.get(pEmail) : undefined
-    const existing = candidates.get(id)
-    const profileInterests: string[] = Array.isArray(p.interests) ? p.interests : []
-
-    candidates.set(id, {
-      id,
-      email: existing?.email ?? pEmail,
-      firstName: existing?.firstName ?? p.first_name ?? u?.first_name ?? undefined,
-      lastName: existing?.lastName ?? p.last_name ?? u?.last_name ?? undefined,
-      company: existing?.company ?? u?.company_name ?? undefined,
-      interests: existing?.interests.length ? existing.interests : profileInterests,
-    })
-  }
-
-  const dbInterns: InternProfile[] = []
-  for (const c of candidates.values()) {
-    if (c.id === uid) continue // skip yourself
-    if (email && c.email && c.email === email.toLowerCase()) continue // skip yourself (by email)
-
-    const { score, shared } = scoreInternMatch(myInterests, c.interests)
-
-    const fullName = `${c.firstName ?? 'Intern'} ${c.lastName ?? ''}`.trim()
-    const initials =
-      fullName
-        .split(' ')
-        .map((s) => s[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase() || 'IN'
-
-    dbInterns.push({
-      id: c.id,
+    interns.push({
+      // the auth user id, so "Connect" can save a row in the connections table
+      id: String(u.id),
       name: fullName,
-      initials,
-      email: c.email,
-      role: c.company ? `Intern at ${c.company}` : 'Summer Intern',
-      company: c.company,
-      school: c.email ? schoolFromEmail(c.email) : 'University Student',
-      interests: c.interests,
+      initials: initials || 'IN',
+      role: u.company_name ? `Intern at ${u.company_name}` : 'Summer intern',
+      company: u.company_name ?? undefined,
+      school: String(u.university ?? '').trim() || schoolFromEmail(u.student_email),
+      interests,
       shared,
       match: score,
     })
   }
 
-  // 3. Build candidate interns from the seed pool with dynamic matching
-  const seedInterns: InternProfile[] = BASE_SEED_INTERNS.map((seed) => {
-    const { score, shared } = scoreInternMatch(myInterests, seed.interests)
-    return {
-      ...seed,
-      shared,
-      match: score,
-    }
-  })
+  interns.sort((a, b) => (b.match ?? 0) - (a.match ?? 0) || (b.shared?.length ?? 0) - (a.shared?.length ?? 0))
+  const topMatches = interns.filter((i) => i.match !== undefined && i.match >= 65)
 
-  // 4. Combine and rank by match score (descending). Interns with no score go last,
-  // so people who don't match still come back and show as small dots on the map.
-  const allInterns = [...dbInterns, ...seedInterns]
-  allInterns.sort((a, b) => {
-    const scoreA = a.match ?? 0
-    const scoreB = b.match ?? 0
-    if (scoreB !== scoreA) return scoreB - scoreA
-    return (b.shared?.length ?? 0) - (a.shared?.length ?? 0)
-  })
-
-  const topMatches = allInterns.filter((i) => i.match !== undefined && i.match >= 65)
-
+  // no emails in the response: other users' addresses shouldn't reach the browser
   return NextResponse.json({
     myInterests,
-    totalInterns: allInterns.length,
+    city,
+    needsOffice: false,
+    totalInterns: interns.length,
     matchedCount: topMatches.length,
-    interns: allInterns,
+    interns,
     topMatches,
   })
+}
+
+/** "Houston, TX" from "315 Capitol St Unit 205, Houston, TX 77002" */
+function cityLabel(office: string): string {
+  const parts = office.split(/,|\s+in\s+/i).map((s) => s.trim()).filter(Boolean)
+  if (parts.length < 2) return ''
+  const last = parts[parts.length - 1]
+  const state = last.match(/^([A-Za-z]{2})(?:\s+\d{5}(?:-\d{4})?)?$/)
+  if (state) return `${parts[parts.length - 2]}, ${state[1].toUpperCase()}`
+  return parts.slice(-2).join(', ').replace(/\s*\d{5}(-\d{4})?$/, '')
 }

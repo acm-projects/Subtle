@@ -31,6 +31,18 @@ const cache = new Map<string, { minutes: number | null; at: number }>()
 const keyFor = (from: Coordinates, to: Coordinates, mode: CommuteMode) =>
   `${from.lat.toFixed(5)},${from.lon.toFixed(5)}>${to.lat.toFixed(5)},${to.lon.toFixed(5)}:${mode}`
 
+// Transit times depend on when you leave (a 10 pm trip can mean an hour of waiting), so transit is
+// always asked for the next weekday at 8:30 am at the office. The office's time zone is approximated
+// from its longitude (15 degrees per hour), which is close enough for a morning commute.
+function nextWeekdayMorningUtc(office: Coordinates): string {
+  const offsetHours = Math.round(office.lon / 15)
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() + 1)
+  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1)
+  d.setUTCHours(8 - offsetHours, 30, 0, 0)
+  return d.toISOString()
+}
+
 const waypoint = (c: Coordinates) => ({ waypoint: { location: { latLng: { latitude: c.lat, longitude: c.lon } } } })
 
 export function hasGoogleMapsKey(): boolean {
@@ -73,6 +85,7 @@ export async function googleCommuteMinutes(
           origins: batch.map((i) => waypoint(origins[i])),
           destinations: [waypoint(office)],
           travelMode: TRAVEL_MODE[mode],
+          ...(mode === 'transit' ? { departureTime: nextWeekdayMorningUtc(office) } : {}),
         }),
         cache: 'no-store',
       })
