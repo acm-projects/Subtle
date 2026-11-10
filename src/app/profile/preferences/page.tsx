@@ -232,22 +232,23 @@ export default function PreferencesPage() {
   const noAnswers = JSON.stringify(saved) === JSON.stringify(EMPTY)
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#c3d5ee] via-[#e6ebf4] to-[#f6e6d2] px-6 pb-28 pt-28 text-[#1E2B44]">
+    <main className="min-h-screen bg-gradient-to-b from-[#c3d5ee] via-[#e6ebf4] to-[#f6e6d2] px-4 pb-28 pt-32 text-[#1E2B44] md:px-8">
       <AppNavbar firstName={firstName} />
 
-      <div className="mx-auto flex max-w-[820px] flex-col gap-6">
-        <header className="animate-[fadeIn_.5s_ease-out]">
-          <button
-            type="button"
-            onClick={() => router.push('/profile')}
-            className="mb-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-[#1E2B44]/80 px-4 text-sm text-white font-semibold transition hover:bg-[#1E2B44] focus-visible:ring-2 focus-visible:ring-white"
-          >
-            <span aria-hidden="true">←</span> Back to profile
-          </button>
-          <h1 className="mt-2 font-medium text-5xl font-[family-name:var(--font-serif)] tracking-[-0.02em] md:text-6xl">Preferences</h1>
-          <p className="mt-2 text-[15px] text-[#3D4A6B]">
-            Every questionnaire answer is below. Change any of them and save to refresh matches.
-          </p>
+      {/* title in the same spot as every other page; the form keeps its narrower column */}
+      <header className="mx-auto flex w-full max-w-[1240px] animate-[fadeIn_.5s_ease-out] flex-wrap items-end justify-between gap-4 md:pl-10">
+        <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">Preferences</h1>
+        <button
+          type="button"
+          onClick={() => router.push('/profile')}
+          className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#1E2B44]/80 px-4 text-sm font-semibold text-white transition hover:bg-[#1E2B44] focus-visible:ring-2 focus-visible:ring-white"
+        >
+          <span aria-hidden="true">←</span> Back to profile
+        </button>
+      </header>
+
+      <div className="mx-auto mt-6 flex max-w-[820px] flex-col gap-6">
+        <header>
           {noAnswers && (
             <p className="mt-3 rounded-2xl border border-white bg-white/70 px-4 py-3 text-sm">
               We couldn&apos;t find saved answers on this device. Fill them in below, or finish the questionnaire first.
@@ -306,18 +307,6 @@ export default function PreferencesPage() {
           <Row label={`Pick at least ${MIN_INTERESTS}`}>
             <Choices options={INTERESTS} isOn={(id) => a.interests.includes(id)} onPick={(id) => toggle('interests', id)} />
           </Row>
-          <div>
-            <label htmlFor="other-interests" className={`${labelCls} mb-2 block`}>
-              Anything else?
-            </label>
-            <input
-              id="other-interests"
-              value={a.otherInterests}
-              onChange={(e) => set('otherInterests', e.target.value)}
-              placeholder="e.g. pottery, chess, running club"
-              className="h-12 w-full rounded-2xl border border-[#D5DFEA] bg-white px-4 text-[15px] outline-none transition placeholder:text-[#6B7691] focus:border-[#2F4161] focus:shadow-[0_0_0_4px_rgba(169,199,232,0.45)]"
-            />
-          </div>
         </Section>
       </div>
 

@@ -113,6 +113,7 @@ export async function GET(request: Request) {
   const me = email ? byEmail.get(email) : undefined
 
   const myInterests: string[] = Array.isArray(me?.user_interests) ? me!.user_interests : []
+  const mySchool = String(me?.university ?? '').trim().toLowerCase()
   const myOffice = String(me?.office_address ?? '').trim()
   const city = cityLabel(myOffice)
 
@@ -133,7 +134,10 @@ export async function GET(request: Request) {
     if (!coords || haversineDistanceKm(coords, myCoords) > nearbyKm) continue
 
     const interests: string[] = Array.isArray(u.user_interests) ? u.user_interests : []
-    const { score, shared } = scoreInternMatch(myInterests, interests)
+    const { score: interestScore, shared } = scoreInternMatch(myInterests, interests)
+    // same school ranks a bit higher (the quiz says so)
+    const sameSchool = !!mySchool && String(u.university ?? '').trim().toLowerCase() === mySchool
+    const score = interestScore === undefined ? undefined : Math.min(99, interestScore + (sameSchool ? 5 : 0))
     if (shared.length === 0) continue
 
     const fullName = `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() || 'Subtle intern'

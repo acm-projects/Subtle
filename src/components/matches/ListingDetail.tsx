@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useMatchContext, useScoredListing } from './useScored'
 import { supabase } from '../../lib/supabase'
+import { authFetch } from '../../lib/auth-fetch'
 import { useEffect, useRef, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { EMPTY_CONTEXT, NEARBY_MILES, type Listing, type MatchContext } from './listings'
@@ -14,15 +15,14 @@ const commuteTo = (l: Listing, office: string) => {
   return `${l.commuteMinutes} min ${how} to ${office}`
 }
 
-// Fallbacks so the page still reads well if the backend only sends the basic fields.
-const subtitleFor = (l: Listing) =>
-  l.subtitle ?? (l.roomType === 'Entire place' ? `Entire ${l.homeType.toLowerCase()}` : `${l.roomType} in ${l.homeType === 'Apartment' ? 'an' : 'a'} ${l.homeType.toLowerCase()}`)
-const whyFor = (l: Listing) =>
-  l.whyScore ?? [
-    `${l.commuteMode === 'walk' ? 'Walk' : 'Commute'} to the office · ${l.commuteMinutes} minutes`,
-    `Dates match the summer · ${l.availableFrom}`,
-    l.tags.length ? l.tags.join(' · ') : l.roomType,
-  ]
+// Reasons come from /api/matches; never make one up (no office means no commute reason).
+const whyFor = (l: Listing): string[] => {
+  const reasons = (l.whyScore ?? []).filter((w) => l.commuteKnown !== false || !/commute|to work|to the office/i.test(w))
+  if (reasons.length) return reasons
+  return l.commuteKnown === false
+    ? ['Add your office in the quiz to see the commute and a full score.']
+    : ['Finish the quiz to see why this home fits you.']
+}
 const featuresFor = (l: Listing) => l.features ?? Array.from(new Set([l.homeType, l.roomType, ...l.tags, ...l.amenities]))
 
 /*
@@ -55,29 +55,52 @@ export default function ListingDetail({ listing: loadedListing, context: initial
   useEffect(() => {
     if (counted.current === listing.id) return
     counted.current = listing.id
-    fetch('/api/listing-views', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ listingId: listing.id }) }).catch(() => {})
+    // a random id for logged-out visitors, so each person counts once
+    let visitorId = ''
+    try {
+      visitorId = localStorage.getItem('subtle-visitor-id') ?? ''
+      if (!visitorId) {
+        visitorId = crypto.randomUUID()
+        localStorage.setItem('subtle-visitor-id', visitorId)
+      }
+    } catch {}
+    authFetch('/api/listing-views', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ listingId: listing.id, visitorId }),
+    }).catch(() => {})
   }, [listing.id])
   const toggleSaved = () => setSaved(toggleSavedId(listing.id).includes(listing.id))
 
   const facts = [
     { icon: 'dollar', label: 'Rent', value: `$${listing.price.toLocaleString()} / month` },
-    { icon: commuteIcon(listing), label: 'Commute', value: far ? `Far from ${context.office || 'your office'}` : commuteTo(listing, context.office || 'your office') },
+    {
+      icon: commuteIcon(listing),
+      label: 'Commute',
+      value:
+        listing.commuteKnown === false || !context.office
+          ? 'Add your office to see it'
+          : far
+            ? `Far from ${context.office}`
+            : commuteTo(listing, context.office),
+    },
     { icon: 'calendar', label: 'Available', value: `${listing.availableFrom} – ${listing.availableTo}` },
   ]
 
   return (
     <>
       <AppNavbar firstName="" />
-      <section className="px-4 pb-16 pt-28 md:px-8">
-        <article className="mx-auto w-full max-w-[1240px] animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] rounded-[36px] border border-white bg-white/60 p-5 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-9">
+      <section className="px-4 pb-16 pt-32 md:px-8">
+        <header className="mx-auto w-full max-w-[1240px] animate-[fadeIn_.5s_ease-out] md:pl-10">
+          <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">{listing.title}</h1>
+        </header>
+        <article className="mx-auto mt-6 w-full max-w-[1240px] animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] rounded-[36px] border border-white bg-white/60 p-5 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-9">
           {/* header */}
           <header className="flex flex-wrap items-start justify-between gap-6">
             <div>
               <Link href="/matches" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-[#4A5A75] hover:text-[#1E2B44]">
                 <Icon name="arrowL" size={16} /> All matches
               </Link>
-              <h1 className="mt-2 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">{listing.title}</h1>
-              <p className="mt-2 text-[17px] text-[#4A5A75]">{subtitleFor(listing)}</p>
             </div>
             <div className="flex flex-col items-end gap-3">
               <button
@@ -157,26 +180,36 @@ export default function ListingDetail({ listing: loadedListing, context: initial
                     </li>
                   ))}
                 </ul>
-                <p className="mt-5 text-[15px] leading-relaxed">{listing.description}</p>
+                {listing.description && <p className="mt-5 text-[15px] leading-relaxed">{listing.description}</p>}
                 <p className="mt-3 flex items-center gap-2 text-sm text-[#4A5A75]">
                   <Icon name="user" size={15} /> Hosted by {listing.hostName}
                 </p>
               </section>
 
               <div className="mt-auto flex flex-col gap-2">
-                <div className="grid grid-cols-3 gap-2">
+                {listing.isActive === false && (
+                  <p role="status" className="rounded-2xl border border-[#D5DFEA] bg-white/80 px-4 py-3 text-center text-sm font-semibold">
+                    This place is booked, so it&apos;s no longer taking requests.
+                  </p>
+                )}
+                {/* hosts don't book or message their own listing; nobody books a place that's taken */}
+                <div className={`grid gap-2 ${isHost || listing.isActive === false ? 'grid-cols-1' : 'grid-cols-3'}`}>
                   <Link
                     href="/matches"
                     className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white text-[15px] font-semibold transition hover:-translate-y-0.5"
                   >
                     Back
                   </Link>
-                  <Link href={`/matches/${listing.id}/book`} className="flex min-h-12 items-center justify-center rounded-full bg-[#1E2B44] text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
-                    Book
-                  </Link>
-                  <Link href={`/matches/${listing.id}/contact`} className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white text-[15px] font-semibold transition hover:-translate-y-0.5">
-                    Contact
-                  </Link>
+                  {!isHost && listing.isActive !== false && (
+                    <>
+                      <Link href={`/matches/${listing.id}/book`} className="flex min-h-12 items-center justify-center rounded-full bg-[#1E2B44] text-[15px] font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161]">
+                        Book
+                      </Link>
+                      <Link href={`/matches/${listing.id}/contact`} className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white text-[15px] font-semibold transition hover:-translate-y-0.5">
+                        Contact
+                      </Link>
+                    </>
+                  )}
                 </div>
                 {isHost && (
                 <Link

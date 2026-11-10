@@ -63,14 +63,13 @@ export default function ContactHost({ listing: loadedListing, context: initialCo
   const hostMeta = [listing.hostVerified ? 'Verified .edu sub-leaser' : 'Sub-leaser', listing.hostReplyTime].filter(Boolean).join(' · ')
 
   return (
-    <FlowShell listing={listing} context={context} caption={`$${listing.price.toLocaleString()} / month · ${commute}`}>
+    <FlowShell listing={listing} context={context} title={sent ? 'Message sent.' : 'Message the sub-leaser'} caption={`$${listing.price.toLocaleString()} / month · ${commute}`}>
       {sent ? (
         <div className="my-auto animate-[fadeIn_.3s_ease-out] py-6" role="status">
           <span aria-hidden="true" className="flex h-14 w-14 items-center justify-center rounded-full bg-[#1E2B44] text-white">
             <Icon name="check" size={24} />
           </span>
-          <h1 className="mt-5 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Message sent.</h1>
-          <p className="mt-3 text-[17px] text-[#4A5A75]">{host} will reply in Messages. (Demo only for now.)</p>
+          <p className="mt-3 text-[17px] text-[#4A5A75]">{host} will reply in Messages.</p>
           <div className="mt-8 grid grid-cols-2 gap-3">
             <Link href={`/matches/${listing.id}`} className="flex min-h-12 items-center justify-center rounded-full border border-[#D5DFEA] bg-white font-semibold transition hover:-translate-y-0.5">
               Back to listing
@@ -85,10 +84,6 @@ export default function ContactHost({ listing: loadedListing, context: initialCo
         </div>
       ) : (
         <>
-          <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Message the sub-leaser</h1>
-          <p className="mt-2 text-[17px] text-[#4A5A75]">
-            About the {listing.title}{listing.nearWork === false ? ' · far from your office' : ` · ${listing.score} Subtle score`}
-          </p>
 
           <div className="mt-6 flex items-center gap-4 rounded-[24px] border border-white bg-white/80 p-4">
             <span aria-hidden="true" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#C9DBEA] font-[family-name:var(--font-serif)] text-2xl font-medium">

@@ -229,7 +229,7 @@ export default function EditListingPage() {
     return (
       <>
         <AppNavbar firstName={firstName} />
-        <main className="mx-auto flex min-h-[60vh] max-w-2xl items-center justify-center px-4 pt-28">
+        <main className="mx-auto flex min-h-[60vh] max-w-2xl items-center justify-center px-4 pt-32">
           <p className="text-[#4A5A75]">Loading listing details…</p>
         </main>
       </>
@@ -239,19 +239,17 @@ export default function EditListingPage() {
   return (
     <>
       <AppNavbar firstName={firstName} />
-      <main className="mx-auto max-w-2xl px-4 pb-20 pt-28">
-        <header className="mb-6 flex items-center justify-between">
-          <div>
+      <main className="px-4 pb-20 pt-32 md:px-8">
+        {/* title in the same spot as every other page; the form keeps its narrower column */}
+        <header className="mx-auto mb-6 flex w-full max-w-[1240px] flex-wrap items-end justify-between gap-4 md:pl-10">
+          <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">Edit Listing</h1>
+          <div className="flex items-center gap-3">
             <Link
               href="/my-listings"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-[#4A5A75] hover:text-[#1E2B44]"
+              className="inline-flex min-h-10 items-center rounded-full border border-[#D5DFEA] bg-white/80 px-4 text-xs font-semibold text-[#1E2B44] hover:bg-white"
             >
               &larr; Back to listings
             </Link>
-            <h1 className="mt-2 font-[family-name:var(--font-serif)] text-4xl font-medium tracking-tight">
-              Edit Listing
-            </h1>
-          </div>
           <button
             type="button"
             onClick={handleDelete}
@@ -260,7 +258,9 @@ export default function EditListingPage() {
           >
             {deleting ? 'Deleting…' : 'Delete listing'}
           </button>
+          </div>
         </header>
+        <div className="mx-auto max-w-2xl">
 
         {error && (
           <div className="mb-6 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-700">
@@ -433,6 +433,7 @@ export default function EditListingPage() {
             </button>
           </div>
         </form>
+        </div>
       </main>
     </>
   )

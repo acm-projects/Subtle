@@ -27,6 +27,8 @@ export type Listing = {
   address?: string
   city?: string // the listing's own city (listing_table.city); used to place it on the map
   nearWork?: boolean // false when /api/matches left it out for being too far from the user's office
+  commuteKnown?: boolean // false when the user has no office yet, so commuteMinutes is only a placeholder
+  isActive?: boolean // false once the place is booked (or paused): hidden from Matches
   hostId?: string | null // listing_table.user_id: the lister's auth id (only they can edit it; messages go to them)
   startDate?: string | null // 'YYYY-MM-DD' first day available (listing_table.move_in)
   endDate?: string | null // 'YYYY-MM-DD' last day available (listing_table.end_date)
@@ -84,10 +86,10 @@ export function dbListingToMatchListing(db: any): Listing {
     tags: db.company_tags?.length ? db.company_tags : (db.amenities?.slice(0, 2) ?? []),
     availableFrom: formattedStart,
     availableTo: formattedEnd,
-    description: db.about || 'Comfortable sublet, fully furnished and close to transit.',
+    description: (db.about ?? '').trim(),
     amenities: db.amenities || [],
     hostName: 'Student Host', // replaced by withHost() in lib/hosts.ts when the lister has a profile
-    hostVerified: true,
+    hostVerified: false, // set from the host's real email by withHost() in lib/hosts.ts
     hostReplyTime: 'Replies within a few hours',
     subtitle: `${roomType} in ${homeType === 'Apartment' ? 'an' : 'a'} ${homeType.toLowerCase()}`,
     features: [homeType, roomType, ...(db.amenities || [])],
@@ -95,6 +97,7 @@ export function dbListingToMatchListing(db: any): Listing {
     address: db.address || undefined,
     city: db.city || undefined,
     hostId: db.user_id ?? null,
+    isActive: db.is_active !== false,
     startDate,
     endDate: db.end_date ?? null,
     latitude: db.latitude || null,

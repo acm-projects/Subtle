@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import BookListing from '../../../../components/matches/BookListing'
 import PageFrame from '../../../../components/matches/PageFrame'
 import { dbListingToMatchListing } from '../../../../components/matches/listings'
-import { getListing as getDbListing } from '../../../../lib/listings'
+import { getListingById as getDbListing } from '../../../../lib/listings-server'
 import { withHost } from '../../../../lib/hosts'
 type Props = { params: Promise<{ id: string }> }
 

@@ -1,11 +1,12 @@
-import { supabase } from './supabase'
+import { admin } from './supabase-admin'
 import type { Listing } from '../components/matches/listings'
 
 /** Fills in host fields on a match-view listing from the host_profiles view. */
 export async function withHost(listing: Listing, userId?: string | null): Promise<Listing> {
   if (!userId) return listing
 
-  const { data, error } = await supabase
+  // server only: host_profiles is read with the server key
+  const { data, error } = await admin()
     .from('host_profiles')
     .select('user_id, first_name, last_initial, is_edu')
     .eq('user_id', userId)

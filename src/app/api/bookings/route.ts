@@ -140,5 +140,20 @@ export async function PATCH(request: Request) {
   const { data, error } = await auth.client.from('bookings').update({ status }).eq('id', id).select(SELECT).maybeSingle()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: 'Booking not found, or it is not for one of your listings' }, { status: 404 })
-  return NextResponse.json(toBooking(data as unknown as Row, new Map()))
+
+  // Once a host accepts a booking the place is taken: take the listing down so it stops showing in
+  // Matches. If they undo it (and no other booking is accepted), put it back up.
+  const row = data as unknown as Row
+  const { count: acceptedCount } = await auth.client
+    .from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('listing_id', row.listing_id)
+    .eq('status', 'accepted')
+  const { error: listingError } = await auth.client
+    .from('listing_table')
+    .update({ is_active: (acceptedCount ?? 0) === 0 })
+    .eq('id', row.listing_id)
+  if (listingError) console.warn('[bookings] could not update the listing after a booking change:', listingError.message)
+
+  return NextResponse.json(toBooking(row, new Map()))
 }

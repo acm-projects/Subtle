@@ -75,14 +75,16 @@ export default function Matches({
   return (
     <>
       <AppNavbar firstName="" />
-      <section className="px-4 pb-16 pt-28 md:px-8">
-        <div className="mx-auto w-full max-w-[1240px] rounded-[36px] border border-white bg-white/60 p-5 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-9">
-          {/* header */}
+      <section className="px-4 pb-16 pt-32 md:px-8">
+        <div className="mx-auto w-full max-w-[1240px]">
+          <header className="animate-[fadeIn_.5s_ease-out] md:pl-10">
+            <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">Matches</h1>
+          </header>
+        <div className="mt-6 rounded-[36px] border border-white bg-white/60 p-5 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-9">
+          {/* where the matches are for, and links */}
           <div className="flex flex-wrap items-end justify-between gap-6">
             <div className="min-w-0">
-              <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">Matches</h1>
-              <p className="mt-2 text-[17px] text-[#4A5A75]">Highest Subtle score first.</p>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <span title={context.office} className="inline-flex max-w-full items-center gap-2 rounded-full border border-white bg-white/80 px-4 py-2 text-sm font-semibold">
                   <Icon name="pin" size={15} />
                   <span className="truncate">
@@ -269,6 +271,7 @@ export default function Matches({
               )}
             </div>
           )}
+        </div>
         </div>
         <p className="mt-8 text-center text-[13px] text-[#4A5A75]">&copy; 2026 Subtle Technologies, Inc. All rights reserved.</p>
       </section>

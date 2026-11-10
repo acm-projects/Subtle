@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 import { dbListingToMatchListing } from '../../../../components/matches/listings'
 import { getListing as getDbListing, validateListing } from '../../../../lib/listings'
 import { supabase } from '../../../../lib/supabase'
+import { admin } from '../../../../lib/supabase-admin'
+import { getListingById } from '../../../../lib/listings-server'
 
 const TABLE = 'listing_table'
 
@@ -28,12 +30,12 @@ function getSupabaseForRequest(request: Request) {
 export async function GET(_request: Request, { params }: Context) {
   const { id } = await params
   try {
-    const dbListing = await getDbListing(id)
+    const dbListing = await getListingById(id)
     if (dbListing) {
       const matchView: Record<string, any> = dbListingToMatchListing(dbListing)
 
       if (dbListing.user_id) {
-        const { data } = await getSupabaseForRequest(_request)
+        const { data } = await admin()
           .from('host_profiles')
           .select('user_id, first_name, last_initial, is_edu')
           .eq('user_id', dbListing.user_id)
