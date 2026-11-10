@@ -274,7 +274,6 @@ export default function PostListing() {
           <header className="animate-[fadeIn_.5s_ease-out]">
             <div className="md:pl-10">
               <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">Post a Listing</h1>
-              <p className="mt-2 text-[17px] text-[#4A5A75]">Find a subletter who actually fits.</p>
             </div>
 
             {!user && !checkingAuth && (

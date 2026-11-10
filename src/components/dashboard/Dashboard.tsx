@@ -44,7 +44,7 @@ export default function Dashboard() {
       <AppNavbar firstName={d.firstName} />
       <section className="px-4 pb-16 pt-32 md:px-8">
         <div className="mx-auto w-full max-w-[1240px]">
-          <header className="animate-[fadeIn_.5s_ease-out] pl-2 md:pl-10">
+          <header className="animate-[fadeIn_.5s_ease-out] md:pl-10">
             <h1 className={`${serif} text-5xl font-medium tracking-[-0.02em] md:text-6xl`}>
               {name ? `${hello}, ${name}.` : `${hello}.`}
             </h1>

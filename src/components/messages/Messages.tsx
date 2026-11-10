@@ -174,7 +174,7 @@ export default function Messages() {
           <p className="truncate text-sm text-[#4A5A75]">
             {selected.listingId ? (
               <>
-                Sub-leaser ·{' '}
+                {selected.iAmHost ? 'Interested in' : 'Sub-leaser'} ·{' '}
                 <Link href={`/matches/${selected.listingId}`} className="font-semibold text-[#2F4161] underline-offset-2 hover:underline">
                   {selected.listingTitle}
                 </Link>
@@ -185,7 +185,7 @@ export default function Messages() {
           </p>
         </div>
         {selected.listingScore !== undefined && <ScoreBadge score={selected.listingScore} size={40} />}
-        {selected.listingId && (
+        {selected.listingId && !selected.iAmHost && (
            <Link
             href={`/matches/${selected.listingId}/book`}
             className="hidden min-h-11 items-center rounded-full bg-[#1E2B44] px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161] sm:flex"
@@ -288,7 +288,6 @@ export default function Messages() {
           <header className="flex animate-[fadeIn_.5s_ease-out] flex-wrap items-end justify-between gap-4 md:pl-10">
             <div>
               <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">Messages</h1>
-              <p className="mt-2 text-[17px] text-[#4A5A75]">Pick up where you left off with hosts and interns.</p>
             </div>
             {unreadCount > 0 && <span className="mb-2 rounded-full bg-[#1E2B44] px-3 py-1 text-xs font-bold text-white">{unreadCount} new</span>}
           </header>

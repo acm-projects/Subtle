@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { loadConversations } from '../messages/store'
 import { authFetch } from '../../lib/auth-fetch'
 import { useEffect, useState } from 'react'
 import AppNavbar from '../AppNavbar'
@@ -9,7 +10,7 @@ import Icon from '../quiz/icons'
 import { deleteListing, getMyListings, type Listing } from '../../lib/listings'
 
 type Booking = { id: string; guestName: string; guestEmail: string; moveIn: string; moveOut: string; note: string; status: 'pending' | 'accepted' | 'declined'; createdAt: string }
-type Thread = { id: string; listingId: string; messages: { from: 'me' | 'them'; body: string; sentAt: string }[] }
+type Thread = { id: string; listingId: string; hostName?: string; messages: { from: 'me' | 'them'; body: string; sentAt: string }[] }
 type Activity = { views: number; bookings: Booking[]; threads: Thread[] }
 
 const glass = 'rounded-[32px] border border-white bg-white/65 shadow-[0_30px_70px_-40px_rgba(30,43,68,0.38)] backdrop-blur-xl'
@@ -31,7 +32,7 @@ const ago = (iso: string) => {
 
 /*
   Renter (host) view: every place this user posted, with views and who wants to talk.
-  Data: getMyListings (Supabase), /api/listing-views, /api/bookings?listingId= (public.bookings), /api/messages.
+  Data: getMyListings (Supabase), /api/listing-views, /api/bookings?listingId= (public.bookings), /api/conversations.
   TODO(backend): messages need the sender's name/email so hosts can see who wrote.
 */
 async function loadActivity(id: string, threads: Thread[]): Promise<Activity> {
@@ -95,10 +96,11 @@ export default function RenterDashboard() {
       })
       if (res.ok) {
         const updated = (await res.json()) as Booking
-        setActivity((all) => ({
-          ...all,
-          [listingId]: { ...all[listingId], bookings: all[listingId].bookings.map((b) => (b.id === bookingId ? { ...b, status: updated.status } : b)) },
-        }))
+        const bookings = activity[listingId].bookings.map((b) => (b.id === bookingId ? { ...b, status: updated.status } : b))
+        setActivity((all) => ({ ...all, [listingId]: { ...all[listingId], bookings } }))
+        // a booked place comes down from Matches (the server does the same); undoing puts it back up
+        const booked = bookings.some((b) => b.status === 'accepted')
+        setListings((all) => all.map((l) => (l.id === listingId ? { ...l, is_active: !booked } : l)))
       }
     } catch {}
     setBusy(null)
@@ -115,8 +117,8 @@ export default function RenterDashboard() {
       }
       let threads: Thread[] = []
       try {
-        const res = await fetch('/api/messages', { cache: 'no-store' })
-        if (res.ok) threads = ((await res.json()).conversations ?? []) as Thread[]
+        // real conversations (Supabase), so the Messages count matches the Messages page
+        threads = (await loadConversations()) as Thread[]
       } catch {}
       const entries = await Promise.all(mine.map(async (l) => [l.id, await loadActivity(l.id, threads)] as const))
       if (!alive) return
@@ -154,7 +156,6 @@ export default function RenterDashboard() {
           <header className="flex animate-[fadeIn_.5s_ease-out] flex-wrap items-end justify-between gap-6 md:pl-10">
             <div>
               <h1 className={`${serif} text-5xl font-medium tracking-[-0.02em] md:text-6xl`}>Listings</h1>
-              <p className="mt-2 text-[17px] text-[#4A5A75]">See who&apos;s looking at each place and who wants to talk.</p>
             </div>
             <Link href="/post" className={btnLight}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -195,7 +196,14 @@ export default function RenterDashboard() {
               {listings.map((l, idx) => {
                 const act = activity[l.id] ?? { views: 0, bookings: [], threads: [] }
                 const cover = l.image_urls?.[0]
-                const people = act.bookings.length + act.threads.length
+                // someone who asked to book also has a message thread (booking opens one): list them once
+                const short = (n: string) => {
+                  const [first = '', last = ''] = n.trim().toLowerCase().split(/\s+/)
+                  return `${first} ${last.charAt(0)}`
+                }
+                const booked = new Set(act.bookings.map((b) => short(b.guestName || '')))
+                const threadsOnly = act.threads.filter((t) => !booked.has(short(t.hostName ?? '')))
+                const people = act.bookings.length + threadsOnly.length
                 return (
                   <article
                     key={l.id}
@@ -217,12 +225,12 @@ export default function RenterDashboard() {
                         </div>
                         <div className="min-w-0">
                           <span className={`inline-block rounded-full px-3 py-1 text-sm font-bold ${l.is_active ? 'bg-[#E3F1E8] text-[#2E6B45]' : 'bg-[#EEF3F8] text-[#4A5A75]'}`}>
-                            {l.is_active ? 'Live' : 'Paused'}
+                            {l.is_active ? 'Live' : (activity[l.id]?.bookings ?? []).some((b) => b.status === 'accepted') ? 'Booked · hidden from Matches' : 'Paused'}
                           </span>
                           <h2 className={`${serif} mt-2 truncate text-3xl font-medium`}>{l.title || 'Untitled place'}</h2>
                           <p className="mt-1 text-[15px] text-[#4A5A75]">
                             {l.monthly_rent ? `$${l.monthly_rent.toLocaleString()} / month · ` : ''}
-                            {shortDate(l.start_date)} – {shortDate(l.end_date)}
+                            {shortDate(l.move_in)} – {shortDate(l.end_date)}
                           </p>
                           <div className="mt-3 flex flex-wrap gap-2">
                             <Link href={`/matches/${l.id}`} className={btnLight}>
@@ -323,7 +331,7 @@ export default function RenterDashboard() {
                               </div>
                             </li>
                           ))}
-                          {act.threads.map((t) => {
+                          {threadsOnly.map((t) => {
                             const last = t.messages[t.messages.length - 1]
                             return (
                               <li key={t.id}>
@@ -333,7 +341,7 @@ export default function RenterDashboard() {
                                   </span>
                                   <div className="min-w-0 flex-1">
                                     <div className="flex items-baseline justify-between gap-2">
-                                      <p className="truncate font-semibold">Message from an intern</p>
+                                      <p className="truncate font-semibold">{t.hostName || 'An intern'}</p>
                                       {last && <span className="shrink-0 text-sm text-[#4A5A75]">{ago(last.sentAt)}</span>}
                                     </div>
                                     <p className="line-clamp-2 text-sm text-[#4A5A75]">{last?.body}</p>

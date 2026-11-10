@@ -2,6 +2,7 @@
 // Real conversations come from /api/conversations (Supabase). Sample listings and
 // logged-out visitors fall back to demo threads kept in localStorage.
 import { apiFetch } from '../../lib/apiFetch'
+import { supabase } from '../../lib/supabase'
 
 export type Message = {
   id: string
@@ -16,6 +17,7 @@ export type Conversation = {
   listingTitle: string
   listingScore?: number
   hostName: string // the other person in the conversation
+  iAmHost?: boolean // true when the listing is mine, so the other person is the guest
   messages: Message[]
   unread?: boolean
   sample?: boolean // true for the made-up starter conversations
@@ -82,6 +84,8 @@ export async function loadConversations(): Promise<Conversation[]> {
     if (res.ok) {
       const rows: any[] = await res.json()
       const markers = readReadMarkers()
+      const { data: auth } = await supabase.auth.getUser()
+      const myId = auth.user?.id ?? null
 
       const real = await Promise.all(
         rows.map(async (r): Promise<Conversation> => {
@@ -108,6 +112,7 @@ export async function loadConversations(): Promise<Conversation[]> {
             id: r.conversation_id,
             listingId: r.listing_id ?? '',
             listingTitle: listingData?.listing?.title ?? 'Direct message',
+            iAmHost: !!myId && listingData?.listing?.user_id === myId,
             hostName: r.other_user_name,
             messages,
             unread,

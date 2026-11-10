@@ -77,15 +77,19 @@ export function ListingPhoto({ listing, seed, className = 'min-h-[220px]' }: { l
           className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
         />
       )}
-      <span className="absolute left-3 top-3 rounded-full border border-white bg-white/85 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-[#1E2B44] backdrop-blur">
-        {listing.imageUrl ? 'Verified' : 'Sample'}
-      </span>
+      {listing.hostVerified && (
+        <span className="absolute left-3 top-3 rounded-full border border-white bg-white/85 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-[#1E2B44] backdrop-blur">
+          Verified host
+        </span>
+      )}
     </div>
   )
 }
 
 export const commuteText = (l: Listing) =>
-  l.nearWork === false
+  l.commuteKnown === false
+    ? 'Add your office to see the commute'
+    : l.nearWork === false
     ? `Far from your office${l.city ? ` · in ${l.city}` : ''}`
     : l.commuteMode === 'walk'
     ? `${l.commuteMinutes} min walk to the office`

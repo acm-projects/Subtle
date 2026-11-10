@@ -429,10 +429,12 @@ export default function MatchesPage() {
     return (
       <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_92%_100%,rgba(246,214,180,0.85),transparent_42%),linear-gradient(180deg,#c3d8ec_0%,#dde8f3_38%,#f1eeea_72%,#f7e8d8_100%)] text-[#1E2B44]">
         <AppNavbar firstName={firstName} />
-        <div className="mx-auto max-w-[1240px] px-3 pt-28 md:px-4">
-          <div className="rounded-[40px] border border-white bg-white/65 p-6 backdrop-blur-xl md:p-9">
-            <h1 className={`${serif} text-[44px] font-medium leading-[1.02] tracking-[-0.02em] md:text-[56px]`}>Intern Matches</h1>
-            <div className="mt-8 aspect-[16/11] min-h-[400px] animate-pulse rounded-[28px] bg-[#E4EAF1]" />
+        <div className="mx-auto max-w-[1240px] px-4 pt-32 md:px-8">
+          <header className="animate-[fadeIn_.5s_ease-out] md:pl-10">
+            <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">Intern Matches</h1>
+          </header>
+          <div className="mt-6 rounded-[40px] border border-white bg-white/65 p-6 backdrop-blur-xl md:p-9">
+            <div className="aspect-[16/11] min-h-[400px] animate-pulse rounded-[28px] bg-[#E4EAF1]" />
           </div>
         </div>
       </div>
@@ -443,17 +445,15 @@ export default function MatchesPage() {
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_92%_100%,rgba(246,214,180,0.85),transparent_42%),linear-gradient(180deg,#c3d8ec_0%,#dde8f3_38%,#f1eeea_72%,#f7e8d8_100%)] text-[#1E2B44]">
       <AppNavbar firstName={firstName} />
 
-      {/* pt-28 leaves room for the fixed navbar */}
-      <div className="relative mx-auto max-w-[1240px] px-3 pb-10 pt-28 md:px-4">
-        <div className="rounded-[40px] border border-white bg-white/65 p-6 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-9">
-          {/* header: the interests block sits on the right, label directly above its tags */}
+      {/* pt-32 leaves room for the fixed navbar, same as every page */}
+      <div className="relative mx-auto max-w-[1240px] px-4 pb-10 pt-32 md:px-8">
+        <header className="animate-[fadeIn_.5s_ease-out] md:pl-10">
+            <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">Intern Matches</h1>
+          </header>
+        <div className="mt-6 rounded-[40px] border border-white bg-white/65 p-6 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-9">
+          {/* the user's interests, and where the matches are for */}
           <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
-            <div>
-              <h1 className={`${serif} text-[44px] font-medium leading-[1.02] tracking-[-0.02em] md:text-[56px]`}>Intern Matches</h1>
-              <p className="mt-2 text-[15px] text-[#4A5A75]">
-                {city ? `Interns working within ${NEARBY_MILES} miles of you in ${city} with shared interests.` : 'Interns working near you with shared interests.'}
-              </p>
-            </div>
+            <p className="text-[15px] font-semibold text-[#4A5A75]">{city ? `Within ${NEARBY_MILES} miles of ${city}` : 'Near your office'}</p>
 
             <div className="max-w-[460px]">
               <div className={`${label} mb-2`}>Interests</div>

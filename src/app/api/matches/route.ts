@@ -141,8 +141,21 @@ export async function GET(request: Request) {
     if (to && to < addDays(moveIn, 28)) return false
     return true
   }
-  const combined: MatchListing[] = nearbyOnes.filter(fitsDates)
-  const wrongDates = nearbyOnes.length - combined.length
+  // Needs from the quiz ("Pets allowed", "Wheelchair accessible"): only homes that list them
+  const needs: string[] = Array.isArray(userProfile?.user_accommodations) ? userProfile.user_accommodations : []
+  const wantsPets = needs.some((n) => /pet/i.test(n))
+  const wantsAccessible = needs.some((n) => /wheelchair|accessib/i.test(n))
+  const fitsNeeds = (l: MatchListing) => {
+    const has = (re: RegExp) => [...(l.amenities ?? []), ...(l.tags ?? [])].some((a) => re.test(a))
+    if (wantsPets && !has(/pet/i)) return false
+    if (wantsAccessible && !has(/wheelchair|accessib/i)) return false
+    return true
+  }
+
+  const datesOk = nearbyOnes.filter(fitsDates)
+  const wrongDates = nearbyOnes.length - datesOk.length
+  const combined: MatchListing[] = datesOk.filter(fitsNeeds)
+  const missingNeeds = datesOk.length - combined.length
   let filteredOut = rawCombined.length - combined.length
 
   // 2a''. If nothing is nearby, the closest few within 3x the radius (with the right dates), so the page isn't a dead end
@@ -231,6 +244,26 @@ export async function GET(request: Request) {
     }
   })
 
+  // Real host names and the .edu "verified host" check (same as the listing page)
+  const hostIds = Array.from(new Set(scored.map((l) => l.hostId).filter((x): x is string => !!x)))
+  if (hostIds.length) {
+    const { data: hosts } = await admin().from('host_profiles').select('user_id, first_name, last_initial, is_edu').in('user_id', hostIds)
+    const byHost = new Map((hosts ?? []).map((h) => [h.user_id as string, h]))
+    scored = scored.map((l) => {
+      const h = l.hostId ? byHost.get(l.hostId) : undefined
+      return h ? { ...l, hostName: `${h.first_name} ${h.last_initial}.`, hostVerified: !!h.is_edu } : l
+    })
+  }
+
+  // No office yet: there's no commute to show, so don't pretend there is one
+  if (!workplaceCoords) {
+    scored = scored.map((l) => ({
+      ...l,
+      commuteKnown: false,
+      whyScore: (l.whyScore ?? []).filter((w) => !/commute|to work|to the office/i.test(w)),
+    }))
+  }
+
   scored.sort((a, b) => {
     if (sort === 'price') return a.price - b.price
     if (sort === 'commute') return a.commuteMinutes - b.commuteMinutes
@@ -247,6 +280,7 @@ export async function GET(request: Request) {
     nearby: combined.length,
     filteredOut,
     wrongDates, // nearby homes left out because they aren't free around the user's move-in day
+    missingNeeds, // nearby homes left out because they don't allow pets / aren't accessible (from the quiz)
     moveIn: moveIn ? moveIn.toISOString().slice(0, 10) : null,
     nearest: combined.length === 0 ? nearest : [],
     radiusKm: workplaceCoords ? NEARBY_KM : null,

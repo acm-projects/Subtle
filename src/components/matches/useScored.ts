@@ -69,7 +69,8 @@ export async function fetchScoredMatches(): Promise<Listing[] | null> {
  * `listKnown`: we have the user's matches and this listing isn't in them, so it's far from their office.
  */
 export function withScore(listing: Listing, scored: Listing | undefined, listKnown = false): Listing {
-  if (!scored) return listKnown ? { ...listing, nearWork: false } : listing
+  // a booked listing isn't in Matches because it's taken, not because it's far
+  if (!scored) return listKnown && listing.isActive !== false ? { ...listing, nearWork: false } : listing
   return {
     ...listing,
     nearWork: true,
@@ -77,6 +78,7 @@ export function withScore(listing: Listing, scored: Listing | undefined, listKno
     commuteMinutes: scored.commuteMinutes,
     commuteMode: scored.commuteMode,
     commuteSource: scored.commuteSource,
+    commuteKnown: scored.commuteKnown,
     whyScore: scored.whyScore ?? listing.whyScore,
     safety: scored.safety,
   }

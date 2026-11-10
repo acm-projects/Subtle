@@ -485,21 +485,23 @@ try {
   const fullName = `${first} ${last}`.trim() || "Profile";
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#c3d5ee] via-[#e6ebf4] to-[#f6e6d2] px-3 pb-16 pt-32 text-[#1f2a44] md:px-4">
+    <main className="min-h-screen bg-gradient-to-b from-[#c3d5ee] via-[#e6ebf4] to-[#f6e6d2] px-4 pb-16 pt-32 text-[#1f2a44] md:px-8">
       <AppNavbar firstName={first} />
       <div className="mx-auto flex max-w-[1240px] flex-col gap-7">
         <header className="flex animate-[fadeIn_.5s_ease-out] flex-wrap items-end justify-between gap-6 md:pl-10">
           <div>
             <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">{fullName}</h1>
-            <p className="mt-2 text-[17px] text-[#4A5A75]">Manage account settings.</p>
           </div>
+          {/* only .edu accounts are verified students */}
+          {/\.edu$/i.test(savedEmail || email) && (
           <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2.5 text-sm font-semibold text-[#2f6b3f]">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6l8-3z" />
-              <path d="M8.5 12l2.5 2.5 4.5-5" />
-            </svg>
-            Verified student
-          </span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6l8-3z" />
+                <path d="M8.5 12l2.5 2.5 4.5-5" />
+              </svg>
+              Verified student
+            </span>
+          )}
         </header>
 
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">

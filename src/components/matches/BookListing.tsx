@@ -103,11 +103,10 @@ export default function BookListing({ listing: loadedListing, context = EMPTY_CO
   const commute = listing.nearWork === false ? 'far from your office' : `${listing.commuteMinutes} min ${listing.commuteMode === 'walk' ? 'walk' : listing.commuteMode === 'transit' ? 'by transit' : listing.commuteMode === 'bike' ? 'bike' : 'drive'}`
 
   return (
-    <FlowShell listing={listing} context={context} caption={`${listing.roomType} · ${listing.tags[0] ?? listing.homeType} · From ${listing.availableFrom}`}>
+    <FlowShell listing={listing} context={context} title={sent ? 'Request sent.' : `Book the ${listing.title}`} caption={Array.from(new Set([listing.roomType, listing.tags[0] ?? listing.homeType])).join(' · ') + ` · From ${listing.availableFrom}`}>
       {sent ? (
         <div className="my-auto animate-[fadeIn_.3s_ease-out] py-6" role="status">
           <HouseMascot label="Subtle's house mascot waving" className="-ml-2 h-32 w-32" />
-          <h1 className="mt-3 font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Request sent.</h1>
           <p className="mt-3 text-[17px] text-[#4A5A75]">
             {host} usually confirms within a day.
           </p>
@@ -122,10 +121,6 @@ export default function BookListing({ listing: loadedListing, context = EMPTY_CO
         </div>
       ) : (
         <>
-          <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em]">Book the {listing.title}</h1>
-          <p className="mt-2 text-[17px] text-[#4A5A75]">
-            {listing.nearWork === false ? 'Not scored' : `${listing.score} Subtle score`} · ${listing.price.toLocaleString()} / month · {commute}
-          </p>
 
           <ol className="mt-6 space-y-2.5">
             {STEPS.map((s, i) => (
