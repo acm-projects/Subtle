@@ -64,7 +64,34 @@ const COMPANY_PREFIX = 'Interns at '
  * to that company's group. Yes adds them; no closes it and they aren't asked again.
  * (A company invite has invited_by = the person themselves, which the app shows as "Subtle".)
  */
-export async function ensureCompanyInvite(userId: string): Promise<void> {
+// one check per person at a time (Messages and the navbar badge can ask at the same moment)
+const running = new Map<string, Promise<void>>()
+export function ensureCompanyInvite(userId: string): Promise<void> {
+  const busy = running.get(userId)
+  if (busy) return busy
+  const job = companyInvite(userId).finally(() => running.delete(userId))
+  running.set(userId, job)
+  return job
+}
+
+// the company's group: company_key is unique in the database, so two requests can never make two groups
+async function companyGroupId(key: string, companyName: string): Promise<string | null> {
+  const db = admin()
+  const find = async () => (await db.from('conversations').select('id').eq('company_key', key).maybeSingle()).data?.id as string | undefined
+  const existing = await find()
+  if (existing) return existing
+  const { data: made, error } = await db
+    .from('conversations')
+    .insert({ listing_id: null, is_group: true, title: `${COMPANY_PREFIX}${companyName}`.slice(0, 60), created_by: null, company_key: key })
+    .select('id')
+    .single()
+  if (made) return made.id as string
+  // someone else made it a moment ago (unique company_key): use theirs
+  if (error?.code === '23505') return (await find()) ?? null
+  return null
+}
+
+async function companyInvite(userId: string): Promise<void> {
   const db = admin()
   const { data: me } = await db.from('users_table').select('company_name').eq('id', userId).maybeSingle()
   const companyName = String(me?.company_name ?? '').trim()
@@ -75,24 +102,8 @@ export async function ensureCompanyInvite(userId: string): Promise<void> {
   const { data: everyone } = await db.from('users_table').select('id, company_name').neq('id', userId).not('company_name', 'is', null)
   if (!(everyone ?? []).some((u) => normCompany(u.company_name) === key)) return
 
-  // find this company's group (oldest one wins), or make it
-  const { data: groups } = await db
-    .from('conversations')
-    .select('id, title, created_at')
-    .eq('is_group', true)
-    .is('created_by', null)
-    .like('title', `${COMPANY_PREFIX}%`)
-    .order('created_at', { ascending: true })
-  let groupId = (groups ?? []).find((g) => normCompany(String(g.title).slice(COMPANY_PREFIX.length)) === key)?.id as string | undefined
-  if (!groupId) {
-    const { data: made, error } = await db
-      .from('conversations')
-      .insert({ listing_id: null, is_group: true, title: `${COMPANY_PREFIX}${companyName}`.slice(0, 60), created_by: null })
-      .select('id')
-      .single()
-    if (error || !made) return
-    groupId = made.id as string
-  }
+  const groupId = await companyGroupId(key, companyName)
+  if (!groupId) return
 
   // already in it, or already asked (yes or no): nothing to do
   const [{ data: member }, { data: invite }] = await Promise.all([
@@ -101,5 +112,6 @@ export async function ensureCompanyInvite(userId: string): Promise<void> {
   ])
   if (member || invite) return
 
+  // unique (conversation_id, invited_user_id) stops a second copy if two requests get here together
   await db.from('conversation_invites').insert({ conversation_id: groupId, invited_user_id: userId, invited_by: userId, status: 'pending' })
 }

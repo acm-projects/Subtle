@@ -20,3 +20,7 @@ drop policy if exists "read my invites" on public.conversation_invites;
 create policy "read my invites" on public.conversation_invites
   for select to authenticated using (auth.uid() = invited_user_id or auth.uid() = invited_by);
 revoke all on public.conversation_invites from anon;
+
+-- one group chat per company: the app looks the group up by company_key, and the database refuses a second one
+alter table public.conversations add column if not exists company_key text;
+create unique index if not exists conversations_company_key_unique on public.conversations (company_key);
