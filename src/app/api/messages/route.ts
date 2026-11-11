@@ -1,161 +1,122 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../lib/supabase'
+import { createUserClient } from '../../../lib/supabaseServer'
 
-export type MessageItem = {
+export type MessageRow = {
   id: string
-  from: 'me' | 'them'
+  conversation_id: string
+  sender_id: string
   body: string
-  sentAt: string
+  created_at: string
 }
-
-export type ConversationItem = {
-  id: string
-  listingId: string
-  listingTitle: string
-  listingScore?: number
-  hostName: string
-  messages: MessageItem[]
-  unread?: boolean
-  sample?: boolean
-}
-
-const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString()
-
-declare global {
-  // eslint-disable-next-line no-var
-  var __subtleConversations: ConversationItem[] | undefined
-}
-
-function getServerStore(): ConversationItem[] {
-  if (!globalThis.__subtleConversations) {
-    globalThis.__subtleConversations = []
-  }
-  return globalThis.__subtleConversations
-}
-
-const lastAt = (c: ConversationItem) => c.messages[c.messages.length - 1]?.sentAt ?? ''
-const newestFirst = (list: ConversationItem[]) => [...list].sort((a, b) => lastAt(b).localeCompare(lastAt(a)))
 
 /**
- * GET /api/messages
- * Query params:
- *   - conversationId (or c): optional ID to retrieve a single conversation
+ * GET /api/messages?conversationId=<id>&limit=<n>
+ * Returns the messages in one conversation, oldest first.
+ * RLS on `messages` makes sure only participants can read them.
+ * (The conversation list lives in /api/conversations.)
  */
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
+export async function GET(req: Request) {
+  const { client, token } = createUserClient(req)
+
+  const { data: { user } } = await client.auth.getUser(token)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { searchParams } = new URL(req.url)
   const conversationId = searchParams.get('conversationId') ?? searchParams.get('c')
-
-  // Check if a Supabase messages_table exists; if so, merge with in-memory store
-  const store = getServerStore()
-  try {
-    const { data, error } = await supabase.from('messages_table').select('*')
-    if (!error && Array.isArray(data) && data.length > 0) {
-      // Optional future Supabase table sync
-    }
-  } catch {}
-
-  if (conversationId) {
-    const found = store.find((c) => c.id === conversationId)
-    if (!found) {
-      return NextResponse.json({ error: `Conversation "${conversationId}" not found` }, { status: 404 })
-    }
-    return NextResponse.json(found)
-  }
-
-  return NextResponse.json({
-    total: store.length,
-    conversations: newestFirst(store),
-  })
-}
-
-/**
- * POST /api/messages
- * Body can be:
- * 1) Reply to existing conversation:
- *    { conversationId: string, body: string, from?: 'me' | 'them' }
- * 2) Start or append to a conversation for a listing/intern:
- *    { listingId: string, listingTitle?: string, listingScore?: number, hostName: string, body: string }
- */
-export async function POST(request: Request) {
-  let payload: Record<string, any>
-  try {
-    payload = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-  }
-
-  const text = (payload.body ?? payload.message ?? '').toString().trim()
-  if (!text) {
-    return NextResponse.json({ error: 'Message body is required' }, { status: 400 })
-  }
-
-  const store = getServerStore()
-  const msg: MessageItem = {
-    id: uid(),
-    from: payload.from === 'them' ? 'them' : 'me',
-    body: text,
-    sentAt: new Date().toISOString(),
-  }
-
-  // Case 1: Append to existing conversationId
-  if (payload.conversationId) {
-    const existing = store.find((c) => c.id === payload.conversationId)
-    if (!existing) {
-      return NextResponse.json({ error: `Conversation "${payload.conversationId}" not found` }, { status: 404 })
-    }
-    existing.messages.push(msg)
-    return NextResponse.json({ conversation: existing, message: msg }, { status: 201 })
-  }
-
-  // Case 2: Start or append by listingId
-  const listingId = (payload.listingId ?? payload.id ?? 'general').toString()
-  const listingTitle = (payload.listingTitle ?? payload.title ?? 'Sublet listing').toString()
-  const hostName = (payload.hostName ?? 'Host').toString()
-  const listingScore = typeof payload.listingScore === 'number' ? payload.listingScore : payload.score
-
-  let conv = store.find((c) => c.listingId === listingId)
-  if (conv) {
-    conv.messages.push(msg)
-  } else {
-    conv = {
-      id: `c-${listingId}-${uid()}`,
-      listingId,
-      listingTitle,
-      listingScore,
-      hostName,
-      messages: [msg],
-    }
-    store.unshift(conv)
-  }
-
-  return NextResponse.json({ conversationId: conv.id, conversation: conv, message: msg }, { status: 201 })
-}
-
-/**
- * PATCH /api/messages
- * Body: { conversationId: string, unread?: boolean }
- */
-export async function PATCH(request: Request) {
-  let payload: Record<string, any>
-  try {
-    payload = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-  }
-
-  const conversationId = payload.conversationId ?? payload.id
   if (!conversationId) {
     return NextResponse.json({ error: 'conversationId is required' }, { status: 400 })
   }
 
-  const store = getServerStore()
-  const conv = store.find((c) => c.id === conversationId)
-  if (!conv) {
-    return NextResponse.json({ error: `Conversation "${conversationId}" not found` }, { status: 404 })
-  }
+  const limitParam = Number(searchParams.get('limit'))
+  const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 500) : 200
 
-  conv.unread = payload.unread ?? false
-  return NextResponse.json(conv)
+  // Grab the newest `limit` messages, then flip them to oldest-first for display
+  const { data, error } = await client
+    .from('messages')
+    .select('id, conversation_id, sender_id, body, created_at')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  return NextResponse.json((data ?? []).reverse() as MessageRow[])
 }
 
+/**
+ * POST /api/messages
+ * Body: { conversationId: string, body: string }
+ * Inserts the message as the logged-in user and returns the saved row.
+ * Supabase Realtime picks up the INSERT and pushes it to subscribed clients.
+ */
+export async function POST(req: Request) {
+  const { client, token } = createUserClient(req)
+
+  const { data: { user } } = await client.auth.getUser(token)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  let conversationId: unknown
+  let body: unknown
+  try {
+    ({ conversationId, body } = await req.json())
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const text = typeof body === 'string' ? body.trim() : ''
+  if (typeof conversationId !== 'string' || !conversationId || !text) {
+    return NextResponse.json({ error: 'conversationId and body are required' }, { status: 400 })
+  }
+  if (text.length > 5000) {
+    return NextResponse.json({ error: 'Message is too long' }, { status: 400 })
+  }
+
+  // sender_id always comes from the verified session, never from the request body.
+  // The INSERT policy on `messages` checks the sender is a participant.
+  const { data, error } = await client
+    .from('messages')
+    .insert({ conversation_id: conversationId, sender_id: user.id, body: text })
+    .select('id, conversation_id, sender_id, body, created_at')
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  return NextResponse.json(data as MessageRow, { status: 201 })
+}
+
+/**
+ * PATCH /api/messages
+ * Body: { conversationId: string }
+ * Marks the conversation as read for the logged-in user by bumping last_read_at.
+ */
+export async function PATCH(req: Request) {
+  const { client, token } = createUserClient(req)
+
+  const { data: { user } } = await client.auth.getUser(token)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  let conversationId: unknown
+  try {
+    const payload = await req.json()
+    conversationId = payload.conversationId ?? payload.id
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  if (typeof conversationId !== 'string' || !conversationId) {
+    return NextResponse.json({ error: 'conversationId is required' }, { status: 400 })
+  }
+
+  const { data, error } = await client
+    .from('conversation_participants')
+    .update({ last_read_at: new Date().toISOString() })
+    .eq('conversation_id', conversationId)
+    .eq('user_id', user.id)
+    .select('conversation_id, last_read_at')
+    .maybeSingle()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (!data) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+
+  return NextResponse.json(data)
+}

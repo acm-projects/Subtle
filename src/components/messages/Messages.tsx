@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import AppNavbar from '../AppNavbar'
 import { ScoreBadge } from '../matches/parts'
+import { supabase } from '../../lib/supabase'
 import {
   answerInvite,
   createGroup,
@@ -18,6 +19,7 @@ import {
   shortTime,
   type Conversation,
   type GroupInvite,
+  type Message,
   type Person,
 } from './store'
 
@@ -53,6 +55,10 @@ export default function Messages() {
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  // always-current copy of the conversations, so the realtime handler can check it without re-subscribing
+  const convosRef = useRef(conversations)
+  convosRef.current = conversations
+
   // group chats: who I can add, invites waiting for my yes / no, and the "new group" / "add people" form
   const [connections, setConnections] = useState<Person[]>([])
   const [invites, setInvites] = useState<GroupInvite[]>([])
@@ -71,6 +77,57 @@ export default function Messages() {
     })
   }
   useEffect(refresh, [])
+
+  // live updates: new messages land in the open thread (and the list) without a reload.
+  // RLS decides which inserts this user receives.
+  useEffect(() => {
+    let cancelled = false
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
+    ;(async () => {
+      const { data } = await supabase.auth.getUser()
+      const myId = data.user?.id
+      if (!myId || cancelled) return
+
+      channel = supabase
+        .channel('messages-page')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'messages' },
+          (payload) => {
+            const row = payload.new as { id: string; conversation_id: string; sender_id: string; body: string; created_at: string }
+
+            // a conversation this page doesn't have yet (new DM or group): reload the list
+            if (!convosRef.current?.some((c) => c.id === row.conversation_id)) {
+              loadConversations().then(setConversations)
+              return
+            }
+
+            setConversations((list) => {
+              const convo = list?.find((c) => c.id === row.conversation_id)
+              if (!list || !convo || convo.messages.some((m) => m.id === row.id)) return list // already have it
+
+              const mine = row.sender_id === myId
+              const msg: Message = {
+                id: row.id,
+                from: mine ? 'me' : 'them',
+                senderName: mine ? undefined : convo.members?.find((p) => p.id === row.sender_id)?.name ?? 'Former member',
+                body: row.body,
+                sentAt: row.created_at,
+              }
+              const updated = { ...convo, messages: [...convo.messages, msg], unread: mine ? convo.unread : true }
+              return [updated, ...list.filter((c) => c.id !== convo.id)] // bump to top
+            })
+          },
+        )
+        .subscribe((status, err) => console.log('messages channel', status, err))
+    })()
+
+    return () => {
+      cancelled = true
+      if (channel) supabase.removeChannel(channel)
+    }
+  }, [])
 
   const selected = conversations?.find((c) => c.id === selectedId) ?? null
 
@@ -106,7 +163,12 @@ export default function Messages() {
     const msg = await sendMessage(selected.id, body)
     setConversations((list) => {
       if (!list) return list
-      const updated = list.map((c) => (c.id === selected.id ? { ...c, messages: [...c.messages, msg] } : c))
+      // the realtime event can arrive before this POST resolves, so don't add the message twice
+      const updated = list.map((c) =>
+        c.id === selected.id
+          ? { ...c, messages: c.messages.some((m) => m.id === msg.id) ? c.messages : [...c.messages, msg] }
+          : c,
+      )
       // move this conversation to the top, like any messaging app
       return [updated.find((c) => c.id === selected.id)!, ...updated.filter((c) => c.id !== selected.id)]
     })
@@ -316,13 +378,13 @@ export default function Messages() {
           </button>
         )}
         {selected.listingId && !selected.isGroup && !selected.iAmHost && (
-           <Link
+          <Link
             href={`/matches/${selected.listingId}/book`}
             className="hidden min-h-11 items-center rounded-full bg-[#1E2B44] px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#2F4161] sm:flex"
           >
             Book
           </Link>
-          )}
+        )}
       </div>
 
       {/* messages */}
@@ -356,7 +418,7 @@ export default function Messages() {
           )
         })}
         {selected.messages.length === 0 && (
-        <p className="py-10 text-center text-sm text-[#4A5A75]">No messages yet. Say hi to {selected.hostName}.</p>
+          <p className="py-10 text-center text-sm text-[#4A5A75]">No messages yet. Say hi to {selected.hostName}.</p>
         )}
         {groupNote && <p className="py-2 text-center text-xs font-semibold text-[#2F4161]">{groupNote}</p>}
         <div ref={endRef} />

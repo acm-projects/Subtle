@@ -11,7 +11,7 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const viewingProfile = pathname?.startsWith('/profile')
-  const matching = pathname?.startsWith('/internMatches')  
+  const matching = pathname?.startsWith('/internMatches')
   const messaging = pathname?.startsWith('/messages')
   const hosting = pathname?.startsWith('/my-listings')
   const [confirming, setConfirming] = useState(false)
@@ -76,28 +76,74 @@ export default function AppNavbar({ firstName }: { firstName: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [confirming])
 
+  // unread dot: instant via realtime, with a recount in the background to correct the exact number
+  useEffect(() => {
+    let active = true
+    let timer: ReturnType<typeof setTimeout>
+    let seq = 0 // only the newest recount is allowed to set the number
+    let channel: ReturnType<typeof supabase.channel> | null = null
 
-  // unread dot: check on load, every 30s, when the tab regains focus, and when a thread is opened
-useEffect(() => {
-  let active = true
-  const check = async () => {
-    if (document.hidden) return
-    try {
-      const n = await loadUnreadCount()
-      if (active) setUnread(n)
-    } catch {}
-  }
-  check()
-  const timer = window.setInterval(check, 30_000)
-  window.addEventListener('messages-read', check)
-  window.addEventListener('focus', check)
-  return () => {
-    active = false
-    window.clearInterval(timer)
-    window.removeEventListener('messages-read', check)
-    window.removeEventListener('focus', check)
-  }
-}, [pathname])
+    const check = () => {
+      clearTimeout(timer)
+      timer = setTimeout(async () => {
+        if (document.hidden) return
+        const mine = ++seq
+        try {
+          const n = await loadUnreadCount()
+          if (active && mine === seq) setUnread(n) // ignore stale answers
+        } catch {}
+      }, 150)
+    }
+
+    // instant local change; also invalidates any recount already in flight
+    const bump = (fn: (n: number) => number) => {
+      seq++
+      setUnread(fn)
+    }
+
+    check()
+
+    ;(async () => {
+      const { data } = await supabase.auth.getUser()
+      const myId = data.user?.id
+      if (!myId || !active) return
+
+      channel = supabase
+        .channel('navbar-unread')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+          const row = payload.new as { conversation_id: string; sender_id: string }
+          console.log('navbar got message event', new Date().toISOString())
+
+          if (row.sender_id !== myId) {
+            const openId = window.location.pathname.startsWith('/messages')
+              ? new URLSearchParams(window.location.search).get('c')
+              : null
+            if (openId !== row.conversation_id) bump((n) => Math.max(n, 1))
+          }
+          check()
+        })
+        .subscribe((status, err) => console.log('navbar channel', status, err))
+    })()
+
+    // a thread was just opened: drop the badge right away instead of waiting for the recount
+    const onRead = () => {
+      bump((n) => Math.max(0, n - 1))
+      check()
+    }
+
+    const poll = window.setInterval(check, 30_000)
+    window.addEventListener('messages-read', onRead)
+    window.addEventListener('focus', check)
+
+    return () => {
+      active = false
+      clearTimeout(timer)
+      clearInterval(poll)
+      window.removeEventListener('messages-read', onRead)
+      window.removeEventListener('focus', check)
+      if (channel) supabase.removeChannel(channel)
+    }
+  }, [])
 
   const logOut = async () => {
     setLeaving(true)
