@@ -459,16 +459,7 @@ export default function MatchesPage() {
           <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
             <p className="text-[15px] font-semibold text-[#4A5A75]">{city ? `Within ${NEARBY_MILES} miles of ${city}` : 'Near your office'}</p>
 
-            <div className="max-w-[460px]">
-              <div className={`${label} mb-2`}>Interests</div>
-              <ul className="flex flex-wrap gap-1.5" aria-label="Interests">
-                {myInterests.map((i) => (
-                  <li key={i} className="rounded-full bg-[#DCEBF6] px-2.5 py-1 text-[11px] font-semibold text-[#245F90] ring-[1.5px] ring-inset ring-[#2E7DB5]">
-                    {titleCase(i)}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            
           </header>
 
           {status !== 'ready' || interns.length === 0 ? (
