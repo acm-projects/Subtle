@@ -91,16 +91,16 @@ export default function ListingDetail({ listing: loadedListing, context: initial
     <>
       <AppNavbar firstName="" />
       <section className="px-4 pb-16 pt-32 md:px-8">
-        <header className="mx-auto w-full max-w-[1240px] animate-[fadeIn_.5s_ease-out] md:pl-10">
-          <h1 className="font-[family-name:var(--font-serif)] text-5xl font-medium tracking-[-0.02em] md:text-6xl">{listing.title}</h1>
-        </header>
-        <article className="mx-auto mt-6 w-full max-w-[1240px] animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] rounded-[36px] border border-white bg-white/60 p-5 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-9">
+        <article className="mx-auto w-full max-w-[1240px] animate-[popIn_.45s_cubic-bezier(.2,.8,.3,1.05)_both] rounded-[36px] border border-white bg-white/60 p-5 shadow-[0_30px_70px_-36px_rgba(30,43,68,0.35)] backdrop-blur-xl md:p-9">
           {/* header */}
           <header className="flex flex-wrap items-start justify-between gap-6">
             <div>
               <Link href="/matches" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-[#4A5A75] hover:text-[#1E2B44]">
                 <Icon name="arrowL" size={16} /> All matches
               </Link>
+              <h1 className="mt-3 font-[family-name:var(--font-serif)] text-4xl font-medium tracking-[-0.02em] md:text-5xl">
+                {listing.title}
+              </h1>
             </div>
             <div className="flex flex-col items-end gap-3">
               <button

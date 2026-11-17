@@ -59,12 +59,13 @@ const btnDark = 'rounded-full bg-[#1E2B44] text-sm font-semibold text-white tran
 const btnLight = 'rounded-full border border-[#D5DFEA] bg-white text-sm font-semibold text-[#1E2B44] transition hover:bg-[#F7F9FB] disabled:cursor-default disabled:text-[#4A5A75]'
 
 // Score colors: the stronger the match, the darker the blue.
-// Text on each shade passes 4.5:1 contrast (white on the two dark ones, navy on the two light ones).
+// Steps are spaced well apart so the gradient is easy to read, but they stay in one soft blue family.
+// Text on each shade passes 4.5:1 contrast (white on the darkest, navy on the other three).
 const SCORE_SHADES = [
-  { min: 90, bg: '#589cdc', text: '#FFFFFF' },
-  { min: 80, bg: '#81abd4', text: '#FFFFFF' },
-  { min: 70, bg: '#adc9e6', text: '#15203A' },
-  { min: 0, bg: '#C9DBEA', text: '#15203A' },
+  { min: 90, bg: '#4F6F94', text: '#FFFFFF' },
+  { min: 80, bg: '#7C9BBD', text: '#15203A' },
+  { min: 70, bg: '#A9C3DC', text: '#15203A' },
+  { min: 0, bg: '#CBDAE8', text: '#15203A' },
 ]
 const shadeFor = (score: number) => SCORE_SHADES.find((s) => score >= s.min) ?? SCORE_SHADES[SCORE_SHADES.length - 1]
 function scoreColor(score: number) {
@@ -505,7 +506,7 @@ export default function MatchesPage() {
 
           {/* map + side column */}
           <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_320px]">
-            <div className="relative aspect-[16/11] min-h-[400px] overflow-hidden rounded-[28px] border border-white bg-[#F5F8FC] bg-[linear-gradient(#E3ECF5_1px,transparent_1px),linear-gradient(90deg,#E3ECF5_1px,transparent_1px)] bg-[length:48px_48px] shadow-[inset_0_0_0_1px_rgba(213,223,234,0.8)]">
+            <div className="relative aspect-[16/11] min-h-[400px] overflow-hidden rounded-[28px] border border-white bg-[#F5F8FC] lg:aspect-auto bg-[linear-gradient(#E3ECF5_1px,transparent_1px),linear-gradient(90deg,#E3ECF5_1px,transparent_1px)] bg-[length:48px_48px] shadow-[inset_0_0_0_1px_rgba(213,223,234,0.8)]">
               {/* distance zones */}
               <div className="pointer-events-none absolute inset-[14%] rounded-[28px] border border-dashed border-[#BFD0E2]" />
               <div className="pointer-events-none absolute inset-[30%] rounded-[24px] border border-dashed border-[#BFD0E2]" />
@@ -523,7 +524,7 @@ export default function MatchesPage() {
                     strokeLinecap="round"
                     vectorEffect="non-scaling-stroke"
                     strokeWidth={hoverId === m.id ? 3 : 1.2 + ((m.match ?? 0) / 100) * 1.2}
-                    strokeOpacity={hoverId === m.id ? 0.9 : 0.25 + ((m.match ?? 0) / 100) * 0.3}
+                    strokeOpacity={hoverId === m.id ? 0.9 : 0.3 + ((m.match ?? 0) / 100) * 0.4}
                     style={{ transition: 'stroke-opacity .2s, stroke-width .2s' }}
                   />
                 ))}
@@ -602,12 +603,12 @@ export default function MatchesPage() {
                   <h2 className={`${serif} text-2xl font-medium`}>Top Matches</h2>
                   <span className={label}>Score</span>
                 </div>
-                {/* 5 rows (57px each) are visible; scroll for the rest */}
+                {/* about 5 rows are visible; rows grow with their content, scroll for the rest */}
                 <div
                   tabIndex={0}
                   role="region"
                   aria-label="All interns, scrollable"
-                  className="max-h-[285px] overflow-y-auto overscroll-contain rounded-xl pr-1 outline-none focus-visible:ring-2 focus-visible:ring-[#1E2B44]/40"
+                  className="max-h-[285px] overflow-y-auto overscroll-contain rounded-xl pr-1 outline-none [scrollbar-gutter:stable] focus-visible:ring-2 focus-visible:ring-[#1E2B44]/40"
                 >
                   {everyone.map((m) => {
                     const state = stateOf(m.id)
@@ -617,7 +618,7 @@ export default function MatchesPage() {
                         key={m.id}
                         onMouseEnter={() => setHoverId(m.id)}
                         onMouseLeave={() => setHoverId(null)}
-                        className={`flex h-[57px] items-center gap-3 border-t border-[#E3ECF5] px-1 transition-colors ${hoverId === m.id ? 'bg-[#F4F7FB]' : ''}`}
+                        className={`flex min-h-[57px] items-center gap-3 border-t border-[#E3ECF5] px-1 py-2 transition-colors ${hoverId === m.id ? 'bg-[#F4F7FB]' : ''}`}
                       >
                         <span
                           className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white"
@@ -627,12 +628,12 @@ export default function MatchesPage() {
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-semibold">{m.name}</div>
-                          <div className="text-xs text-[#4A5A75]">
+                          <div className="text-xs leading-snug text-[#4A5A75]">
                             {m.sameCompany ? 'Same company · ' : ''}
                             {m.shared.length} shared {m.shared.length === 1 ? 'interest' : 'interests'}
                           </div>
                         </div>
-                        <button type="button" disabled={state !== 'none'} onClick={() => connect(m.id)} className={`px-3 py-1.5 text-xs ${btnLight}`}>
+                        <button type="button" disabled={state !== 'none'} onClick={() => connect(m.id)} className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-xs ${btnLight}`}>
                           {state === 'connected' ? 'Connected' : state === 'sent' ? 'Sent' : 'Connect'}
                         </button>
                       </div>
